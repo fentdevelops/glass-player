@@ -1,0 +1,26 @@
+{
+  "detector": {
+    "ignoreRules": [],
+    "ignoreFiles": [],
+    "ignoreValues": [
+      {
+        "rule": "low-contrast",
+        "value": "*",
+        "files": [
+          "renderer/index.html"
+        ],
+        "createdAt": "2026-11-04T01:43:00.428Z",
+        "reason": "Claude: false positive. index.html is a transparent Windows acrylic window (html/body background transparent, dark tint layer behind the UI), so the detector composites text onto an assumed white page (#dbdbdb) that never renders. Real screen-capture measurements 2026-11-03: search placeholder 7.83:1 idle (5.50:1 hover, 5.23:1 focus computed from the measured panel colour); all other measured text 5.58:1 to 10.8:1. Re-measure with GLASS_SCREEN captures if text colours change."
+      },
+      {
+        "rule": "border-accent-on-rounded",
+        "value": "*",
+        "files": [
+          "renderer/styles.css"
+        ],
+        "createdAt": "2026-11-04T05:59:47.636Z",
+        "reason": "Claude: false positive. The only hit (.ghead, styles.css ~L1169) is border-top: 22px solid transparent with background-clip: padding-box, an invisible spacer that makes room above each album header in the virtual list (fixed row heights), not a visible accent border. Checked with impeccable detect 2026-11-04."
+      }
+    ]
+  }
+}

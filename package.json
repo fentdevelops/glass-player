@@ -1,0 +1,76 @@
+{
+  "name": "glass-player",
+  "version": "0.2.0",
+  "description": "Liquid glass music and video player",
+  "main": "main.js",
+  "scripts": {
+    "start": "electron .",
+    "dist": "electron-builder --win",
+    "dist:portable": "electron-builder --win portable"
+  },
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "devDependencies": {
+    "electron": "github:castlabs/electron-releases#v44.10.1+wvcus",
+    "electron-builder": "^26.18.0"
+  },
+  "allowScripts": {
+    "electron@44.10.1+wvcus": true,
+    "electron-winstaller@5.4.0": true
+  },
+  "dependencies": {
+    "electron-updater": "^6.8.11",
+    "music-metadata": "^12.3.4",
+    "node-id3": "^0.2.9"
+  },
+  "productName": "Glass Player",
+  "build": {
+    "appId": "com.glass.player",
+    "productName": "Glass Player",
+    "files": [
+      "main.js",
+      "spotify-main.js",
+      "preload.js",
+      "renderer/**/*"
+    ],
+    "win": {
+      "target": [
+        "nsis",
+        "portable"
+      ]
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true
+    },
+    "fileAssociations": [
+      {
+        "ext": [
+          "mp3",
+          "m4a",
+          "flac",
+          "wav",
+          "ogg",
+          "opus"
+        ],
+        "name": "Audio",
+        "role": "Viewer"
+      },
+      {
+        "ext": [
+          "mp4",
+          "m4v",
+          "webm",
+          "mkv",
+          "mov"
+        ],
+        "name": "Video",
+        "role": "Viewer"
+      }
+    ],
+    "afterPack": "scripts/vmp-sign.js",
+    "electronDist": "node_modules/electron/dist",
+    "electronVersion": "44.10.1"
+  }
+}

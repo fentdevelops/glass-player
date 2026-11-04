@@ -1,0 +1,324 @@
+'use strict';
+// Spotify Web API for Glass Player (main process).
+// Sign-in: Authorization Code + PKCE in the user's own browser (no client secret, Glass never sees the password).
+// Tokens live only here; the refresh token is stored encrypted with Windows DPAPI (safeStorage).
+// The renderer gets a narrow proxy: whitelisted Web API paths, structured errors.
+const { app, ipcMain, shell, safeStorage } = require('electron');
+const http = require('http');
+const crypto = require('crypto');
+const fs = require('fs');
+const path = require('path');
+
+const PORT = 43821;
+const REDIRECT = `http://127.0.0.1:${PORT}/callback`;
+const SCOPES = [
+  'user-read-private',
+  'user-read-playback-state',
+  'user-modify-playback-state',
+  'user-read-currently-playing',
+  'playlist-read-private',
+  'playlist-read-collaborative',
+  'user-library-read',
+  'user-library-modify',
+  // in-app playback (Web Playback SDK, Premium): Glass itself becomes a Spotify device
+  'streaming',
+  'user-read-email',
+  // Search tab recommendations
+  'user-read-recently-played',
+  'user-top-read',
+];
+const MOCK = !!process.env.GLASS_SPOTIFY_MOCK;   // dev/test only: a fake Spotify so the UI can be tested without an account
+
+const file = () => path.join(app.getPath('userData'), 'spotify.json');
+let cfg = null;              // { clientId, refresh (encrypted), user }
+let access = null, accessExp = 0, refreshing = null, authServer = null;
+
+function load() {
+  if (cfg) return cfg;
+  try { cfg = JSON.parse(fs.readFileSync(file(), 'utf8')); } catch { cfg = {}; }
+  return cfg;
+}
+function persist() {
+  fs.writeFileSync(file() + '.tmp', JSON.stringify(cfg));
+  fs.renameSync(file() + '.tmp', file());
+}
+const seal = (s) => (safeStorage.isEncryptionAvailable() ? 'e:' + safeStorage.encryptString(s).toString('base64') : 'p:' + Buffer.from(s).toString('base64'));
+function unseal(s) {
+  if (!s) return null;
+  try { return s.startsWith('e:') ? safeStorage.decryptString(Buffer.from(s.slice(2), 'base64')) : Buffer.from(s.slice(2), 'base64').toString(); }
+  catch { return null; }
+}
+
+function status() {
+  if (MOCK) return { clientId: 'mock', connected: true, user: { name: 'Mock Listener', product: 'premium' }, redirect: REDIRECT, mock: true };
+  load();
+  // canStream: the sign-in included the 'streaming' scope (older sign-ins need a reconnect for in-app playback)
+  return { clientId: cfg.clientId || '', connected: !!cfg.refresh, user: cfg.user || null, redirect: REDIRECT, canStream: !!(cfg.scope && cfg.scope.split(' ').includes('streaming')) };
+}
+
+class SpotifyError extends Error {
+  constructor(message, status = 0, reason = '') { super(message); this.status = status; this.reason = reason; }
+}
+
+async function tokenRequest(params) {
+  const r = await fetch('https://accounts.spotify.com/api/token', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    body: new URLSearchParams(params),
+    signal: AbortSignal.timeout(15000),
+  });
+  const j = await r.json().catch(() => ({}));
+  if (!r.ok) throw new SpotifyError(j.error_description || j.error || `Spotify sign-in failed (${r.status})`, r.status, j.error || '');
+  return j;
+}
+function keep(j) {
+  access = j.access_token;
+  accessExp = Date.now() + Math.max(60, (j.expires_in || 3600) - 60) * 1000;
+  if (j.scope && cfg.scope !== j.scope) { cfg.scope = j.scope; persist(); }
+  if (j.refresh_token) { cfg.refresh = seal(j.refresh_token); persist(); }   // PKCE refresh tokens rotate: always keep the newest
+}
+async function token() {
+  if (access && Date.now() < accessExp) return access;
+  // one refresh at a time: a second concurrent refresh would spend an already-rotated token and sign the user out
+  refreshing ??= (async () => {
+    load();
+    const rt = unseal(cfg.refresh);
+    if (!rt || !cfg.clientId) throw new SpotifyError('Connect Spotify first', 401, 'NOT_CONNECTED');
+    try { keep(await tokenRequest({ grant_type: 'refresh_token', refresh_token: rt, client_id: cfg.clientId })); }
+    catch (e) {
+      if (e.reason === 'invalid_grant') { cfg.refresh = null; persist(); throw new SpotifyError('Spotify signed you out. Connect again.', 401, 'NOT_CONNECTED'); }
+      throw e;
+    }
+  })().finally(() => { refreshing = null; });
+  await refreshing;
+  return access;
+}
+
+const PATH_OK = /^\/(me|search|playlists|albums|artists|tracks)(\/|\?|$)/;
+const METHODS = new Set(['GET', 'PUT', 'POST', 'DELETE']);
+async function api(method, p, query, body, retry = true) {
+  if (!METHODS.has(method) || !PATH_OK.test(p) || p.includes('..')) throw new SpotifyError('Blocked Spotify request');
+  if (MOCK) return mockApi(method, p, query || {}, body);
+  const url = new URL('https://api.spotify.com/v1' + p);
+  for (const [k, v] of Object.entries(query || {})) if (v !== undefined && v !== null) url.searchParams.set(k, String(v));
+  const r = await fetch(url, {
+    method,
+    headers: { Authorization: 'Bearer ' + (await token()), ...(body ? { 'Content-Type': 'application/json' } : {}) },
+    body: body ? JSON.stringify(body) : undefined,
+    signal: AbortSignal.timeout(15000),
+  });
+  if (r.status === 401 && retry) { access = null; return api(method, p, query, body, false); }
+  if (r.status === 429 && retry) {
+    const s = Math.min(10, Number(r.headers.get('retry-after')) || 1);
+    await new Promise((res) => setTimeout(res, s * 1000));
+    return api(method, p, query, body, false);
+  }
+  const text = r.status === 204 ? '' : await r.text();
+  let j = null;
+  try { j = text ? JSON.parse(text) : null; } catch { /* some player endpoints answer with plain text */ }
+  if (!r.ok) throw new SpotifyError(j?.error?.message || `Spotify error ${r.status}`, r.status, j?.error?.reason || '');
+  return j;
+}
+
+function page(msg) {
+  return `<!doctype html><meta charset="utf-8"><title>Glass Player</title>
+<body style="margin:0;height:100vh;display:grid;place-items:center;background:#2a2a30;color:#fff;font:16px 'Segoe UI',system-ui,sans-serif">
+<div style="padding:28px 36px;border-radius:20px;background:rgba(255,255,255,.1);box-shadow:inset 0 1px 0 rgba(255,255,255,.3)">${msg}</div>`;
+}
+function closeServer() {
+  if (authServer) { try { authServer.close(); } catch { /* already closed */ } authServer = null; }
+}
+async function connect() {
+  if (MOCK) return status();
+  load();
+  if (!cfg.clientId) throw new SpotifyError('Paste your Spotify app Client ID first');
+  const verifier = crypto.randomBytes(48).toString('base64url');
+  const challenge = crypto.createHash('sha256').update(verifier).digest('base64url');
+  const state = crypto.randomBytes(16).toString('hex');
+  closeServer();
+  const code = await new Promise((resolve, reject) => {
+    const timer = setTimeout(() => { closeServer(); reject(new SpotifyError('Spotify sign-in timed out. Try again.')); }, 5 * 60 * 1000);
+    authServer = http.createServer((req, res) => {
+      const u = new URL(req.url, REDIRECT);
+      if (u.pathname !== '/callback') { res.writeHead(404); res.end(); return; }
+      const ok = u.searchParams.get('state') === state && !!u.searchParams.get('code');
+      res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
+      res.end(page(ok ? 'Spotify is connected to Glass Player. You can close this tab.' : 'Spotify sign-in was cancelled. You can close this tab.'));
+      clearTimeout(timer);
+      closeServer();
+      if (ok) resolve(u.searchParams.get('code'));
+      else reject(new SpotifyError(u.searchParams.get('error') === 'access_denied' ? 'Spotify access was not allowed' : 'Spotify sign-in failed'));
+    });
+    authServer.on('error', (e) => {
+      clearTimeout(timer);
+      closeServer();
+      reject(new SpotifyError(e.code === 'EADDRINUSE' ? `Port ${PORT} is busy. Close whatever uses it and try again.` : e.message));
+    });
+    authServer.listen(PORT, '127.0.0.1', () => {
+      const u = new URL('https://accounts.spotify.com/authorize');
+      u.search = new URLSearchParams({
+        client_id: cfg.clientId, response_type: 'code', redirect_uri: REDIRECT,
+        code_challenge_method: 'S256', code_challenge: challenge, state, scope: SCOPES.join(' '),
+      }).toString();
+      shell.openExternal(u.toString());
+    });
+  });
+  keep(await tokenRequest({ grant_type: 'authorization_code', code, redirect_uri: REDIRECT, client_id: cfg.clientId, code_verifier: verifier }));
+  const me = await api('GET', '/me');
+  cfg.user = { name: me.display_name || me.id, id: me.id, product: me.product || '' };
+  persist();
+  return status();
+}
+
+// ---------- fake Spotify for off-screen UI tests (GLASS_SPOTIFY_MOCK=1) ----------
+let mock = null;
+// test pictures: a square cover, or a wide "video frame" with a play mark
+function mockImg(w, h, hue) {
+  const mark = w > h
+    ? `<circle cx="${w / 2}" cy="${h / 2}" r="${h / 6}" fill="rgba(255,255,255,.85)"/><path d="M${w / 2 - h / 18} ${h / 2 - h / 12}L${w / 2 + h / 11} ${h / 2}L${w / 2 - h / 18} ${h / 2 + h / 12}Z" fill="hsl(${hue},45%,32%)"/>`
+    : `<circle cx="${w / 2}" cy="${h / 2}" r="${w / 4}" fill="none" stroke="rgba(255,255,255,.8)" stroke-width="${w / 40}"/>`;
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${w}" height="${h}"><defs><linearGradient id="g" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="hsl(${hue},70%,62%)"/><stop offset="1" stop-color="hsl(${(hue + 60) % 360},60%,28%)"/></linearGradient></defs><rect width="100%" height="100%" fill="url(#g)"/>${mark}</svg>`;
+  return 'data:image/svg+xml;utf8,' + encodeURIComponent(svg);
+}
+function mockState() {
+  if (mock) return mock;
+  const words = ['Glass', 'Neon', 'Velvet', 'Orbit', 'Static', 'Bloom', 'Echo', 'Drift', 'Halo', 'Pulse', 'Ember', 'Tide'];
+  const artists = ['Nova Lane', 'The Weekends', 'Lil Prism', 'Mara Vex', 'Juno Park', 'Vampyre Club'];
+  const artistObj = (k) => ({ id: 'art' + k, uri: 'spotify:artist:art' + k, name: artists[k], images: [], followers: { total: 1000 * (k + 3) } });
+  const albumObj = (k) => ({ id: 'alb' + k, uri: 'spotify:album:alb' + k, name: `${words[(k * 3) % 12]} Sessions`,
+    images: [{ url: mockImg(640, 640, k * 24), width: 640, height: 640 }, { url: mockImg(64, 64, k * 24), width: 64, height: 64 }], release_date: `20${10 + k}-05-01`, artists: [artistObj(k % 6)], total_tracks: 20 });
+  const track = (i) => ({
+    id: 'trk' + i, uri: 'spotify:track:trk' + i, name: `${words[i % 12]} ${words[(i * 5) % 12]}${i % 7 === 0 ? ' (Remix)' : ''}`,
+    duration_ms: 150000 + (i % 9) * 17000, is_playable: true,
+    artists: [artistObj(i % 6), ...(i % 4 === 0 ? [artistObj((i + 2) % 6)] : [])],
+    album: albumObj(i % 15),
+  });
+  const catalog = Array.from({ length: 300 }, (_, i) => track(i));
+  const artistList = artists.map((_, k) => artistObj(k));
+  const albumList = Array.from({ length: 15 }, (_, k) => albumObj(k));
+  const playlists = ['Late night drive', 'Gym', 'Rainy day'].map((name, k) => ({
+    id: 'pl' + k, uri: 'spotify:playlist:pl' + k, name, images: [], owner: { display_name: 'Mock Listener' },
+    tracks: { total: 20 + k * 15 }, items: catalog.slice(k * 30, k * 30 + 20 + k * 15),
+  }));
+  mock = {
+    catalog, playlists, artistList, albumList, liked: new Set(catalog.slice(0, 140).map((t) => t.id)),
+    player: { is_playing: false, item: null, progress_ms: 0, at: Date.now(), shuffle_state: false, repeat_state: 'off', list: [], idx: 0,
+      device: { id: 'dev1', name: 'Mock PC', type: 'Computer', is_active: true, volume_percent: 60, supports_volume: true } },
+  };
+  return mock;
+}
+function mockApi(method, p, q, body) {
+  const m = mockState(), P = m.player;
+  const pos = () => Math.min(P.item ? P.item.duration_ms : 0, P.progress_ms + (P.is_playing ? Date.now() - P.at : 0));
+  const pageOf = (arr, limit, offset, wrap) => {
+    const o = Number(offset) || 0, l = Number(limit) || 20;
+    return { items: arr.slice(o, o + l).map(wrap || ((x) => x)), total: arr.length, next: o + l < arr.length ? 'more' : null };
+  };
+  const start = (list, idx) => { P.list = list; P.idx = Math.max(0, idx); P.item = list[P.idx]; P.audioItem = null; P.progress_ms = 0; P.at = Date.now(); P.is_playing = true; };
+  // tests: the playing song switched to its music video in Spotify (same song with a wide frame as its art,
+  // a separate "video" track, or a wide frame that comes without a size)
+  if (method === 'PUT' && p === '/me/player/mock-video') {
+    if (!P.item) return null;
+    const base = (P.audioItem = P.audioItem || P.item);
+    const wide = [{ url: mockImg(1280, 720, 200), width: 1280, height: 720 }, { url: mockImg(320, 180, 200), width: 320, height: 180 }];
+    if (q.mode === 'same') P.item = { ...base, album: { ...base.album, images: wide } };
+    else if (q.mode === 'twin') P.item = { ...base, id: base.id + 'v', uri: base.uri + 'v', album: { ...base.album, id: base.album.id + 'v', uri: base.album.uri + 'v', images: wide } };
+    else if (q.mode === 'squareframe') P.item = { ...base, album: { ...base.album, images: [{ url: mockImg(640, 640, 120), width: 640, height: 640 }] } };
+    else if (q.mode === 'nodims') P.item = { ...base, id: base.id + 'n', uri: base.uri + 'n', album: { ...base.album, id: base.album.id + 'n', images: [{ url: mockImg(1280, 720, 300), width: null, height: null }] } };
+    else { P.item = base; P.audioItem = null; }
+    return null;
+  }
+  if (method === 'GET' && p === '/me') return { id: 'mock', display_name: 'Mock Listener', product: 'premium' };
+  if (method === 'GET' && p === '/me/tracks') return pageOf(m.catalog.filter((t) => m.liked.has(t.id)), q.limit, q.offset, (t) => ({ added_at: '2026-01-01', track: t }));
+  if (method === 'GET' && p === '/me/tracks/contains') return String(q.ids || '').split(',').map((id) => m.liked.has(id));
+  if ((method === 'PUT' || method === 'DELETE') && p === '/me/tracks') { for (const id of String(q.ids || '').split(',')) method === 'PUT' ? m.liked.add(id) : m.liked.delete(id); return null; }
+  if (method === 'GET' && p === '/me/playlists') return pageOf(m.playlists.map(({ items, ...pl }) => pl), q.limit, q.offset);
+  const plm = /^\/playlists\/([^/]+)\/tracks$/.exec(p);
+  if (method === 'GET' && plm) { const pl = m.playlists.find((x) => x.id === plm[1]); if (!pl) throw new SpotifyError('Not found', 404); return pageOf(pl.items, q.limit, q.offset, (t) => ({ track: t })); }
+  if (method === 'GET' && p === '/search') {
+    if (Number(q.limit) > 10) throw new SpotifyError('Invalid limit', 400);   // like apps whose search page size was capped
+    const s = String(q.q || '').toLowerCase(), types = String(q.type || 'track').split(',');
+    const out = {};
+    if (types.includes('track')) out.tracks = pageOf(m.catalog.filter((t) => `${t.name} ${t.artists.map((a) => a.name).join(' ')}`.toLowerCase().includes(s)), q.limit, q.offset);
+    if (types.includes('artist')) out.artists = pageOf(m.artistList.filter((a) => a.name.toLowerCase().includes(s)), q.limit, 0);
+    if (types.includes('album')) out.albums = pageOf(m.albumList.filter((a) => `${a.name} ${a.artists[0].name}`.toLowerCase().includes(s)), q.limit, 0);
+    if (types.includes('playlist')) out.playlists = pageOf(m.playlists.filter((x) => x.name.toLowerCase().includes(s)).map(({ items, ...pl }) => pl), q.limit, 0);
+    return out;
+  }
+  const alm = /^\/albums\/([^/]+)(\/tracks)?$/.exec(p);
+  if (method === 'GET' && alm) {
+    const al = m.albumList.find((a) => a.id === alm[1]);
+    if (!al) throw new SpotifyError('Not found', 404);
+    const tracks = m.catalog.filter((t) => t.album.id === al.id).map(({ album, ...t }) => t);   // simplified tracks, like Spotify
+    return alm[2] ? pageOf(tracks, q.limit, q.offset) : { ...al, total_tracks: tracks.length, tracks: pageOf(tracks, 50, 0) };
+  }
+  const arm = /^\/artists\/([^/]+)(\/top-tracks|\/albums)?$/.exec(p);
+  if (method === 'GET' && arm) {
+    const ar = m.artistList.find((a) => a.id === arm[1]);
+    if (!ar) throw new SpotifyError('Not found', 404);
+    if (arm[2] === '/top-tracks') return { tracks: m.catalog.filter((t) => t.artists[0].id === ar.id).slice(0, 10) };
+    if (arm[2] === '/albums') return pageOf(m.albumList.filter((a) => a.artists[0].id === ar.id), q.limit, q.offset);
+    return ar;
+  }
+  if (method === 'GET' && p === '/me/player') return P.item ? { ...P, progress_ms: pos(), timestamp: Date.now(), list: undefined, idx: undefined, at: undefined } : null;
+  if (method === 'GET' && p === '/me/player/queue') return { currently_playing: P.item, queue: P.list.slice(P.idx + 1, P.idx + 21) };
+  if (method === 'GET' && p === '/me/player/devices') return { devices: [P.device] };
+  if (method === 'GET' && p === '/me/player/recently-played') return { items: m.catalog.slice(40, 40 + (Number(q.limit) || 20)).map((t) => ({ track: t, played_at: '2026-11-03T12:00:00Z' })) };
+  if (method === 'GET' && p === '/me/top/tracks') return pageOf(m.catalog.slice(10, 60), q.limit, q.offset);
+  if (method === 'PUT' && p === '/me/player/play') {
+    if (body?.uris) { start(body.uris.map((u) => m.catalog.find((t) => t.uri === u)).filter(Boolean), body.offset?.position || 0); P.context = null; }
+    else if (body?.context_uri) {
+      P.context = { type: body.context_uri.split(':')[1], uri: body.context_uri };
+      const pl = m.playlists.find((x) => x.uri === body.context_uri);
+      const list = pl ? pl.items : m.catalog;
+      start(list, list.findIndex((t) => t.uri === body.offset?.uri));
+    } else if (P.item) { P.progress_ms = pos(); P.at = Date.now(); P.is_playing = true; }
+    return null;
+  }
+  if (method === 'PUT' && p === '/me/player/pause') { P.progress_ms = pos(); P.at = Date.now(); P.is_playing = false; return null; }
+  if (method === 'POST' && (p === '/me/player/next' || p === '/me/player/previous')) {
+    if (P.list.length) start(P.list, (P.idx + (p.endsWith('next') ? 1 : -1) + P.list.length) % P.list.length);
+    return null;
+  }
+  if (method === 'PUT' && p === '/me/player/seek') { P.progress_ms = Number(q.position_ms) || 0; P.at = Date.now(); return null; }
+  if (method === 'PUT' && p === '/me/player/volume') { P.device.volume_percent = Number(q.volume_percent); return null; }
+  if (method === 'PUT' && p === '/me/player/shuffle') { P.shuffle_state = q.state === 'true' || q.state === true; return null; }
+  if (method === 'PUT' && p === '/me/player/repeat') { P.repeat_state = q.state; return null; }
+  if (method === 'POST' && p === '/me/player/queue') { const t = m.catalog.find((x) => x.uri === q.uri); if (t) P.list.splice(P.idx + 1, 0, t); return null; }
+  if (method === 'PUT' && p === '/me/player') return null;
+  throw new SpotifyError(`Mock has no ${method} ${p}`, 404);
+}
+
+function register() {
+  // the Web Playback SDK asks for a fresh token whenever it needs one
+  ipcMain.handle('sp:token', async () => (MOCK ? 'mock-token' : token()));
+  ipcMain.handle('sp:status', () => status());
+  ipcMain.handle('sp:setClient', (_e, id) => {
+    id = String(id || '').trim();
+    if (!/^[0-9a-f]{32}$/i.test(id)) throw new SpotifyError('That doesn\'t look like a Spotify Client ID (32 letters and digits).');
+    load();
+    if (cfg.clientId !== id) { cfg = { clientId: id }; access = null; accessExp = 0; persist(); }
+    return status();
+  });
+  ipcMain.handle('sp:connect', () => connect());
+  ipcMain.handle('sp:cancel', () => { closeServer(); return true; });
+  ipcMain.handle('sp:disconnect', () => {
+    load();
+    cfg = { clientId: cfg.clientId || '' };
+    access = null; accessExp = 0;
+    persist();
+    return status();
+  });
+  // errors are returned, not thrown, so status/reason survive the IPC boundary
+  ipcMain.handle('sp:api', async (_e, method, p, query, body) => {
+    try { return { ok: true, data: await api(String(method).toUpperCase(), String(p), query, body) }; }
+    catch (e) { return { ok: false, status: e.status || 0, reason: e.reason || '', message: e.message || 'Spotify request failed' }; }
+  });
+  ipcMain.handle('open-external', (_e, url) => {
+    const u = new URL(String(url));
+    if (u.protocol !== 'https:' || !['open.spotify.com', 'developer.spotify.com', 'genius.com', 'en.wikipedia.org'].includes(u.hostname)) throw new Error('Blocked link');
+    return shell.openExternal(u.toString());
+  });
+}
+
+module.exports = { register };
