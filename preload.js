@@ -40,6 +40,13 @@ contextBridge.exposeInMainWorld('glass', {
     transparency: () => ipcRenderer.invoke('sys:transparency'),
     openColors: () => ipcRenderer.invoke('sys:open-colors'),
   },
+  evs: {
+    status: () => ipcRenderer.invoke('evs:status'),
+    prepare: () => ipcRenderer.invoke('evs:prepare'),
+    account: (d) => ipcRenderer.invoke('evs:account', d),
+    sign: () => ipcRenderer.invoke('evs:sign'),
+    relaunch: () => ipcRenderer.invoke('evs:relaunch'),
+  },
   spotify: {
     status: () => ipcRenderer.invoke('sp:status'),
     setClient: (id) => ipcRenderer.invoke('sp:setClient', id),

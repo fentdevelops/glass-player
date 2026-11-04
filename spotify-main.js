@@ -49,9 +49,12 @@ function unseal(s) {
   catch { return null; }
 }
 
-// Spotify only plays inside apps with a production Widevine (VMP) signature. A signed build carries
-// resources/vmp-signed (scripts/vmp-sign.js). Dev runs: GLASS_VMP=1 once node_modules/electron/dist is signed.
-const vmpSigned = () => (app.isPackaged ? fs.existsSync(path.join(process.resourcesPath, 'vmp-signed')) : process.env.GLASS_VMP === '1');
+// Spotify only plays inside apps with a production Widevine (VMP) signature. A signed app carries
+// resources/vmp-signed next to its exe: written by the build (scripts/vmp-sign.js) or by Glass's own setup
+// (Settings > Spotify > Set up), which signs the installed copy in place.
+const appDir = () => path.dirname(process.execPath);
+const vmpMarker = () => path.join(appDir(), 'resources', 'vmp-signed');
+const vmpSigned = () => fs.existsSync(vmpMarker()) || process.env.GLASS_VMP === '1';
 function status() {
   if (MOCK) return { clientId: 'mock', connected: true, user: { name: 'Mock Listener', product: 'premium' }, redirect: REDIRECT, mock: true, vmp: process.env.GLASS_VMP === '1', canStream: true };
   load();
@@ -292,6 +295,79 @@ function mockApi(method, p, q, body) {
   throw new SpotifyError(`Mock has no ${method} ${p}`, 404);
 }
 
+// ---------- one-time setup so Spotify plays inside Glass (renderer/spsetup.js) ----------
+// Glass drives castlabs' own free tool (the castlabs-evs Python package): it installs it when missing,
+// creates or logs into the castlabs account with what was typed in Glass, then signs this install.
+// Passwords travel to Python over stdin, never on a command line, and Glass doesn't keep them.
+const { spawn } = require('child_process');
+const os = require('os');
+const EVS_FAKE = !!(process.env.GLASS_SHOT && process.env.GLASS_EVS_FAKE);   // tests: pretend, never touch castlabs
+const fake = { python: true, evs: true, account: null, signed: false, pending: null };
+let pyCmd = null;
+function run(cmd, args, input, ms = 180000) {
+  return new Promise((resolve) => {
+    let out = '', err = '', p;
+    try { p = spawn(cmd, args, { windowsHide: true, env: { ...process.env, EVS_NO_ASK: '1', PYTHONIOENCODING: 'utf-8' } }); }
+    catch (e) { resolve({ code: -1, out, err: e.message }); return; }
+    const t = setTimeout(() => { try { p.kill(); } catch { /* gone */ } }, ms);
+    p.stdout.on('data', (d) => { out += d; });
+    p.stderr.on('data', (d) => { err += d; });
+    p.on('error', (e) => { clearTimeout(t); resolve({ code: -1, out, err: e.message }); });
+    p.on('close', (code) => { clearTimeout(t); resolve({ code, out, err }); });
+    p.stdin.on('error', () => {});
+    p.stdin.end(input == null ? '' : input);
+  });
+}
+async function python() {
+  if (pyCmd) return pyCmd;
+  for (const c of ['py', 'python']) {
+    const r = await run(c, ['-c', 'import sys; print(sys.version_info[0])'], null, 20000);
+    if (r.code === 0 && /^3/.test(r.out.trim())) return (pyCmd = c);
+  }
+  return null;
+}
+function evsAccount() {
+  try {
+    const f = process.env.EVS_CONFIG_FILE || path.join(os.homedir(), '.config', 'evs', 'config.json');
+    const a = JSON.parse(fs.readFileSync(f, 'utf8')).Auth || {};
+    return a.AccountName && a.RefreshToken ? a.AccountName : null;
+  } catch { return null; }
+}
+async function evsStatus() {
+  const portable = !!process.env.PORTABLE_EXECUTABLE_DIR;
+  if (EVS_FAKE) return { portable, signed: fake.signed, python: fake.python, evs: fake.evs, account: fake.account };
+  const py = await python();
+  const evs = py ? (await run(py, ['-c', 'import castlabs_evs'], null, 20000)).code === 0 : false;
+  return { portable, signed: vmpSigned(), python: !!py, evs, account: evsAccount() };
+}
+const lastLine = (s) => String(s || '').trim().split(/\r?\n/).filter(Boolean).pop() || '';
+const EVS_WRAPPER = String.raw`import json, sys, io, contextlib
+d = json.loads(sys.stdin.read())
+buf = io.StringIO()
+try:
+    from castlabs_evs.account import Account
+    with contextlib.redirect_stdout(buf):
+        a = Account(no_ask=True)
+        act = d.get('action')
+        if act == 'signup':
+            a.signup(d['account'], d['password'], d['email'], d['first'], d['last'], d.get('org') or 'Personal', no_confirm=True)
+        elif act == 'confirm':
+            a.confirm_signup(d['account'], d['password'], d['code'])
+        elif act == 'resend':
+            a.resend(d['account'], no_confirm=True)
+        elif act == 'login':
+            a.reauth(d['account'], d['password'])
+        else:
+            raise ValueError('unknown action')
+    print(json.dumps({'ok': True}))
+except Exception as e:
+    msg, c = str(e), e.__cause__
+    while c is not None:
+        msg += ': ' + str(c)
+        c = c.__cause__
+    print(json.dumps({'ok': False, 'error': msg[:400]}))
+`;
+
 function register() {
   // the Web Playback SDK asks for a fresh token whenever it needs one
   ipcMain.handle('sp:token', async () => (MOCK ? 'mock-token' : token()));
@@ -317,6 +393,51 @@ function register() {
     try { return { ok: true, data: await api(String(method).toUpperCase(), String(p), query, body) }; }
     catch (e) { return { ok: false, status: e.status || 0, reason: e.reason || '', message: e.message || 'Spotify request failed' }; }
   });
+  // ----- setup steps -----
+  ipcMain.handle('evs:status', () => evsStatus());
+  // castlabs' tool ready: Python (installed for this user with winget if missing), then castlabs-evs
+  ipcMain.handle('evs:prepare', async () => {
+    if (EVS_FAKE) { fake.python = fake.evs = true; return { ok: true }; }
+    if (!(await python())) {
+      const w = await run('winget', ['install', '-e', '--id', 'Python.Python.3.12', '--scope', 'user', '--silent', '--accept-package-agreements', '--accept-source-agreements', '--disable-interactivity'], null, 600000);
+      pyCmd = null;
+      if (!(await python())) return { ok: false, error: 'Couldn\u2019t install Python automatically. Install it from python.org, then open this again.' + (w.code ? ` (winget ${w.code})` : '') };
+    }
+    const r = await run(pyCmd, ['-m', 'pip', 'install', '--user', '--upgrade', '--disable-pip-version-check', 'castlabs-evs'], null, 600000);
+    if (r.code !== 0) return { ok: false, error: 'Couldn\u2019t install castlabs\u2019 tool: ' + lastLine(r.err || r.out).slice(0, 200) };
+    return { ok: true };
+  });
+  // castlabs account: signup (sends a code by email), confirm, resend, login
+  ipcMain.handle('evs:account', async (_e, d) => {
+    d = d && typeof d === 'object' ? d : {};
+    const action = String(d.action || '');
+    if (!['signup', 'confirm', 'resend', 'login'].includes(action)) return { ok: false, error: 'Unknown step' };
+    if (EVS_FAKE) {
+      if (action === 'signup') { fake.pending = d.account; return { ok: true }; }
+      if (action === 'resend') return { ok: true };
+      if (action === 'confirm') { if (d.code !== '123456') return { ok: false, error: 'Invalid verification code provided, please try again.' }; fake.account = fake.pending; return { ok: true }; }
+      if (action === 'login') { if (d.password !== 'right-password') return { ok: false, error: 'Incorrect username or password.' }; fake.account = d.account; return { ok: true }; }
+    }
+    const py = await python();
+    if (!py) return { ok: false, error: 'Python isn\u2019t installed yet' };
+    const payload = JSON.stringify({ action, account: String(d.account || ''), password: String(d.password || ''), email: String(d.email || ''), first: String(d.first || ''), last: String(d.last || ''), code: String(d.code || '') });
+    const r = await run(py, ['-c', EVS_WRAPPER], payload, 120000);
+    try { return JSON.parse(lastLine(r.out)); }
+    catch { return { ok: false, error: lastLine(r.err || r.out).slice(0, 300) || 'castlabs didn\u2019t answer' }; }
+  });
+  // sign this install in place (the exe's .sig), then leave the marker Glass checks at start
+  ipcMain.handle('evs:sign', async () => {
+    if (EVS_FAKE) { fake.signed = true; return { ok: true }; }
+    if (process.env.PORTABLE_EXECUTABLE_DIR) return { ok: false, error: 'Open the installed Glass (Start menu) to sign it' };
+    const py = await python();
+    if (!py) return { ok: false, error: 'Python isn\u2019t installed yet' };
+    const r = await run(py, ['-m', 'castlabs_evs.vmp', '-n', 'sign-pkg', appDir()], null, 300000);
+    if (r.code !== 0) return { ok: false, error: 'Signing failed: ' + lastLine(r.err || r.out).slice(0, 220) };
+    try { fs.writeFileSync(vmpMarker(), new Date().toISOString()); } catch (e) { return { ok: false, error: 'Signed, but couldn\u2019t mark it: ' + e.message }; }
+    return { ok: true };
+  });
+  ipcMain.handle('evs:relaunch', () => { if (EVS_FAKE) return; app.relaunch(); app.exit(0); });
+
   // what Glass asked Spotify to do and what came back (no tokens), so a skip or stop can be traced;
   // userData/spotify-log.txt, kept under ~300 KB
   ipcMain.on('sp:log', (_e, line) => {

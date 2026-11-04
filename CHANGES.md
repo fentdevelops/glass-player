@@ -192,10 +192,14 @@ how to use it, where it lives in the code, and what's still waiting on you.
 - **Settings → Spotify** shows exactly what's missing for playing inside Glass: a Reconnect button for the playback permission, and the one-time castlabs sign-up command, with a Copy button.
 - **A small local log**, `spotify-log.txt` in Glass's data folder, records what Glass asked Spotify to do and what changed (song, play/pause, device). It holds no passwords or tokens, and helps trace any skip that's left.
 
-### Playing Spotify without the Spotify app: what it needs
-1. **Spotify Premium** (you have it).
-2. **Reconnect once:** Settings → Spotify → Reconnect, so Spotify allows playback inside Glass.
-3. **A signed build:** Spotify only plays inside apps that carry a Widevine signature from castlabs. Make a free castlabs account once with `py -m castlabs_evs.account signup`. After that every build signs itself, and Glass shows up as a Spotify device that plays on its own.
+### Playing Spotify without the Spotify app: Glass sets itself up
+- **A setup window**, "Play Spotify inside Glass", opens by itself the first time Spotify mode is used without in-app playback (once per launch). It's also in Settings → Spotify → **Set up**. Three steps:
+  1. **Spotify permission:** opens Spotify's page in your browser; click Agree.
+  2. **castlabs account:** Glass gets castlabs' free signing tool ready, installing Python and `castlabs-evs` if they're missing. It then creates the account from the form (or logs in with "I have one"); castlabs emails a code, which you type into Glass.
+  3. **Sign and restart:** Glass signs its own installed copy (Widevine/VMP, which Spotify requires), marks it signed and restarts. Spotify then plays inside Glass with no Spotify app.
+- **Passwords** go to castlabs' tool privately (over stdin, never on a command line), and Glass doesn't store them.
+- **Future builds** are signed automatically once the account exists (`scripts/vmp-sign.js`).
+- **Needs** Spotify Premium (you have it) and the installed Glass, not the portable exe.
 
 ### Background picture and blur
 - **Settings → Glass → Background:** Artwork, Colours, or **Your image**. Your image keeps your picture behind the glass whatever plays. It's stored at full size (up to 3840 px) and works best landscape 16:9 at high resolution, like 3840 × 2160 or 1920 × 1080. The row under it shows your picture's size and says if a sharper or 16:9 one would look better.

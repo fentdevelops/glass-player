@@ -881,12 +881,18 @@
       else navTo('queue', () => { nav.queue = []; });
     }
   };
+  let setupOffered = false;
   Spot.activate = async () => {
     $('#search').placeholder = 'Search Spotify';
     await statusP;
     render(true);
     if (status.connected) soon(50);
     refresh();
+    // playing inside Glass isn't set up yet: open the setup by itself, once per launch
+    if (status.connected && !setupOffered && window.SpSetup) {
+      setupOffered = true;
+      setTimeout(async () => { if (S.source === 'spotify' && !modalClose && await SpSetup.needed()) SpSetup.open(); }, 1200);
+    }
   };
   Spot.deactivate = () => {
     $('#search').placeholder = 'Search songs, artists, albums';

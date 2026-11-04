@@ -1401,3 +1401,29 @@ body.fs .vfs-btn .i-out { opacity: 1; transform: none; }
 body.fs .vfs-btn { left: auto; top: auto; right: 26px; bottom: 26px; }
 body.fs.idle .vfs-btn { opacity: 0; pointer-events: none; }
 body.sp-unlinked .vfs-btn { display: none !important; }
+
+/* ---------- "Play Spotify inside Glass" setup (spsetup.js) ---------- */
+.modal.sps { width: min(500px, calc(100vw - 48px)); }
+.sps-steps { display: flex; flex-direction: column; gap: 6px; margin: 14px 0 12px; }
+.sps-step { display: flex; align-items: center; gap: 12px; padding: 9px 10px; border-radius: 13px; opacity: .6;
+  transition: opacity .5s var(--glide), background-color .5s var(--glide); }
+.sps-step.active { opacity: 1; background-color: var(--fill-1); box-shadow: inset 0 0 0 1px rgba(255, 255, 255, .12); }
+.sps-step.done { opacity: .9; }
+.sps-step i { flex: none; width: 28px; height: 28px; border-radius: 50%; display: grid; place-items: center; font: 700 13px/1 "Segoe UI", sans-serif; font-style: normal;
+  background: rgba(255, 255, 255, .1); box-shadow: inset 0 0 0 1px rgba(255, 255, 255, .25); transition: background-color .5s var(--glide); }
+.sps-step.active i { background: #fff; color: #16161b; }
+.sps-step.done i { background: rgba(120, 220, 160, .25); box-shadow: inset 0 0 0 1px rgba(150, 240, 180, .6); }
+.sps-step i svg { width: 15px; height: 15px; fill: none; stroke: #d8ffe6; stroke-width: 2.4; stroke-linecap: round; stroke-linejoin: round; }
+.sps-step b { display: block; font-size: 13.5px; font-weight: 650; }
+.sps-step span { display: block; font-size: 12px; color: var(--ink-2); }
+.sps-panel { padding: 4px 2px 0; }
+.sps-text { margin: 0 0 12px; font-size: 13px; line-height: 1.5; color: var(--ink-2); }
+.sps-text b { color: #fff; }
+.sps-mode { margin-bottom: 12px; }
+.sps-form { display: flex; flex-direction: column; gap: 10px; }
+.sps-two { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.sps-bar { height: 4px; border-radius: 4px; background: rgba(255, 255, 255, .14); overflow: hidden; }
+/* working: the bar breathes in place (grows and eases back) while a step runs */
+.sps-bar i { display: block; width: 100%; height: 100%; border-radius: 4px; background: #fff; transform-origin: left center; animation: sps-breathe 1.4s var(--glide) infinite alternate; }
+@keyframes sps-breathe { from { transform: scaleX(.12); opacity: .55; } to { transform: scaleX(.92); opacity: 1; } }
+.sps-foot { margin-top: 10px; }
