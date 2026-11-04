@@ -49,11 +49,14 @@ function unseal(s) {
   catch { return null; }
 }
 
+// Spotify only plays inside apps with a production Widevine (VMP) signature. A signed build carries
+// resources/vmp-signed (scripts/vmp-sign.js). Dev runs: GLASS_VMP=1 once node_modules/electron/dist is signed.
+const vmpSigned = () => (app.isPackaged ? fs.existsSync(path.join(process.resourcesPath, 'vmp-signed')) : process.env.GLASS_VMP === '1');
 function status() {
-  if (MOCK) return { clientId: 'mock', connected: true, user: { name: 'Mock Listener', product: 'premium' }, redirect: REDIRECT, mock: true };
+  if (MOCK) return { clientId: 'mock', connected: true, user: { name: 'Mock Listener', product: 'premium' }, redirect: REDIRECT, mock: true, vmp: process.env.GLASS_VMP === '1', canStream: true };
   load();
   // canStream: the sign-in included the 'streaming' scope (older sign-ins need a reconnect for in-app playback)
-  return { clientId: cfg.clientId || '', connected: !!cfg.refresh, user: cfg.user || null, redirect: REDIRECT, canStream: !!(cfg.scope && cfg.scope.split(' ').includes('streaming')) };
+  return { clientId: cfg.clientId || '', connected: !!cfg.refresh, user: cfg.user || null, redirect: REDIRECT, canStream: !!(cfg.scope && cfg.scope.split(' ').includes('streaming')), vmp: vmpSigned() };
 }
 
 class SpotifyError extends Error {
@@ -313,6 +316,15 @@ function register() {
   ipcMain.handle('sp:api', async (_e, method, p, query, body) => {
     try { return { ok: true, data: await api(String(method).toUpperCase(), String(p), query, body) }; }
     catch (e) { return { ok: false, status: e.status || 0, reason: e.reason || '', message: e.message || 'Spotify request failed' }; }
+  });
+  // what Glass asked Spotify to do and what came back (no tokens), so a skip or stop can be traced;
+  // userData/spotify-log.txt, kept under ~300 KB
+  ipcMain.on('sp:log', (_e, line) => {
+    try {
+      const f = path.join(app.getPath('userData'), 'spotify-log.txt');
+      if (fs.existsSync(f) && fs.statSync(f).size > 300000) fs.renameSync(f, f + '.old');
+      fs.appendFileSync(f, new Date().toISOString() + ' ' + String(line).slice(0, 400).replace(/[\r\n]+/g, ' ') + '\n');
+    } catch { /* logging never breaks playback */ }
   });
   ipcMain.handle('open-external', (_e, url) => {
     const u = new URL(String(url));

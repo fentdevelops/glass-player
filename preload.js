@@ -48,6 +48,7 @@ contextBridge.exposeInMainWorld('glass', {
     disconnect: () => ipcRenderer.invoke('sp:disconnect'),
     api: (method, path, query, body) => ipcRenderer.invoke('sp:api', method, path, query, body),
     token: () => ipcRenderer.invoke('sp:token'),
+    log: (line) => ipcRenderer.send('sp:log', line),
   },
   onOpenPaths: (cb) => ipcRenderer.on('open-paths', (_e, tracks) => cb(tracks)),
   onMaximized: (cb) => ipcRenderer.on('maximized', (_e, v) => cb(v)),

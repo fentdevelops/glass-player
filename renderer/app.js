@@ -36,7 +36,7 @@ const S = {
   libOpen: null,            // { by, key } open group page in Library
   playlists: [],
   favs: new Set(),
-  collapsed: new Set(),     // "by:key" of collapsed groups
+  expanded: new Set(),      // "by:key" of groups opened by hand: albums (and other groups) start closed
   filter: '',               // search text
   filters: { type: 'all', formats: [], fav: false, missing: false, nocover: false },   // Library filter menu
   lib: { group: 'album', sort: 'title', layout: 'list' },
@@ -597,8 +597,30 @@ async function goFrom() {
     S.browse = !!f.browse;
     S.filter = f.filter || '';
     $('#search').value = f.filter || '';
+    // a list grouped by album / artist / folder: open the group the song is in (groups start closed)
+    const by = S.libOpen ? null : S.lib.group;
+    if (S.view === 'library' && by && by !== 'none') S.expanded.add(`${by}:${groupOf(current(), by).key}`);
   });
-  scrollToCurrent();
+  revealCurrent();
+}
+// the playing song in the list: glide it to the middle and give it a soft glow so it's easy to spot
+function revealCurrent() {
+  const t = current();
+  if (!t) return;
+  const i = items.findIndex((it) => it.kind === 'row' && (it.ctx === 'queue' ? it.i === S.cur : it.track === t));
+  if (i < 0) return;
+  const H = view.clientHeight, top = Math.max(0, offs[i] - H / 2 + items[i].h / 2);
+  view.scrollTo({ top, behavior: reduceMotion ? 'auto' : 'smooth' });
+  const it = items[i];
+  const glow = (tries) => {
+    const n = [...vspace.querySelectorAll('.vi.row')].find((x) => items[x._vi] === it);
+    if (!n) { if (tries) setTimeout(() => glow(tries - 1), 250); return; }
+    n.classList.remove('found');
+    void n.offsetWidth;                  // restart the glow if it's already running
+    n.classList.add('found');
+    setTimeout(() => n.classList.remove('found'), 2800);
+  };
+  setTimeout(() => glow(4), 380);
 }
 function playCollection(tracks, start, shuffle = false, from = navHere()) {
   if (!tracks.length) return;
@@ -1011,7 +1033,7 @@ function buildItemsInner() {
   }
   for (const g of groups) {
     items.push(headItem(g));
-    if (!S.collapsed.has(`${g.by}:${g.key}`) || S.filter) g.tracks.forEach((t, i) => items.push(rowItem(t, 'lib', i, i + 1, g.tracks, true)));
+    if (S.expanded.has(`${g.by}:${g.key}`) || S.filter) g.tracks.forEach((t, i) => items.push(rowItem(t, 'lib', i, i + 1, g.tracks, true)));
   }
   return items;
 }
@@ -1055,7 +1077,7 @@ function applyState(node, it) {
     const t = it.track;
     node.classList.toggle('current', it.ctx === 'queue' ? it.i === S.cur : t === current());
     node.querySelector('.heart')?.classList.toggle('on', S.favs.has(t.path));
-  } else if (it.kind === 'head') node.classList.toggle('collapsed', S.collapsed.has(it.ckey) && !S.filter);
+  } else if (it.kind === 'head') node.classList.toggle('collapsed', !S.expanded.has(it.ckey) && !S.filter);
   else if (it.kind === 'tiles') {
     const cur = current();
     it.cards.forEach((c, j) => node.children[j]?.classList.toggle('current', !!c.track && c.track === cur));
@@ -1140,6 +1162,11 @@ function scrollToCurrent() {
 
 // sticky group label
 const sticky = $('#vsticky');
+sticky.title = 'Back to the top of this album';
+sticky.addEventListener('click', () => {
+  if (stickyFor < 0 || offs[stickyFor] == null) return;
+  view.scrollTo({ top: Math.max(0, offs[stickyFor]), behavior: reduceMotion ? 'auto' : 'smooth' });
+});
 let stickyFor = -1;
 function paintSticky(top) {
   if (!heads.length || S.lib.layout === 'grid') { sticky.classList.remove('on'); stickyFor = -1; return; }
@@ -1273,7 +1300,7 @@ let toggling = false;
 async function toggleGroup(it, node) {
   if (toggling) return;
   toggling = true;
-  const k = it.ckey, g = it.group, closing = !S.collapsed.has(k);
+  const k = it.ckey, g = it.group, closing = S.expanded.has(k);
   const inGroup = (n) => { const x = items[n._vi]; return x && x.kind === 'row' && g.tracks.includes(x.track); };
   try {
     if (closing && !reduceMotion) {
@@ -1285,7 +1312,7 @@ async function toggleGroup(it, node) {
     }
     const before = new Map();
     for (const [key, n] of mounted) before.set(key, n._top);
-    S.collapsed.has(k) ? S.collapsed.delete(k) : S.collapsed.add(k);
+    S.expanded.has(k) ? S.expanded.delete(k) : S.expanded.add(k);
     stateV++;
     rebuild(false);
     save();
@@ -1475,7 +1502,7 @@ function albumEditModal(g) {
       if (changedArt) { if (art) S.albumArt[g.key] = art; else delete S.albumArt[g.key]; }
       if (newKey !== g.key || g.merged) {
         if (S.albumArt[g.key]) { S.albumArt[newKey] = S.albumArt[g.key]; if (newKey !== g.key) delete S.albumArt[g.key]; }
-        if (S.collapsed.delete('album:' + g.key)) S.collapsed.add('album:' + newKey);
+        if (S.expanded.delete('album:' + g.key)) S.expanded.add('album:' + newKey);
         setAlbum(g.tracks, name, `Renamed to “${name}”`);
         if (S.libOpen && S.libOpen.by === 'album' && S.libOpen.key === g.key) S.libOpen = { by: 'album', key: newKey, name };
       } else { libChanged(); save(); toast('Album saved'); }
@@ -2227,8 +2254,27 @@ function fitVideo() {
     v.style.width = Math.round(v.videoWidth * s) + 'px';
     v.style.height = Math.round(v.videoHeight * s) + 'px';
   }
+  const v = deck.videoElement;
+  if (v && v.videoWidth) { stage.style.setProperty('--vw', v.style.width); stage.style.setProperty('--vh', v.style.height); }
 }
 new ResizeObserver(fitVideo).observe(stage);
+// fullscreen button on the video's bottom-right corner: shows while the pointer moves over the video,
+// glides away after a couple of seconds of stillness (or straight away when the pointer leaves)
+const vidFs = $('#btnVidFs');
+let vHoverT = 0;
+function videoHover(on) {
+  clearTimeout(vHoverT);
+  if (!on) { vHoverT = setTimeout(() => body.classList.remove('v-hover'), 140); return; }
+  body.classList.add('v-hover');
+  vHoverT = setTimeout(() => { if (!vidFs.matches(':hover')) body.classList.remove('v-hover'); }, 2200);
+}
+for (const v of deck.elements) {
+  v.addEventListener('mousemove', () => videoHover(true));
+  v.addEventListener('mouseleave', (e) => { if (e.relatedTarget !== vidFs && !vidFs.contains(e.relatedTarget)) videoHover(false); });
+}
+vidFs.addEventListener('mouseenter', () => clearTimeout(vHoverT));
+vidFs.addEventListener('mouseleave', (e) => { if (!deck.elements.includes(e.relatedTarget)) videoHover(false); });
+vidFs.addEventListener('click', (e) => { e.stopPropagation(); toggleFullscreen(); });
 seek.addEventListener('input', () => { seeking = true; setFill(seek); $('#tCur').textContent = fmt((seek.value / 1000) * (deck.duration || 0)); });
 seek.addEventListener('change', () => { if (deck.duration) deck.seek((seek.value / 1000) * deck.duration); seeking = false; seek.blur(); });
 
@@ -2387,11 +2433,14 @@ window.addEventListener('keydown', (e) => {
 
 if ('mediaSession' in navigator) {
   const ms = navigator.mediaSession;
-  ms.setActionHandler('play', () => togglePlay());
-  ms.setActionHandler('pause', () => deck.pause());
-  ms.setActionHandler('previoustrack', prev);
-  ms.setActionHandler('nexttrack', () => next());
-  ms.setActionHandler('seekto', (d) => deck.seek(d.seekTime));
+  // media keys / Windows media controls act on whichever source is on screen: in Spotify mode they used to
+  // start the local player, which paused Spotify, and skip in both
+  const onSp = () => S.source === 'spotify' && !!window.Spot?.media;
+  ms.setActionHandler('play', () => (onSp() ? Spot.media('toggle') : togglePlay()));
+  ms.setActionHandler('pause', () => (onSp() ? Spot.media('pause') : deck.pause()));
+  ms.setActionHandler('previoustrack', () => (onSp() ? Spot.media('prev') : prev()));
+  ms.setActionHandler('nexttrack', () => (onSp() ? Spot.media('next') : next()));
+  ms.setActionHandler('seekto', (d) => (onSp() ? Spot.media('seek', d.seekTime) : deck.seek(d.seekTime)));
 }
 
 // ---------- drag & drop ----------
@@ -2420,7 +2469,7 @@ function snapshot() {
     queue: S.queue.map((t) => t.path),
     cur: S.cur, at: deck.currentTime || 0,
     shuffle: S.shuffle, repeat: S.repeat,
-    playlists: S.playlists, favs: [...S.favs], collapsed: [...S.collapsed],
+    playlists: S.playlists, favs: [...S.favs],
     view: S.view, lib: S.lib, filters: S.filters, wide: S.wide, source: S.source, localVol, ui: S.ui, lyrics: !!window.Lyrics?.open, albumArt: S.albumArt, play: S.play, sound: S.sound, tags: S.tags, songTags: S.songTags, plays: S.plays, sideW: S.sideW, recent: S.recent, browse: S.browse, from: S.from,
     vol: +vol.value, muted,
   };
@@ -2439,7 +2488,7 @@ async function restore() {
   S.playlists = s.playlists || [];
   S.favs = new Set(s.favs || []);
   // v2 stored "albumkey"; v3 stores "by:key"
-  S.collapsed = new Set((s.collapsed || []).map((k) => (k.includes(':') && /^(album|artist|folder):/.test(k) ? k : `album:${k}`)));
+  S.expanded = new Set();   // every launch starts with all albums closed
   S.shuffle = !!s.shuffle;
   S.repeat = s.repeat || 'off';
   S.view = s.view === 'albums' ? 'library' : VIEWS.includes(s.view) ? s.view : 'queue';

@@ -176,6 +176,27 @@ how to use it, where it lives in the code, and what's still waiting on you.
 - **Lyrics glide to the sung line** on a soft spring instead of jumping: they ease in and out, and a new line mid-glide just bends the path. In testing: never more than 3 px per frame.
 - **Glass maps fit exactly:** maps were sized from a panel's on-screen size, so a panel caught mid-animation or pulsing to the bass could get a slightly wrong one. They now use the panel's real size.
 
+### App icon, installer and Start menu
+- **New app icon:** a liquid-glass tile in the app's colours, with a frosted glass lens and a white play mark. It stays readable down to 16 px. Source: `build/icon.svg`, rendered to `build/icon.png`.
+- **Installer:** `dist-deck/Glass Player Setup 0.2.0.exe` installs for your account (no admin) into `%LOCALAPPDATA%\Programs\Glass Player`. It adds Start menu and desktop shortcuts, so typing "Glass" in Windows search finds it, and an entry in Settings → Apps so it can be uninstalled.
+
+### Albums, finding the playing song, video button
+- **Albums start closed** in grouped lists. Click one to open it; it stays open until you close Glass.
+- **The song title** (dock or under the cover) goes back to where the song is playing from. If that's a grouped list, it opens the song's album, glides the song to the middle and gives it a soft glow that fades. The **album** and **artist** links do the same on their pages.
+- **Fullscreen button on videos:** a small frosted-glass button in the video's bottom-right corner. It appears while the mouse moves over the video and fades after a couple of seconds of stillness. In fullscreen it becomes "exit fullscreen".
+- **Why some .mp3 files play video:** 22 of the 924 .mp3 files in the library are really MP4 music videos with an .mp3 name (common with YouTube downloads), so Glass plays what's inside them. They also have no MP3 tags, hence "Unknown artist".
+
+### Spotify fixes
+- **Media keys and Windows' media controls follow the source on screen.** In Spotify mode they used to drive the local player as well, which skipped twice and paused Spotify whenever a local song started.
+- **No more skip loops inside Glass.** Glass only becomes a Spotify device ("Glass Player") once the build is signed for Spotify. If Spotify still fails twice within 30 s, Glass stops being a device, moves playback to your other device, and says so once, instead of Spotify skipping through the whole queue.
+- **Settings → Spotify** shows exactly what's missing for playing inside Glass: a Reconnect button for the playback permission, and the one-time castlabs sign-up command, with a Copy button.
+- **A small local log**, `spotify-log.txt` in Glass's data folder, records what Glass asked Spotify to do and what changed (song, play/pause, device). It holds no passwords or tokens, and helps trace any skip that's left.
+
+### Playing Spotify without the Spotify app: what it needs
+1. **Spotify Premium** (you have it).
+2. **Reconnect once:** Settings → Spotify → Reconnect, so Spotify allows playback inside Glass.
+3. **A signed build:** Spotify only plays inside apps that carry a Widevine signature from castlabs. Make a free castlabs account once with `py -m castlabs_evs.account signup`. After that every build signs itself, and Glass shows up as a Spotify device that plays on its own.
+
 ### Background picture and blur
 - **Settings → Glass → Background:** Artwork, Colours, or **Your image**. Your image keeps your picture behind the glass whatever plays. It's stored at full size (up to 3840 px) and works best landscape 16:9 at high resolution, like 3840 × 2160 or 1920 × 1080. The row under it shows your picture's size and says if a sharper or 16:9 one would look better.
 - **Background blur** slider (0–40 px) for the artwork or your picture. It was fixed at 3 px.

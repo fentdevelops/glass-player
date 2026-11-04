@@ -38,11 +38,17 @@
       "target": [
         "nsis",
         "portable"
-      ]
+      ],
+      "icon": "build/icon.png"
     },
     "nsis": {
       "oneClick": false,
-      "allowToChangeInstallationDirectory": true
+      "perMachine": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "Glass Player",
+      "artifactName": "Glass Player Setup ${version}.${ext}"
     },
     "fileAssociations": [
       {
@@ -71,6 +77,9 @@
     ],
     "afterPack": "scripts/vmp-sign.js",
     "electronDist": "node_modules/electron/dist",
-    "electronVersion": "44.10.1"
+    "electronVersion": "44.10.1",
+    "directories": {
+      "buildResources": "build"
+    }
   }
 }

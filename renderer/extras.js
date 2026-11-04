@@ -156,7 +156,7 @@ function openLibGroup(by, key, name) {
     $$('.seg button').forEach((b) => b.classList.toggle('active', b.dataset.view === 'library'));
   }
   if (S.wide) setWide(false);
-  transitionView(1, () => { S.view = 'library'; S.plOpen = null; S.libOpen = { by, key, name }; });
+  return transitionView(1, () => { S.view = 'library'; S.plOpen = null; S.libOpen = { by, key, name }; });
 }
 const openArtistOf = (t) => { const a = mainArtist(t); if (t.artist) openLibGroup('artist', a.toLowerCase(), a); };
 const openAlbumOf = (t) => { const ag = albumGroupOf(t); openLibGroup('album', ag.key, ag.name); };
@@ -173,9 +173,10 @@ function goLink(kind, ai = 0) {
   if (S.source === 'spotify') { window.Spot?.goNow(kind, ai); return; }
   const t = current();
   if (!t) return;
+  // album / artist links open that page and find the playing song in it
   if (kind === 'from') goFrom();
-  else if (kind === 'album') openAlbumOf(t);
-  else if (kind === 'artist') { const p = (t.artist ? artistParts(t.artist) : [])[ai]; if (p) openLibGroup('artist', p.name.toLowerCase(), p.name); }
+  else if (kind === 'album') { const ag = albumGroupOf(t); Promise.resolve(openLibGroup('album', ag.key, ag.name)).then(revealCurrent); }
+  else if (kind === 'artist') { const p = (t.artist ? artistParts(t.artist) : [])[ai]; if (p) Promise.resolve(openLibGroup('artist', p.name.toLowerCase(), p.name)).then(revealCurrent); }
 }
 // one click opens the artist / album / source; a double click (quick edits on) renames it instead,
 // so under the cover a single click waits a moment to see whether a second one follows

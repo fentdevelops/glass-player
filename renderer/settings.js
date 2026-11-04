@@ -13,6 +13,8 @@
           <span class="set-pill on"><i></i>Linked</span></div>
         <div class="set-row"><div><b>Play inside Glass</b><span data-spp>${esc(window.SpotPlayer ? SpotPlayer.message() || 'Off' : 'Off')}</span></div>
           ${window.SpotPlayer && SpotPlayer.state() === 'reconnect' ? '<button type="button" class="btn primary" data-act-sp="reconnect">Reconnect</button>' : ''}</div>
+        ${window.SpotPlayer && SpotPlayer.state() === 'unsigned' ? `<div class="set-row"><div><b>Turn on playing inside Glass</b><span>Make a free castlabs account once: run this in a terminal and follow the steps. Then ask for a rebuild and Glass gets signed for Spotify.</span></div></div>
+        <div class="sp-uri"><code>py -m castlabs_evs.account signup</code><button type="button" class="btn ghost" data-act-sp="copy-evs">Copy</button></div>` : ''}
         <div class="set-row"><div><b>Play on</b><span>Glass Player shows up here as a device. Pick where Spotify plays.</span></div></div>
         <div class="dev-list" data-devices><span class="set-hint">Looking for devices…</span></div>
         <div class="set-row"><span class="set-grow"></span>
@@ -222,6 +224,7 @@
           const a = b.dataset.actSp;
           if (a === 'dashboard') api.openExternal('https://developer.spotify.com/dashboard').catch(() => {});
           else if (a === 'copy') { navigator.clipboard.writeText(document.querySelector('#spRedirect').textContent).then(() => toast('Redirect URI copied')).catch(() => {}); }
+          else if (a === 'copy-evs') { navigator.clipboard.writeText('py -m castlabs_evs.account signup').then(() => toast('Command copied')).catch(() => {}); }
           else if (a === 'reload') Spot.reload();
           else if (a === 'disconnect') { await Spot.disconnect(); repaint(); }
           else if (a === 'reconnect') { b.disabled = true; b.textContent = 'Waiting for browser…'; await Spot.connect(Spot.status().clientId); repaint(); }

@@ -502,7 +502,11 @@ body.playing .row.current .eq i { animation: eq .9s ease-in-out infinite alterna
   opacity: 0; transform: translateY(-8px);
   transition: opacity .4s var(--glide), transform .5s var(--glide);
 }
-.vsticky.on { opacity: 1; transform: none; }
+.vsticky.on { opacity: 1; transform: none; pointer-events: auto; cursor: pointer; }
+/* click the bar: back to the top of that album */
+.vsticky.on:hover { background: rgba(72, 72, 82, .96); transform: scale(1.012); }
+.vsticky.on:active { transform: scale(.985); transition-duration: var(--t-press); }
+.vsticky { transition: opacity .4s var(--glide), transform .5s var(--glide), background-color var(--t-hover) var(--glide); }
 .vsticky small { font-weight: 400; color: var(--ink-2); margin-left: 6px; }
 .side.has-az .vsticky { right: 30px; }
 
@@ -928,6 +932,7 @@ body.lyrics-on .lyrics {
 .set-chips { display: flex; flex-wrap: wrap; gap: 6px; padding: 0 0 8px; }
 .schip {
   height: 30px; padding: 0 13px; border-radius: 999px; font-size: 12.5px; font-weight: 500;
+  white-space: nowrap; flex: none;          /* a longer label makes the pill wider, never two lines */
   background-color: var(--fill-1); box-shadow: inset 0 0 0 1px rgba(255, 255, 255, .14);
   transition: background-color var(--t-hover) var(--glide), color var(--t-hover) var(--glide), transform var(--t-hover) var(--glide), box-shadow var(--t-hover) var(--glide);
 }
@@ -1196,6 +1201,7 @@ body.wide .side-grip, body.fs .side-grip { display: none; }
 .rec-browse > span:first-child { font-size: 11px; font-weight: 700; letter-spacing: .4px; text-transform: uppercase; color: var(--ink-2); margin-right: 4px; }
 .rec-browse .grow { flex: 1; }
 .rec-browse .schip { height: 28px; padding: 0 11px; }
+.side:not(.roomy) .rec-browse > span:first-child { display: none; }   /* narrow panel: the chips get the room */
 
 /* ---------- albums in the list: room above each, bigger header, songs tucked in under it ---------- */
 .ghead {
@@ -1367,3 +1373,31 @@ body.art-video.lyrics-on .art-wrap { width: min(calc(36vh * 1.42), 36vw, 760px, 
 .set-wall { max-height: 0; padding-top: 0; padding-bottom: 0; opacity: 0; overflow: hidden; pointer-events: none;
   transition: max-height .55s var(--glide), padding .55s var(--glide), opacity .4s var(--glide); }
 .set-wall.shown { max-height: 140px; padding-top: 8px; padding-bottom: 8px; opacity: 1; pointer-events: auto; }
+
+/* the playing song, found for you (song title / album / artist links): a soft glow that fades */
+.row.found { animation: row-found 2.6s var(--glide); }
+@keyframes row-found {
+  0% { box-shadow: inset 0 0 0 1px rgba(255, 255, 255, .12), 0 0 0 0 rgba(255, 255, 255, 0); }
+  22% { box-shadow: inset 0 0 0 1.5px rgba(255, 255, 255, .7), 0 0 24px 2px rgba(255, 255, 255, .26); }
+  100% { box-shadow: inset 0 0 0 1px rgba(255, 255, 255, .12), 0 0 0 0 rgba(255, 255, 255, 0); }
+}
+
+/* fullscreen button on the video's bottom-right corner, only while the pointer is over the video */
+.vfs-btn {
+  position: absolute; z-index: 4; display: none; place-items: center; width: 42px; height: 42px; border-radius: 13px;
+  left: calc(50% + var(--vw, 0px) / 2 - 54px); top: calc(50% + var(--vh, 0px) / 2 - 54px);
+  background: rgba(16, 16, 22, .42); -webkit-backdrop-filter: blur(16px) saturate(1.4); backdrop-filter: blur(16px) saturate(1.4);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, .24), inset 0 1px 0 rgba(255, 255, 255, .35), 0 8px 22px -8px rgba(0, 0, 0, .55);
+  opacity: 0; transform: translateY(6px) scale(.86); pointer-events: none;
+  transition: opacity .45s var(--glide), transform .55s var(--glide), background-color var(--t-hover) var(--glide);
+}
+body.is-video .vfs-btn { display: grid; }
+body.is-video.v-hover .vfs-btn { opacity: 1; transform: none; pointer-events: auto; }
+body.is-video.v-hover .vfs-btn:hover { background-color: rgba(255, 255, 255, .2); transform: scale(1.08); }
+body.is-video.v-hover .vfs-btn:active { transform: scale(.92); transition-duration: var(--t-press); }
+.vfs-btn svg { grid-area: 1 / 1; width: 18px; height: 18px; fill: none; stroke: #fff; stroke-width: 1.9; stroke-linecap: round; stroke-linejoin: round; transition: opacity .35s var(--glide), transform .45s var(--glide); }
+.vfs-btn .i-out, body.fs .vfs-btn .i-in { opacity: 0; transform: scale(.6); }
+body.fs .vfs-btn .i-out { opacity: 1; transform: none; }
+body.fs .vfs-btn { left: auto; top: auto; right: 26px; bottom: 26px; }
+body.fs.idle .vfs-btn { opacity: 0; pointer-events: none; }
+body.sp-unlinked .vfs-btn { display: none !important; }

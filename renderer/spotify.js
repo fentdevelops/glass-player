@@ -143,6 +143,8 @@
   }
   async function call(method, path, query, body) {
     const r = await sp.api(method, path, query || null, body || null);
+    if (method !== 'GET') sp.log(`${method} ${path}${query && query.device_id ? ' device ' + query.device_id.slice(0, 8) : ''} -> ${r.ok ? 'ok' : r.status + ' ' + (r.reason || r.message)}`);
+    else if (!r.ok && r.status !== 404) sp.log(`${method} ${path} -> ${r.status} ${r.reason || r.message}`);
     if (r.ok) return r.data;
     const e = new Error(r.message);
     e.status = r.status;
@@ -671,6 +673,16 @@
       toast(explain(e), true);
     }
   }
+  // media keys and Windows' media controls, while Spotify is the source
+  Spot.media = (a, v) => {
+    if (!status.connected) return;
+    sp.log(`media key: ${a}`);
+    if (a === 'toggle') togglePlaySp();
+    else if (a === 'pause') { if (player && player.is_playing) togglePlaySp(); }
+    else if (a === 'next') { data.queue = null; cmd('POST', '/me/player/next', null, 250); }
+    else if (a === 'prev') { data.queue = null; cmd('POST', '/me/player/previous', null, 250); }
+    else if (a === 'seek') seekTo(v * 1000);
+  };
   Spot.pauseIfPlaying = () => {
     if (!status.connected || !player || !player.is_playing) return;
     player.progress_ms = progress();
@@ -783,7 +795,15 @@
   }
   function setPlayer(j) {
     const prev = player && player.item ? player.item.uri : null;
+    const was = player;
     player = j || null;
+    // what changed on Spotify's side (track, play/pause, device), for spotify-log.txt
+    if (player) {
+      const p = player, w = was || {};
+      if ((p.item && p.item.uri) !== (w.item && w.item.uri)) sp.log(`now: ${p.item ? p.item.name + ' (' + p.item.uri + ') at ' + Math.round((p.progress_ms || 0) / 1000) + 's' : 'nothing'} on ${p.device ? p.device.name : '?'}`);
+      else if (!!p.is_playing !== !!w.is_playing) sp.log(`${p.is_playing ? 'playing' : 'paused'} at ${Math.round((p.progress_ms || 0) / 1000)}s on ${p.device ? p.device.name : '?'}`);
+      else if ((p.device && p.device.id) !== (w.device && w.device.id)) sp.log(`device: ${p.device ? p.device.name : 'none'}`);
+    }
     recvAt = performance.now();
     const uri = player && player.item ? player.item.uri : null;
     if (uri !== prev) {
