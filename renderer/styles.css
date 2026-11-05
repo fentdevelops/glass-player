@@ -415,6 +415,7 @@ body.playing .ibtn.play .i-pause { opacity: 1; transform: none; }
     opacity var(--t-hover) var(--glide);
 }
 .vi.enter { animation: item-in .6s var(--glide) backwards; animation-delay: var(--d, 0ms); }
+.vspace.retiling > .vi { transition-property: transform, background-color, box-shadow, opacity; }   /* app.js retile(): rows keep up with a moving panel */
 
 /* rows */
 .row {
@@ -803,7 +804,7 @@ body.sp-waiting .sp-wait { opacity: 1; transform: none; }
 /* ---------- lyrics (lyrics.js) ----------
    Open: the stage splits, artwork + title on the left, lyrics on the right.
    Narrow stage: lyrics take it all. Synced lines glide: the sung line is full white, others fade back. */
-.stage { container-type: inline-size; container-name: stage; }
+.stage { container-type: size; container-name: stage; }   /* its size comes from the page grid, so cqh works too */
 .lyrics { display: none; }
 body.lyrics-on:not(.is-video) .now {
   display: grid; align-items: center; justify-items: center;
@@ -822,11 +823,21 @@ body.lyrics-on .lyrics {
   grid-area: ly; display: flex; flex-direction: column; justify-self: stretch;
   height: min(72vh, 640px); min-height: 260px; padding: 10px 10px 0 16px;
 }
-@container stage (max-width: 640px) {
-  body.lyrics-on .now { grid-template-columns: minmax(0, 1fr); grid-template-areas: "ly"; padding: 0 14px; }
-  body.lyrics-on .art-wrap, body.lyrics-on .now-meta { display: none; }
-  body.lyrics-on .lyrics { height: min(82vh, 720px); }
+/* No room for cover and lyrics side by side (a wide queue panel, a small window): the lyrics take the whole
+   stage and the cover sits small in their top-left corner. lyrics.js sets .ly-compact from the stage's width
+   and plays the change as a water drop: the cover falls into the corner while the lyrics flow out to fill. */
+body.lyrics-on.ly-compact:not(.is-video) .now {
+  grid-template-columns: minmax(0, 1fr); grid-template-areas: "ly"; grid-template-rows: auto; padding: 0 14px;
 }
+body.lyrics-on.ly-compact .now-meta { display: none; }
+body.lyrics-on.ly-compact .art-wrap, body.art-video.lyrics-on.ly-compact .art-wrap {
+  grid-area: ly; justify-self: start; align-self: start; z-index: 3;
+  width: 54px; aspect-ratio: 1; margin: 11px 0 0 13px;
+}
+body.lyrics-on.ly-compact .art { --r: 15px; padding: 3px; }
+body.lyrics-on.ly-compact .art-img { border-radius: 12px; box-shadow: 0 6px 16px -6px rgba(0, 0, 0, .5), inset 0 0 0 1px rgba(255, 255, 255, .12); }
+body.lyrics-on.ly-compact .lyrics { z-index: 1; height: 100cqh; min-height: 0; }   /* the stage's full height, like the queue panel beside it */
+body.lyrics-on.ly-compact .ly-head { min-height: 56px; padding-left: 60px; }
 /* closing: the panel is pinned where it was while the cover glides back, then slides out */
 .lyrics.ly-leaving {
   --r: 26px;
@@ -850,7 +861,7 @@ body.lyrics-on .lyrics {
   mask-image: linear-gradient(to bottom, transparent 0, #000 12%, #000 80%, transparent 100%);
 }
 .ly-body::-webkit-scrollbar { display: none; }
-.ly-lines { padding: 28% 6px 45%; }
+.ly-lines { padding: 20cqh 6px 30cqh; }   /* from the stage's height, so the lines don't shift up and down when only the width changes */
 .ly-lines p {
   margin: 0; padding: 7px 10px; border-radius: 14px;
   font: 700 clamp(19px, 2.3cqi, 27px)/1.28 "Segoe UI Variable Display", "Segoe UI", system-ui, sans-serif;

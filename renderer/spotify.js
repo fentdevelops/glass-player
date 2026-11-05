@@ -160,7 +160,7 @@
     return e.message || 'Spotify request failed';
   }
   // Spotify has lowered page sizes for some apps over time; start generous and fall back on "invalid limit"
-  const limits = { search: 20, page: 50 };
+  const limits = { search: 10, page: 50 };   // search: Spotify's limit is 10 since February 2026
   async function paged(path, query, kind = 'page') {
     try { return await call('GET', path, { ...query, limit: Math.min(query.limit || limits[kind], limits[kind]) }); }
     catch (e) {
@@ -247,7 +247,9 @@
         }
       }
     } catch (err) {
-      e.error = kind === 'playlist' && (err.status === 404 || err.status === 403) ? 'Spotify doesn’t let apps open this playlist' : explain(err);
+      // since February 2026 Spotify only lists the songs of some playlists to apps; playing it still works
+      e.blocked = kind === 'playlist' && (err.status === 404 || err.status === 403);
+      e.error = e.blocked ? 'Spotify won’t show this playlist’s songs to apps. Play above still plays it.' : explain(err);
     }
     e.done = true;
     refresh();
@@ -463,7 +465,8 @@
     out.push(h);
     const rows = e.tracks.filter(fuzzy);
     rows.forEach((t, i) => out.push(row(t, kind === 'album' ? 'spa' : 'spp', i, i + 1, e.tracks, h.spContext)));
-    if (e.error) out.push(failed(kind === 'album' ? 'Can’t show this album' : 'Can’t show this playlist', e.error, () => { data.lists.delete(kind + ':' + p.id); }));
+    if (e.blocked) out.push(miscItem('spl:blocked', 150, `<div class="view-empty"><b>Songs hidden by Spotify</b><span>${esc(e.error)}</span></div>`));
+    else if (e.error) out.push(failed(kind === 'album' ? 'Can’t show this album' : 'Can’t show this playlist', e.error, () => { data.lists.delete(kind + ':' + p.id); }));
     else if (!e.tracks.length) out.push(e.done ? emptyItem('Nothing here', '') : loading('Loading songs'));
     else if (!rows.length) out.push(emptyItem('No matches', 'Try a different search'));
     return out;
@@ -573,8 +576,9 @@
   // ---------- playback control (Spotify Connect) ----------
   const progress = () => (!player || !player.item ? 0
     : Math.min(player.item.duration_ms, (player.progress_ms || 0) + (player.is_playing ? performance.now() - recvAt : 0)));
+  // old "Glass Player"s that an earlier Glass left on Spotify play nothing: they're left out of every list
   async function devices() {
-    try { return ((await call('GET', '/me/player/devices')).devices || []).filter((d) => !d.is_restricted); } catch { return []; }
+    try { return ((await call('GET', '/me/player/devices')).devices || []).filter((d) => !d.is_restricted && !window.SpotPlayer?.ghost?.(d)); } catch { return []; }
   }
   async function findDevice() {
     const ds = await devices();
@@ -582,9 +586,21 @@
     const glass = window.SpotPlayer?.deviceId();
     return ds.find((d) => d.is_active) || (glass && (ds.find((d) => d.id === glass) || { id: glass, name: 'Glass Player' })) || ds.find((d) => d.type === 'Computer') || ds[0] || null;
   }
+  // Glass's own player is where Spotify plays, but it has stopped (an error, or it gave up after drops),
+  // or Spotify points at an old "Glass Player" an earlier Glass left behind. Spotify says ok to Play either
+  // way, but nothing would happen: start Glass's own player if needed and play there.
+  const glassDown = () => {
+    const P = window.SpotPlayer, dev = player && player.device;
+    if (!P || ['unsigned', 'reconnect'].includes(P.state())) return false;
+    if (dev && P.ghost?.(dev)) return true;
+    return P.state() !== 'ready' && (!dev || dev.name === 'Glass Player');
+  };
   async function play(body, deviceId) {
     if (!deck.paused) deck.pause();
     window.SpotPlayer?.activate();
+    // start it again first and play on the new one
+    if (!deviceId && glassDown() && await SpotPlayer.ensure()) deviceId = SpotPlayer.deviceId();
+    window.SpotPlayer?.sent?.(body);
     try { await call('PUT', '/me/player/play', deviceId ? { device_id: deviceId } : null, body); }
     catch (e) {
       if (!deviceId && (e.status === 404 || e.reason === 'NO_ACTIVE_DEVICE')) {
@@ -596,6 +612,7 @@
     }
     if (player) { player.is_playing = true; recvAt = performance.now(); }
     data.queue = null;
+    window.SpotPlayer?.watch?.();
     soon(300);
   }
   async function cmd(method, path, query, after = 300) {
@@ -653,6 +670,8 @@
     player.is_playing = !was;
     render(false);
     if (!was && !deck.paused) deck.pause();
+    if (was) window.SpotPlayer?.unwatch?.(); else window.SpotPlayer?.watch?.();
+    if (!was && glassDown()) { play(undefined); return; }   // Glass's player stopped: restart it, then play there
     cmd('PUT', was ? '/me/player/pause' : '/me/player/play');
   }
   function seekTo(ms) {
@@ -819,7 +838,7 @@
   };
 
   // ---------- polling ----------
-  let pollT = 0, pollBusy = false;
+  let pollT = 0, pollBusy = false, movedFrom = null;
   function schedule(ms) { clearTimeout(pollT); pollT = setTimeout(poll, ms); }
   function soon(ms = 350) { schedule(ms); }
   async function poll() {
@@ -851,6 +870,17 @@
       else if (!!p.is_playing !== !!w.is_playing) sp.log(`${p.is_playing ? 'playing' : 'paused'} at ${Math.round((p.progress_ms || 0) / 1000)}s on ${p.device ? p.device.name : '?'}`);
       else if ((p.device && p.device.id) !== (w.device && w.device.id)) sp.log(`device: ${p.device ? p.device.name : 'none'}`);
     }
+    // Spotify (often its own app's device menu) sent the music to an old "Glass Player" an earlier Glass left
+    // behind: nothing plays there, so move it to this Glass's player (once per old one)
+    const dev = player && player.device;
+    if (dev && window.SpotPlayer?.ghost?.(dev) && SpotPlayer.state() === 'ready') {
+      if (movedFrom !== dev.id) {
+        movedFrom = dev.id;
+        sp.log('playback went to an old Glass Player, moving it to this one');
+        call('PUT', '/me/player', null, { device_ids: [SpotPlayer.deviceId()], play: !!(player.is_playing || (was && was.is_playing)) })
+          .catch(() => { /* call() notes the failure */ }).finally(() => soon(700));
+      }
+    } else movedFrom = null;
     recvAt = performance.now();
     const uri = player && player.item ? player.item.uri : null;
     if (uri !== prev) {

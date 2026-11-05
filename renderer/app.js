@@ -934,8 +934,8 @@ function tileItems(cards, keyBase) {
   for (let i = 0; i < cards.length; i += cols) {
     const row = cards.slice(i, i + cols);
     out.push({
-      kind: 'tiles', key: `${keyBase}:${row[0].key}`, h, cards: row, letter: row[0].letter,
-      html: () => `<div class="vi tiles" style="--cols:${cols}">${row.map((c, j) => `<button class="card${c.cls ? ' ' + c.cls : ''}" data-ci="${j}">
+      kind: 'tiles', key: `${keyBase}:${row[0].key}`, h, cards: row, letter: row[0].letter, base: keyBase, cols,
+      html: () => `<div class="vi tiles" style="--cols:${cols}">${row.map((c, j) => `<button class="card${c.cls ? ' ' + c.cls : ''}" data-ci="${j}" data-ck="${esc(c.key)}">
         <div class="card-art" style="${c.art}">${c.icon || ''}</div>
         <div class="card-name">${esc(c.name)}</div><div class="card-sub">${esc(c.sub)}</div></button>`).join('')}</div>`,
     });
@@ -1152,16 +1152,45 @@ view.addEventListener('scroll', () => {
   requestAnimationFrame(() => { paintQueued = false; paint(); });
   if (menuNode) closeMenu();   // only menus anchored to a row; header menus (View options, Filter) stay open while the list resets
 }, { passive: true });
-let lastW = 0, tilesT = 0;
+// Card grids follow the panel while it moves (dragging its edge, resizing the window): every frame the rows
+// take the cards' new height, so cards grow and shrink smoothly instead of overlapping and snapping into
+// place afterwards. When a column comes or goes, the cards glide from where they were to their new spots.
+function retile() {
+  if (!items.some((i) => i.kind === 'tiles')) return;
+  const next = [];
+  let run = null;
+  const flush = () => { if (run) next.push(...tileItems(run.cards, run.base)); run = null; };
+  for (const it of items) {
+    if (it.kind !== 'tiles') { flush(); next.push(it); continue; }
+    if (!run || run.base !== it.base) { flush(); run = { base: it.base, cards: [] }; }
+    run.cards.push(...it.cards);
+  }
+  flush();
+  const was = items.find((i) => i.kind === 'tiles'), now = next.find((i) => i.kind === 'tiles');
+  const moved = was && now && was.cols !== now.cols;
+  // rows follow the cards' height at once while the panel moves (their usual .5s glide would trail behind)
+  vspace.classList.add('retiling');
+  clearTimeout(retileT);
+  retileT = setTimeout(() => vspace.classList.remove('retiling'), 250);
+  const before = new Map();
+  if (moved && !reduceMotion) vspace.querySelectorAll('.card[data-ck]').forEach((c) => before.set(c.dataset.ck, c.getBoundingClientRect()));
+  setItems(next, false);
+  if (!before.size) return;
+  vspace.querySelectorAll('.card[data-ck]').forEach((c) => {
+    const a = before.get(c.dataset.ck);
+    if (!a) return;
+    const b = c.getBoundingClientRect();
+    if (!b.width || (Math.abs(a.left - b.left) < 1 && Math.abs(a.top - b.top) < 1 && Math.abs(a.width - b.width) < 1)) return;
+    c.style.transformOrigin = '0 0';
+    anim(c, [{ transform: `translate(${a.left - b.left}px, ${a.top - b.top}px) scale(${a.width / b.width})` }, { transform: 'none' }], { duration: 460 });
+  });
+}
+let lastW = 0, retileT = 0;
 new ResizeObserver(() => {
   const w = view.clientWidth;
   side.classList.toggle('roomy', w >= 500);
+  if (Math.abs(w - lastW) > 0.5) { lastW = w; retile(); }
   paint();
-  // card grids pick their column count from the width: worked out again once the panel stops moving
-  if (Math.abs(w - lastW) > 2 && items.some((i) => i.kind === 'tiles')) {
-    clearTimeout(tilesT);
-    tilesT = setTimeout(() => { lastW = view.clientWidth; rebuild(false); }, 140);
-  } else lastW = w;
 }).observe(view);
 
 let winResizeT = 0;

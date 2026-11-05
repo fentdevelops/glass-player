@@ -278,10 +278,23 @@ function mockApi(method, p, q, body) {
   }
   if (method === 'GET' && p === '/me/player') return P.item ? { ...P, progress_ms: pos(), timestamp: Date.now(), list: undefined, idx: undefined, at: undefined } : null;
   if (method === 'GET' && p === '/me/player/queue') return { currently_playing: P.item, queue: P.list.slice(P.idx + 1, P.idx + 21) };
-  if (method === 'GET' && p === '/me/player/devices') return { devices: [P.device] };
+  if (method === 'GET' && p === '/me/player/devices') {
+    const pc = m.pc || P.device, seen = new Set();
+    const all = [pc, ...(m.ghosts || []).map((id) => ({ ...pc, id, name: 'Glass Player' })), P.device];
+    return { devices: all.filter((d) => !seen.has(d.id) && seen.add(d.id)).map((d) => ({ ...d, is_active: d.id === P.device.id })) };
+  }
+  // tests: an old "Glass Player" left on the account by a Glass that closed without signing off
+  // (route=1: Spotify sends the music there, like picking it in the Spotify app)
+  if (method === 'PUT' && p === '/me/player/mock-ghost') {
+    (m.ghosts ??= []).push(String(q.id));
+    if (q.route) { m.pc ??= P.device; P.device = { ...m.pc, id: String(q.id), name: 'Glass Player' }; P.is_playing = true; P.at = Date.now(); }
+    return null;
+  }
   if (method === 'GET' && p === '/me/player/recently-played') return { items: m.catalog.slice(40, 40 + (Number(q.limit) || 20)).map((t) => ({ track: t, played_at: '2026-11-03T12:00:00Z' })) };
   if (method === 'GET' && p === '/me/top/tracks') return pageOf(m.catalog.slice(10, 60), q.limit, q.offset);
+  const onDevice = (id) => { if (!id) return; m.pc ??= P.device; P.device = /^(fake|ghost)-/.test(String(id)) ? { ...m.pc, id: String(id), name: 'Glass Player' } : m.pc; };
   if (method === 'PUT' && p === '/me/player/play') {
+    onDevice(q.device_id);
     if (body?.uris) { start(body.uris.map((u) => m.catalog.find((t) => t.uri === u)).filter(Boolean), body.offset?.position || 0); P.context = null; }
     else if (body?.context_uri) {
       P.context = { type: body.context_uri.split(':')[1], uri: body.context_uri };
@@ -289,6 +302,7 @@ function mockApi(method, p, q, body) {
       const list = pl ? pl.items : m.catalog;
       start(list, list.findIndex((t) => t.uri === body.offset?.uri));
     } else if (P.item) { P.progress_ms = pos(); P.at = Date.now(); P.is_playing = true; }
+    if (body && body.position_ms) P.progress_ms = Number(body.position_ms);
     return null;
   }
   if (method === 'PUT' && p === '/me/player/pause') { P.progress_ms = pos(); P.at = Date.now(); P.is_playing = false; return null; }
@@ -301,7 +315,7 @@ function mockApi(method, p, q, body) {
   if (method === 'PUT' && p === '/me/player/shuffle') { P.shuffle_state = q.state === 'true' || q.state === true; return null; }
   if (method === 'PUT' && p === '/me/player/repeat') { P.repeat_state = q.state; return null; }
   if (method === 'POST' && p === '/me/player/queue') { const t = m.catalog.find((x) => x.uri === q.uri); if (t) P.list.splice(P.idx + 1, 0, t); return null; }
-  if (method === 'PUT' && p === '/me/player') return null;
+  if (method === 'PUT' && p === '/me/player') { onDevice(body && body.device_ids && body.device_ids[0]); return null; }
   throw new SpotifyError(`Mock has no ${method} ${p}`, 404);
 }
 
@@ -441,7 +455,11 @@ except Exception as e:
 
 function register() {
   // the Web Playback SDK asks for a fresh token whenever it needs one
-  ipcMain.handle('sp:token', async () => (MOCK ? 'mock-token' : token()));
+  // fresh: Spotify refused the in-app player's sign-in, so don't hand it the same token again
+  ipcMain.handle('sp:token', async (_e, fresh) => {
+    if (fresh) { spLog('player: getting a fresh sign-in'); access = null; }
+    return MOCK ? 'mock-token' : token();
+  });
   ipcMain.handle('sp:status', () => status());
   ipcMain.handle('sp:setClient', (_e, id) => {
     id = String(id || '').trim();
@@ -536,17 +554,9 @@ function register() {
     pr.done(true);
     return { ok: true };
   });
-  ipcMain.handle('evs:relaunch', () => { if (EVS_FAKE) return; app.relaunch(); app.exit(0); });
+  ipcMain.handle('evs:relaunch', async (e) => { if (EVS_FAKE) return; await signOff(e.sender); app.relaunch(); app.exit(0); });
 
-  // what Glass asked Spotify to do and what came back (no tokens), so a skip or stop can be traced;
-  // userData/spotify-log.txt, kept under ~300 KB
-  ipcMain.on('sp:log', (_e, line) => {
-    try {
-      const f = path.join(app.getPath('userData'), 'spotify-log.txt');
-      if (fs.existsSync(f) && fs.statSync(f).size > 300000) fs.renameSync(f, f + '.old');
-      fs.appendFileSync(f, new Date().toISOString() + ' ' + String(line).slice(0, 400).replace(/[\r\n]+/g, ' ') + '\n');
-    } catch { /* logging never breaks playback */ }
-  });
+  ipcMain.on('sp:log', (_e, line) => spLog(line));
   ipcMain.handle('open-external', (_e, url) => {
     const u = new URL(String(url));
     if (u.protocol !== 'https:' || !['open.spotify.com', 'developer.spotify.com', 'genius.com', 'en.wikipedia.org'].includes(u.hostname)) throw new Error('Blocked link');
@@ -554,4 +564,81 @@ function register() {
   });
 }
 
-module.exports = { register };
+// what Glass asked Spotify to do and what came back (no tokens), so a skip or stop can be traced;
+// userData/spotify-log.txt, kept under ~300 KB
+function spLog(line) {
+  try {
+    const f = path.join(app.getPath('userData'), 'spotify-log.txt');
+    if (fs.existsSync(f) && fs.statSync(f).size > 300000) fs.renameSync(f, f + '.old');
+    fs.appendFileSync(f, new Date().toISOString() + ' ' + String(line).slice(0, 400).replace(/[\r\n]+/g, ' ') + '\n');
+  } catch { /* logging never breaks playback */ }
+}
+
+// Spotify's in-app player runs in a hidden sdk.scdn.co frame and talks to Spotify's servers by itself, so its
+// problems (a refused licence, audio that won't load, an autoplay block) never reach Glass's code. This notes
+// them in the log: that frame's console warnings and errors, and how Spotify's servers answered it.
+// Only host + path are written (long ids shortened), never query strings or tokens.
+function watchPlayer(wc) {
+  const short = (u) => { try { const x = new URL(u); return x.host + x.pathname.replace(/[A-Za-z0-9_-]{24,}/g, '…').slice(0, 70); } catch { return '?'; } };
+  const clean = (s) => String(s).replace(/https?:\/\/[^\s"')]+/g, short).replace(/[A-Za-z0-9_\-.]{40,}/g, '…');
+  let last = '';
+  const note = (line) => { if (line !== last) { last = line; spLog(line); } };
+  wc.on('console-message', (e) => {
+    if (e.level !== 'warning' && e.level !== 'error') return;
+    let fr = '';
+    try { fr = (e.frame && e.frame.url) || ''; } catch { /* frame already gone */ }
+    if (!/scdn\.co|spotify/i.test(String(e.sourceId || '') + ' ' + fr)) return;
+    note(`sdk ${e.level}: ${clean(e.message).slice(0, 300)}`);
+  });
+  const urls = ['*://*.spotify.com/*', '*://*.scdn.co/*', '*://*.spotifycdn.com/*', '*://*.akamaized.net/*'];
+  const picture = (host) => /^(i|mosaic|t)\.scdn\.co$|image|seed-mix|lineup/i.test(host);
+  const kindOf = (u) => (/license/i.test(u) ? 'licence' : /storage-resolve/i.test(u) ? 'audio lookup'
+    : /audio|akamaized|\/mp4\//i.test(u) ? 'audio' : /track-playback|connect-state|playplay|melody/i.test(u) ? 'player' : '');
+  const seen = new Map();   // kind -> when a success was last noted (one line per kind every 20 s)
+  const wr = wc.session.webRequest;
+  wr.onCompleted({ urls }, (d) => {
+    let host = '', where = '';
+    try { const x = new URL(d.url); host = x.host; where = x.pathname; } catch { return; }
+    if (picture(host)) return;
+    // the player told Spotify to drop it from your devices (it does this when it's switched off)
+    if (d.method === 'DELETE' && /\/track-playback\/v1\/devices\/[^/]+$/.test(where)) {
+      note(`player: signed off Spotify (${d.statusCode})`);
+      signOffSeen.forEach((f) => f());
+      return;
+    }
+    const kind = kindOf(d.url);
+    if (d.statusCode >= 400) { note(`server ${d.statusCode} for ${kind || 'request'} ${short(d.url)}`); return; }
+    if (!kind) return;
+    const t = Date.now();
+    if (t - (seen.get(kind) || 0) < 20000) return;
+    seen.set(kind, t);
+    note(`server ok (${d.statusCode}) for ${kind} ${short(d.url)}`);
+  });
+  wr.onErrorOccurred({ urls }, (d) => {
+    let host = '';
+    try { host = new URL(d.url).host; } catch { return; }
+    if (picture(host) || /ERR_ABORTED/.test(d.error)) return;
+    note(`network ${d.error} for ${kindOf(d.url) || 'request'} ${short(d.url)}`);
+  });
+  // any sound element in the window starting or stopping (Spotify's player, or the local player)
+  wc.on('media-started-playing', () => note('sound started in Glass'));
+  wc.on('media-paused', () => note('sound paused in Glass'));
+}
+
+// Glass is closing: the in-app player signs off Spotify first. Spotify keeps listing a player until it does,
+// so a Glass that just closed left a second "Glass Player" behind that plays nothing. Resolves once Spotify
+// confirms, right away when there was no player, and after `ms` at most.
+const signOffSeen = new Set();
+function signOff(wc, ms = 1500) {
+  return new Promise((resolve) => {
+    let t = 0;
+    const done = () => { clearTimeout(t); signOffSeen.delete(done); ipcMain.removeListener('sp:off', onOff); resolve(); };
+    const onOff = (e, had) => { if (e.sender === wc && !had) done(); };
+    t = setTimeout(done, ms);
+    signOffSeen.add(done);
+    ipcMain.on('sp:off', onOff);
+    try { wc.send('sp:sign-off'); } catch { done(); }
+  });
+}
+
+module.exports = { register, watchPlayer, spLog, signOff };

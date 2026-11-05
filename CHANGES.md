@@ -3,7 +3,7 @@
 A liquid-glass music and video player for Windows (Electron). This file lists everything built so far,
 how to use it, where it lives in the code, and what's still waiting on you.
 
-**Current version:** 0.2.1 · **Code:** https://github.com/pxlarized2/glass-player (public) · **Releases:** the repo's Releases page. Installed copies update themselves from there.
+**Current version:** 0.2.2 · **Code:** https://github.com/pxlarized2/glass-player (public) · **Releases:** the repo's Releases page. Installed copies update themselves from there.
 
 ---
 
@@ -254,6 +254,39 @@ how to use it, where it lives in the code, and what's still waiting on you.
 - **"Glass updated" card:** the first time a new version opens, a glass card bottom right shows what's new (up to three changes with their pictures). **All changes** opens Settings at What's new. It leaves by itself after 20 s unless you're hovering it, and shows once per version. A fresh install doesn't show it.
 - **Releases are built on your PC,** so they're signed for Spotify. The GitHub Actions release workflow was removed: GitHub's servers don't have your castlabs account, so their builds would have broken Spotify inside Glass after an update.
 - **The update popups sit higher,** clear of the player bar.
+
+### Spotify inside Glass: what the log showed, and what changed (0.2.1)
+- **It never actually played.** Your `spotify-log.txt` shows 45 songs sent to Glass and every one sat at 0:00; Spotify never once reported "playing" there. Glass became the active device and accepted Play, but no sound started. Earlier I took "on Glass Player" in the log as proof it worked; it wasn't.
+- **Ruled out:** Widevine works in the installed, signed Glass (tested with a separate test profile: every audio format Spotify uses unlocks). Glass's content rules don't touch Spotify's player (it plays inside its own sdk.scdn.co frame). Electron doesn't block autoplay.
+- **The log now shows what Spotify's player sees.** Its own console warnings and errors, how Spotify's servers answer it (licence, audio, player requests; host and path only, never tokens), when sound actually starts or pauses in Glass, and the player's own state (playing, paused, still loading).
+- **Autoplay block handled:** if the browser stops the music starting by itself, Glass says "Click anywhere in Glass to start the music" and the next click starts it.
+- **Stall nudge:** 3.5 s after Play, if the song is still at 0:00 on Glass, Glass unlocks audio and resumes from inside the player, and logs whether that worked.
+- **Playlists Spotify hides:** since February 2026 Spotify refuses to list the songs of some playlists to apps (403). The page now says so and **Play** at the top still plays the playlist, instead of "Can't show this playlist" with a Retry that never works.
+- **Search** asks for 10 results at a time (Spotify's new maximum), so the first search no longer fails once before retrying.
+- **First real playback, then a drop:** with the new log, six songs played inside Glass for 13 minutes (licence, audio and player all answered fine), then at 00:51 the player lost its song mid-song, and every Play after that went to a player that no longer existed. One path could cause that without a trace: when Spotify refused the player's sign-in, Glass switched the player off for good and waited for "Reconnect" in Settings, without logging anything.
+- **The player heals itself now.** If Spotify refuses its sign-in, it goes offline for 15 s, or the song drops while Spotify still names Glass as the device, Glass gets a fresh sign-in, starts a new player and carries on with the same song at the same spot (inside the same album or playlist, or the same list of songs). If you moved playback to another device yourself, it's left there. After 3 reconnects in 10 minutes it stops and waits for Play instead of looping; **Play** (or the play button) restarts a stopped player first, then plays on it. Every step is in the log.
+- Checked with a stand-in for Spotify's player in an off-screen test: refused sign-in → back at 74 s on a new player; dropped song → back at 82 s; playback moved to another device → left alone; a 4th failure → stops; Play → back.
+- **Two "Glass Player"s on Spotify (you found this one).** Spotify keeps listing a player until the player signs off, and Glass never signed off when it closed (quitting, an update, a reinstall). Each of those left an old "Glass Player" on your account that plays nothing. When Spotify (or its device menu) sent the music there, nothing happened. The log shows it: songs changing "on Glass Player" with nothing from Glass's own player, and two switches from one "Glass Player" to another.
+  - **Glass signs off when it closes.** Closing waits for Spotify to confirm (1.5 s at most; instant without Spotify), so no new old ones are left behind. Restarting after signing for Spotify signs off first too.
+  - **Old ones are hidden.** Any "Glass Player" that isn't this Glass's own is left out of the Play on lists (the Spotify button in the dock and Settings).
+  - **Music sent to an old one comes back.** If Spotify plays on an old Glass Player, Glass moves it to its own player; Play and the play button do the same; and a song that drops because Spotify moved it to an old one is brought back.
+  - **Only one player at a time.** Starting the player twice at once (sign-in, Play and a reconnect together) used to be able to make two; now it makes one, and a replaced player is switched off.
+  - Glass can't delete an old Glass Player from Spotify's side; Spotify drops it by itself after a while. Until then the Spotify app's own device menu may still show it, and Glass pulls the music back if it's picked.
+  - Checked with the stand-in in an off-screen test: three starts at once → one player; stop/start while starting → one live player; an old Glass Player on the account → hidden from Glass's lists; music sent to it → moved back, still playing; Glass closing → player signed off.
+
+### Lyrics when the queue panel is wide (0.2.2)
+- **The bug:** with the lyrics open and the queue panel dragged wider (or a small window), the cover vanished but the lyrics stayed squeezed into the right-hand column with an empty gap on the left. An older layout rule overrode the narrow layout, and the switch happened with no animation.
+- **Now:** when there isn’t room for both, the lyrics fill the whole stage (top to bottom, lined up with the queue panel) and the cover sits small in their top-left corner, next to the lyrics source and buttons.
+- **The switch is a water drop:** the cover shrinks as it falls into the corner, rounds into a drop, lands with a small squash and settles, while the lyrics pour out to fill the space. Widening again lifts the drop out of the corner and it swells back into the cover, with the title rising in underneath. Switches at 640 px of stage width going narrow and 680 px going wide, so it doesn’t flicker at the edge. The cover no longer drifts toward the mouse while it’s small.
+- Checked off-screen at several widths and mid-animation in both directions; the normal layouts (no lyrics, lyrics side by side, empty library) measure the same as before.
+
+### Smooth resizing (0.2.2)
+- **Cards:** card grids (Library playlists, artists, albums) used to stretch wider while their rows kept the old height, so cards overlapped, then snapped into a new grid 140 ms after you stopped. Now every frame of a drag gives the rows the cards’ real height, and when a column comes or goes the cards glide from where they were to their new spots. A width sweep from 380 to 960 px and back (117 frames) found no overlap at any frame.
+- **Lyrics:** the space above and below the lines came from the panel’s width, so the whole text slid up and down as you dragged. It now comes from the stage’s height, and on every size change the sung line is put back exactly where it was (plain lyrics keep their place in the text). Measured: the sung line stays within 6 px across every width, including the switch to and from the corner layout.
+
+### Updates find you (0.2.2)
+- Glass looks for a new version 8 s after it opens, every 30 minutes, and when you come back to its window after 10 minutes away. A new version downloads quietly with a small progress card, then a card says it’s ready with **Restart to update** (Later shrinks it to a pill).
+- Each finished batch of work now ships as a GitHub release with these notes, so your installed Glass picks it up by itself.
 
 ---
 

@@ -126,6 +126,23 @@
     if (instant || reduceMotion) { stopGlide(); lyBody.scrollTop = pos = goal; return; }
     if (!glideRaf) { pos = lyBody.scrollTop; glideLast = performance.now(); glideRaf = requestAnimationFrame(glideStep); }
   }
+  // The panel changing size (dragging the queue panel, resizing the window, cover ⇄ corner) re-wraps the
+  // lines. Synced lyrics keep the sung line exactly where it was on every frame; plain lyrics keep their place
+  // in the text. Without this the text jumped about and then slid back.
+  let lyW = 0, place = 0;
+  lyBody.addEventListener('scroll', () => {
+    const room = lyBody.scrollHeight - lyBody.clientHeight;
+    if (!glideRaf) place = room > 0 ? lyBody.scrollTop / room : 0;
+  }, { passive: true });
+  new ResizeObserver(() => {
+    const w = lyBody.clientWidth;
+    if (!open || !w || Math.abs(w - lyW) < 0.5) { lyW = w; return; }
+    lyW = w;
+    const box = lyBody.firstElementChild;
+    const cur = lines.length && curLine >= 0 && box ? box.children[curLine] : null;
+    if (cur) { if (performance.now() > userScrollUntil) follow(cur, true); return; }
+    if (!lines.length) lyBody.scrollTop = place * Math.max(0, lyBody.scrollHeight - lyBody.clientHeight);
+  }).observe(lyBody);
   // the user scrolling by hand pauses following for a few seconds
   lyBody.addEventListener('wheel', () => { stopGlide(); userScrollUntil = performance.now() + 4000; }, { passive: true });
   lyBody.addEventListener('pointerdown', (e) => { if (e.target === lyBody) { stopGlide(); userScrollUntil = performance.now() + 4000; } });
@@ -287,6 +304,70 @@
     } finally { moving = false; }
   }
   btn.addEventListener('click', () => setOpen(!open));
+
+  // ---------- room for the cover? ----------
+  // When the stage gets too narrow for cover and lyrics side by side (the queue panel was widened, the window
+  // shrunk), the lyrics flow out to fill it and the cover drops into their top-left corner like a water drop:
+  // it shrinks as it falls, rounds into a drop, lands with a small splash and settles. Widening plays the
+  // drop rising back out. A small gap between the two widths keeps it from flickering at the edge.
+  const stage = $('#stage');
+  const ROOM_OFF = 640, ROOM_ON = 680;      // stage widths: narrower than OFF → compact; wider than ON → side by side
+  let compact = false;
+  function fitRoom(animate) {
+    const w = stage.clientWidth;
+    if (!w) return;
+    const want = compact ? w < ROOM_ON : w < ROOM_OFF;
+    if (want === compact) return;
+    compact = want;
+    const shown = animate && open && !moving && !reduceMotion && body.classList.contains('lyrics-on')
+      && body.classList.contains('has-track') && !body.classList.contains('is-video') && !body.classList.contains('wide');
+    if (shown) drop(want);
+    else body.classList.toggle('ly-compact', want);
+    if (open && lines.length) setTimeout(() => tick(true), shown ? 760 : 0);
+  }
+  function drop(toCorner) {
+    const wrapEl = $('#artWrap'), art = $('#art'), img = $('#artImg'), meta = $('#nowMeta');
+    [wrapEl, art, img, meta, pane].forEach((el) => el.getAnimations().forEach((a) => a.cancel()));
+    const a0 = wrapEl.getBoundingClientRect(), p0 = pane.getBoundingClientRect();
+    body.classList.toggle('ly-compact', toCorner);
+    const a1 = wrapEl.getBoundingClientRect(), p1 = pane.getBoundingClientRect();
+    if (!a0.width || !a1.width) return;
+    const s = a0.width / a1.width;
+    const dx = a0.left + a0.width / 2 - (a1.left + a1.width / 2), dy = a0.top + a0.height / 2 - (a1.top + a1.height / 2);
+    const from = `translate(${dx}px, ${dy}px) scale(${s})`;
+    const big = 22, small = 12;              // the cover's corner radius, big and in the corner
+    const T = 900;
+    if (toCorner) {
+      // falls and shrinks into a round drop just short of the corner, lands flattened, wobbles, settles
+      anim(wrapEl, [
+        { transform: from, easing: 'cubic-bezier(.5, 0, .7, .4)' },
+        { transform: `translate(${dx * 0.1}px, ${dy * 0.1}px) scale(.82)`, offset: 0.55, easing: 'cubic-bezier(.2, .6, .4, 1)' },
+        { transform: 'scale(1.18, .8)', offset: 0.72 },
+        { transform: 'scale(.93, 1.07)', offset: 0.86 },
+        { transform: 'none' },
+      ], { duration: T, easing: 'linear' });   // the easing is set per step above
+      anim(img, [{ borderRadius: `${big / s}px` }, { borderRadius: '50%', offset: 0.5 }, { borderRadius: '42%', offset: 0.72 }, { borderRadius: `${small}px` }], { duration: T, easing: 'ease-in-out' });
+      anim(art, [{ padding: `${9 / s}px` }, { padding: '3px', offset: 0.5 }, { padding: '3px' }], { duration: T });
+      // the lyrics pour out from where they were to fill the stage
+      const ins = [p0.top - p1.top, p1.right - p0.right, p1.bottom - p0.bottom, p0.left - p1.left].map((v) => Math.max(0, Math.round(v)) + 'px');
+      anim(pane, [{ clipPath: `inset(${ins.join(' ')} round 26px)` }, { clipPath: 'inset(-30px round 56px)' }], { duration: 760, easing: GLIDE });
+    } else {
+      // the drop lifts out of the corner, swells back into the cover and settles; the title rises in under it
+      anim(wrapEl, [
+        { transform: from, easing: 'cubic-bezier(.4, 0, .6, 1)' },
+        { transform: `translate(${dx * 0.8}px, ${dy * 0.8}px) scale(${s * 1.4})`, offset: 0.3, easing: 'cubic-bezier(.3, .7, .3, 1)' },
+        { transform: 'scale(1.05, .95)', offset: 0.74 },
+        { transform: 'scale(.99, 1.01)', offset: 0.88 },
+        { transform: 'none' },
+      ], { duration: T, easing: 'linear' });   // the easing is set per step above
+      anim(img, [{ borderRadius: `${small / s}px` }, { borderRadius: '50%', offset: 0.3 }, { borderRadius: `${big}px` }], { duration: T, easing: 'ease-in-out' });
+      anim(art, [{ padding: `${3 / s}px` }, { padding: '9px', offset: 0.6 }, { padding: '9px' }], { duration: T });
+      anim(pane, [{ transform: `translateX(${Math.round(p0.left - p1.left)}px)`, opacity: 0.6 }, { transform: 'none', opacity: 1 }], { duration: 760, easing: GLIDE });
+      anim(meta, [{ opacity: 0, transform: 'translateY(10px)', filter: 'blur(6px)' }, { opacity: 1, transform: 'none', filter: 'none' }], { duration: 620, delay: 260, easing: GLIDE, fill: 'backwards' });
+    }
+  }
+  new ResizeObserver(() => fitRoom(true)).observe(stage);
+  fitRoom(false);
 
   window.Lyrics = {
     // the song on screen changed (local showNow, or Spotify's now playing); null = nothing playing

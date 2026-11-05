@@ -377,7 +377,8 @@ function artDrift(ts) {
   if (!drift.rect || ts - drift.at > 400) { drift.rect = $('#artWrap').getBoundingClientRect(); drift.at = ts; }
   let tx = 0, ty = 0;
   const r = drift.rect;
-  if (drift.mx != null && r.width) {
+  // small in the lyrics' corner (.ly-compact): it stays put
+  if (drift.mx != null && r.width && !(body.classList.contains('lyrics-on') && body.classList.contains('ly-compact'))) {
     tx = Math.max(-1, Math.min(1, (drift.mx - (r.left + r.width / 2)) / (innerWidth / 2))) * MAX;
     ty = Math.max(-1, Math.min(1, (drift.my - (r.top + r.height / 2)) / (innerHeight / 2))) * MAX;
   }

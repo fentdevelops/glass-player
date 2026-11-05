@@ -4,3 +4,6 @@ dist-*/
 *.bak
 *.log
 .impeccable/hook.cache.json
+# private research (legal and backend notes): kept on this PC, never in the public repo
+research_notes/
+reports/

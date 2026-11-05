@@ -8,6 +8,14 @@
     <rect width="96" height="64" rx="12" fill="url(#pn${id})"/><rect width="96" height="64" rx="12" fill="url(#pg${id})"/>
     <g fill="none" stroke="#fff" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round">${body}</g></svg>`;
   const NOTES = [
+    { v: '0.2.2', title: 'Lyrics make room', text: 'With a wide queue panel, the lyrics fill the space and the cover drops into their corner like a water drop.',
+      art: wash(9, '<path d="M48 14c8 10 13 17 13 23a13 13 0 0 1-26 0c0-6 5-13 13-23z" fill="rgba(255,255,255,.18)"/><path d="M24 50h48" opacity=".6"/>') },
+    { v: '0.2.2', title: 'Smooth resizing', text: 'Cards and lyrics follow the panel while you drag it, with no overlapping or jumping.',
+      art: wash(10, '<rect x="18" y="18" width="34" height="28" rx="5" opacity=".55"/><path d="M60 32h20M74 26l6 6-6 6M66 26l-6 6 6 6"/>') },
+    { v: '0.2.2', title: 'Updates find you', text: 'Glass looks for new versions every half hour and tells you when one is ready.',
+      art: wash(11, '<path d="M38 42V30a10 10 0 0 1 20 0v12l4 4H34z"/><path d="M44 50a4 4 0 0 0 8 0"/>') },
+    { v: '0.2.2', title: 'Steadier Spotify in Glass', text: 'It reconnects by itself, and there is no second Glass Player on Spotify that plays nothing.',
+      art: wash(12, '<circle cx="38" cy="32" r="11"/><circle cx="60" cy="32" r="11" opacity=".35"/><path d="M53 25l14 14" opacity=".6"/>') },
     { v: '0.2.1', title: 'Glass updates itself', text: 'New versions download quietly in the background and install when you restart.',
       art: wash(8, '<circle cx="48" cy="32" r="19" opacity=".45"/><path d="M48 20v20M40 33l8 8 8-8"/><path d="M38 47h20"/>') },
     { title: 'Spotify plays inside Glass', text: 'No Spotify app needed. Glass sets itself up in three quick steps.',

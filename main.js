@@ -74,6 +74,8 @@ function createWindow() {
       nodeIntegration: false,
       // keep timers precise while minimised so track transitions stay gapless
       backgroundThrottling: false,
+      // music may start without a click (Spotify's player starts songs it's sent from your phone or the dock)
+      autoplayPolicy: 'no-user-gesture-required',
       offscreen: OFFSCREEN_TEST,
     },
   });
@@ -81,6 +83,17 @@ function createWindow() {
   // tests: a size bigger than this screen (ultrawide, portrait) is set after creation
   if (testW && testH) win.setBounds({ width: testW, height: testH });
   // zoom keys are taken before the page and the default menu see them
+  require('./spotify-main').watchPlayer(win.webContents);
+  // before the window goes, Glass's Spotify player signs off, so Spotify doesn't keep an old "Glass Player"
+  // that plays nothing (closing waits for Spotify to confirm, 1.5 s at most)
+  let signedOff = false;
+  win.on('close', (e) => {
+    if (signedOff) return;
+    signedOff = true;
+    e.preventDefault();
+    const w = win;
+    require('./spotify-main').signOff(w.webContents).then(() => { if (!w.isDestroyed()) w.close(); });
+  });
   win.webContents.on('before-input-event', (e, input) => {
     const dir = zoomKey(input);
     if (dir === null) return;
@@ -714,9 +727,13 @@ let updateState = { state: 'idle', version: app.getVersion() };
 const sendUpdate = (patch) => { updateState = { ...updateState, ...patch }; win?.webContents.send('update', updateState); };
 const newer = (a, b) => { const pa = String(a).replace(/^v/, '').split(/[.-]/).map(Number), pb = String(b).replace(/^v/, '').split(/[.-]/).map(Number);
   for (let i = 0; i < 3; i++) { if ((pa[i] || 0) !== (pb[i] || 0)) return (pa[i] || 0) > (pb[i] || 0); } return false; };
-let autoUpdater = null;
+let autoUpdater = null, lastCheck = 0;
 async function checkUpdates(manual = false) {
   if (!ghPub || !app.isPackaged || process.env.GLASS_SHOT) { if (manual) sendUpdate({ state: 'off' }); return; }
+  // an update already on its way (or waiting for a restart) isn't looked for again
+  const busy = ['downloading', 'ready'].includes(updateState.state) || (updateState.state === 'checking' && Date.now() - lastCheck < 5 * 60e3);
+  if (!manual && busy) return;
+  lastCheck = Date.now();
   try {
     if (isPortable) {
       sendUpdate({ state: 'checking' });
@@ -736,7 +753,8 @@ async function checkUpdates(manual = false) {
       autoUpdater.on('update-not-available', () => sendUpdate({ state: 'current' }));
       autoUpdater.on('download-progress', (p) => sendUpdate({ state: 'downloading', percent: Math.round(p.percent || 0) }));
       autoUpdater.on('update-downloaded', (i) => sendUpdate({ state: 'ready', next: i.version }));
-      autoUpdater.on('error', (e) => sendUpdate({ state: 'error', message: String((e && e.message) || e).split('\n')[0].slice(0, 160) }));
+      // no release on GitHub yet counts as up to date, not as a failed check
+      autoUpdater.on('error', (e) => { const m = String((e && e.message) || e); sendUpdate(/No published versions/i.test(m) ? { state: 'current' } : { state: 'error', message: m.split('\n')[0].slice(0, 160) }); });
     }
     await autoUpdater.checkForUpdates();
   } catch (e) { sendUpdate({ state: 'error', message: String((e && e.message) || e).split('\n')[0].slice(0, 160) }); }
@@ -745,9 +763,12 @@ ipcMain.handle('update:state', () => updateState);
 ipcMain.handle('update:check', () => checkUpdates(true));
 ipcMain.handle('update:install', () => { if (autoUpdater && updateState.state === 'ready') setImmediate(() => autoUpdater.quitAndInstall(false, true)); });
 ipcMain.handle('update:open', () => { if (updateState.url && /^https:\/\/github\.com\//.test(updateState.url)) shell.openExternal(updateState.url); });
+// A new release reaches an open Glass within half an hour, and soon after you come back to the window:
+// it downloads quietly, then a small card says it's ready to restart (renderer/updates.js).
 app.whenReady().then(() => {
   setTimeout(() => checkUpdates(false), 8000);
-  setInterval(() => checkUpdates(false), 3 * 3600e3);
+  setInterval(() => checkUpdates(false), 30 * 60e3);
+  app.on('browser-window-focus', () => { if (Date.now() - lastCheck > 10 * 60e3) checkUpdates(false); });
 });
 
 // ---- Windows glass: is "Transparency effects" on? (read only; the user flips it in Windows Settings) ----

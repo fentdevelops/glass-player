@@ -55,8 +55,11 @@ contextBridge.exposeInMainWorld('glass', {
     cancel: () => ipcRenderer.invoke('sp:cancel'),
     disconnect: () => ipcRenderer.invoke('sp:disconnect'),
     api: (method, path, query, body) => ipcRenderer.invoke('sp:api', method, path, query, body),
-    token: () => ipcRenderer.invoke('sp:token'),
+    token: (fresh) => ipcRenderer.invoke('sp:token', !!fresh),
     log: (line) => ipcRenderer.send('sp:log', line),
+    // Glass is closing: the in-app player signs off Spotify first (had: there was a player to sign off)
+    onSignOff: (cb) => ipcRenderer.on('sp:sign-off', () => cb()),
+    signedOff: (had) => ipcRenderer.send('sp:off', !!had),
   },
   onOpenPaths: (cb) => ipcRenderer.on('open-paths', (_e, tracks) => cb(tracks)),
   onMaximized: (cb) => ipcRenderer.on('maximized', (_e, v) => cb(v)),
