@@ -3,7 +3,7 @@
 A liquid-glass music and video player for Windows (Electron). This file lists everything built so far,
 how to use it, where it lives in the code, and what's still waiting on you.
 
-**Current version:** 0.2.7 · **Code:** https://github.com/pxlarized2/glass-player (public) · **Releases:** the repo's Releases page. Installed copies update themselves from there.
+**Current version:** 0.2.8 · **Code:** https://github.com/pxlarized2/glass-player (public) · **Releases:** the repo's Releases page. Installed copies update themselves from there.
 
 ---
 
@@ -84,8 +84,8 @@ how to use it, where it lives in the code, and what's still waiting on you.
 
 ### Playback
 - **Instant skips:** the next song is chosen ahead (even on shuffle) and pre-loaded: audio, tags, full cover and lyrics. Measured on your files, the cover appears 2–3 ms after a skip (was 8–31 ms).
-- **Autoplay:** when the queue is nearly done, it adds similar songs (same artist, album, genre, folder; at most 4 per artist), shown under an "Autoplay" label. It can be turned off in Settings.
-- **Clicking the song that's playing** restarts it (or pauses it, if you choose that in Settings).
+- **Autoplay:** when the queue is nearly done, it adds similar songs (same artist, album, genre, folder; at most 4 per artist), shown under an "Autoplay" label.
+- **Clicking the song that's playing** restarts it.
 - **Sleep timer:** 15 min, 30 min, 1 hr, or end of song.
 
 ### Sound (Settings → Sound)
@@ -95,10 +95,7 @@ how to use it, where it lives in the code, and what's still waiting on you.
 - **Headroom:** volume is lowered a little as you boost, so heavy bass doesn't distort.
 
 ### Playback settings (Settings → Playback)
-- **Autoplay**
-- **Clicking the playing song:** Restart or Pause
 - **Fade in and out:** 0–8 s, at the start and end of every song
-- **Fade on play and pause**
 - **Speed** 0.75×–2×, and **Keep pitch**
 - **Arrow-key skip** 5/10/15 s (Shift + arrow always skips 30 s)
 - **Sleep timer**
@@ -129,7 +126,7 @@ how to use it, where it lives in the code, and what's still waiting on you.
 ### Gapless playback engine
 - **Two players take turns.** While a song plays, the next one loads on a second, hidden player. When the song ends, the next one is spliced in sample by sample, so albums play with **no gap and no click**.
 - **Skips are instant** when the next song is already loaded, with a short 180 ms fade instead of a hard cut.
-- **Settings → Playback → Between songs:** **Gapless** (default) or **Crossfade 3 s / 6 s / 10 s**. Songs from the same album always stay gapless, even with crossfade on.
+- Songs run straight into each other with no gap. Songs from the same album are always seamless, even with **Fade in and out** on.
 - **Fade in and out** (per song) switches off while crossfading, and doesn't break up an album that flows song to song.
 - **Video to video:** the new picture dissolves in over the old one instead of flashing black.
 - **Everything else keeps working on top of it:** the Sound chain (EQ, reverb, fades), speed and pitch, shuffle (the pre-chosen next song is the one that loads), repeat one, Autoplay, sleep timer ("end of song" now stops cleanly at the end), and renaming or retagging the playing song (it carries on from the same spot).
@@ -220,6 +217,9 @@ how to use it, where it lives in the code, and what's still waiting on you.
 ### Smooth resizing (0.2.2)
 - **Cards:** card grids (Library playlists, artists, albums) used to stretch wider while their rows kept the old height, so cards overlapped, then snapped into a new grid 140 ms after you stopped. Now every frame of a drag gives the rows the cards’ real height, and when a column comes or goes the cards glide from where they were to their new spots. A width sweep from 380 to 960 px and back (117 frames) found no overlap at any frame.
 - **Lyrics:** the space above and below the lines came from the panel’s width, so the whole text slid up and down as you dragged. It now comes from the stage’s height, and on every size change the sung line is put back exactly where it was (plain lyrics keep their place in the text). Measured: the sung line stays within 6 px across every width, including the switch to and from the corner layout.
+
+### Simpler playback (0.2.8)
+- Settings → Playback is down to **Fade in and out**. The rest is simply how Glass behaves now: clicking the song that’s playing restarts it, Autoplay is always on, songs run straight into each other with no crossfade, and play and pause have no audible fade (a 0.04 s ramp only stops the click). Old choices for these are cleared when Glass starts.
 
 ### The cover comes back cleanly (0.2.7)
 - Making the queue panel smaller again (or the window bigger) used to send a frameless copy of the cover slowly out of the lyrics’ corner, rounding into a circle, while the lyrics slid across its spot; the real cover popped in at the end. Now the real cover, frame and all, fades in at its own spot and grows from small to full size, from its middle, and the lyrics only shift a little.

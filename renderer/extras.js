@@ -61,8 +61,8 @@ let songLv = 1;
 function songFade() {
   const f = +S.play.xfade || 0;
   let lv = 1;
-  // off while Between songs is a crossfade (that already fades); album songs that flow into each other stay seamless
-  if (f > 0 && window.Sound?.ready() && !seeking && !(S.play.crossfade > 0)) {
+  // album songs that flow into each other stay seamless
+  if (f > 0 && window.Sound?.ready() && !seeking) {
     const d = deck.duration, c = deck.currentTime, t = current(), nx = deck.plannedItem;
     if (d && isFinite(d) && d > f * 2.5) {
       const fin = lastTransition === 'gapless' ? 1 : c / f;

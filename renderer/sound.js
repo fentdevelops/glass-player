@@ -88,21 +88,8 @@
     if (first) n.fade.gain.value = 1;
   }
 
-  // soft fade on play/pause (Settings > Playback)
-  function fadeTo(v, secs) {
-    if (!n) return Promise.resolve();
-    const g = n.fade.gain, t = ctx.currentTime;
-    g.cancelScheduledValues(t);
-    g.setValueAtTime(g.value, t);
-    g.linearRampToValueAtTime(v, t + secs);
-    return new Promise((r) => setTimeout(r, secs * 1000));
-  }
-
   window.Sound = {
     BANDS, PRESETS, build, apply,
-    fadeIn: () => fadeTo(1, 0.35),
-    silence: () => { if (n) { n.fade.gain.cancelScheduledValues(ctx.currentTime); n.fade.gain.setValueAtTime(0, ctx.currentTime); } },
-    fadeOut: () => fadeTo(0, 0.25),
     ready: () => !!n,
     songLevel: (v) => { if (n) n.song.gain.setTargetAtTime(v, ctx.currentTime, 0.04); },
   };

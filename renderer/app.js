@@ -54,7 +54,7 @@ const S = {
   sideW: 0,                 // dragged side panel width (0 = default)
   from: null,               // the page the playing songs were started from (the song title links back to it)
   // Settings > Playback
-  play: { click: 'restart', skip: 5, fade: true, speed: 1, keepPitch: true, autoplay: true, xfade: 0, crossfade: 0 },   // crossfade: 0 = gapless
+  play: { skip: 5, speed: 1, keepPitch: true, xfade: 0 },
   // Settings > Sound (sound.js builds the Web Audio chain from this)
   sound: { bass: 0, treble: 0, eq: [0, 0, 0, 0, 0], preset: 'flat', reverb: 0, room: 'room', even: true, mono: false, wide: 0 },   // Even out volume: on from the start
 };
@@ -427,29 +427,22 @@ function play(i, autoplay = true) {
   paintHeader();
   save();
 }
-// clicking the song that's already on: start it over (or pause, if the user picked that in Settings)
+// clicking the song that's already on: start it over
 function clickPlaying() {
-  if (S.play.click === 'pause') { togglePlay(); return; }
   deck.seek(0);
   if (deck.paused) deck.play();
 }
 function togglePlay() {
   if (!current()) { if (S.queue.length) play(0); return; }
-  if (deck.paused) {
-    if (S.play.fade && window.Sound?.ready()) { Sound.silence(); Promise.resolve(deck.play()).finally(() => Sound.fadeIn()); }
-    else deck.play();
-  } else if (S.play.fade && window.Sound?.ready()) Sound.fadeOut().then(() => { deck.pause(); Sound.fadeIn(); });
-  else deck.pause();
+  if (deck.paused) deck.play(); else deck.pause();   // no audible fade (the engine's 40 ms ramp only stops a click)
 }
-// speed + pitch survive track changes, on both decks; Between songs: gapless or a crossfade (Settings > Playback)
+// speed + pitch survive track changes, on both decks
 function applySpeed() {
   for (const v of deck.elements) {
     v.defaultPlaybackRate = v.playbackRate = S.play.speed || 1;
     v.preservesPitch = S.play.keepPitch !== false;
   }
   paintSpeed();
-  if (![0, 3, 6, 10].includes(S.play.crossfade)) S.play.crossfade = 0;
-  deck.setCrossfade(S.play.crossfade);
 }
 // the speed button next to Lyrics: shows the speed ("1×", "1.25×") and opens the choices
 const SPEEDS = [0.5, 0.75, 1, 1.25, 1.5, 1.75, 2];
@@ -557,7 +550,7 @@ function autoplayPicks(seed, count, opts = {}) {
   return out;
 }
 function maybeAutoplay() {
-  if (!S.play.autoplay || S.repeat !== 'off' || S.shuffle || S.cur < 0) return;
+  if (S.repeat !== 'off' || S.shuffle || S.cur < 0) return;
   if (S.queue.length - S.cur - 1 > 1) return;          // top up when one song or fewer is left
   const seed = current();
   if (!seed) return;
@@ -2524,7 +2517,11 @@ async function restore() {
   S.from = s.from && typeof s.from === 'object' && VIEWS.includes(s.from.view) ? s.from : null;
   S.sideW = +s.sideW || 0;
   if (typeof applySideW === 'function') applySideW();
-  if (s.play) S.play = { ...S.play, ...s.play };
+  if (s.play) {
+    S.play = { ...S.play, ...s.play };
+    // settings that no longer exist: restart on click, Autoplay always on, no crossfade, no fade on play/pause
+    for (const k of ['click', 'autoplay', 'crossfade', 'fade']) delete S.play[k];
+  }
   if (s.sound) S.sound = { ...S.sound, ...s.sound };
   window.Sound?.apply();
   S.ui.style = 'liquid';          // the Frosted style was removed

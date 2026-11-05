@@ -52,13 +52,7 @@
   }
   function playbackHTML() {
     return `
-      <div class="set-row"><div><b>Clicking the song that's playing</b><span>Start it over, or pause it</span></div></div>
-      ${chips('play.click', [['restart', 'Restart'], ['pause', 'Pause']])}
-      ${toggle('play.autoplay', 'Autoplay', 'When the queue runs out, keep going with similar songs')}
-      <div class="set-row"><div><b>Between songs</b><span>Gapless runs songs straight into each other. Songs from one album always stay gapless.</span></div></div>
-      ${chips('play.crossfade', [[0, 'Gapless'], [3, 'Crossfade 3 s'], [6, '6 s'], [10, '10 s']])}
-      ${slider('play.xfade', 'Fade in and out', 'Each song fades in at the start and out at the end (off while crossfading)', 0, 8, 's')}
-      ${toggle('play.fade', 'Fade on play and pause', 'A soft fade instead of a hard stop')}`;
+      ${slider('play.xfade', 'Fade in and out', 'Each song fades in at the start and out at the end', 0, 8, 's')}`;
   }
 
   const getK = (k) => k.split('.').reduce((o, p) => o[p], S);
