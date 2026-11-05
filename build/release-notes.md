@@ -1,11 +1,9 @@
-## Glass 0.2.5
+## Glass 0.2.6
 
-**Calm, smooth glass.** The colour wash behind the glass used to move and pulse with the beat many times a second, which made the glass edges flicker and cost frame rate on big screens. It now glides to each new song's colours and then holds still.
+**Wrong lyrics? Remove them.** Lyrics found online (LRCLIB, Kugou or NetEase) can be removed from the lyrics ••• menu, and they stay gone instead of coming back a week later. **Look again** now really searches again.
 
-**Bright covers stay readable.** A white or bright cover dims the background just enough to keep white text clear. Normal and dark covers are left exactly as they were.
+**Tidier lyrics search.** An even gap between the field and the Search button, a field that stays put while you type, and no stray dot or bright line.
 
-**Soft artwork background.** The artwork background starts fully blurred, like coloured light behind the glass. Your own image keeps its own blur, and if you'd picked a blur yourself, it's kept.
+**Softer playing marker.** The playing song's cover fades its marker in and out instead of flashing up.
 
-**Also:** choosing a background in Settings updates the blur slider right away.
-
-Installed copies update themselves. New install: download `Glass-Player-Setup-0.2.5.exe` below.
+Installed copies update themselves. New install: download `Glass-Player-Setup-0.2.6.exe` below.

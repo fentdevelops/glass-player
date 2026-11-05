@@ -22,6 +22,7 @@
   }
 
   const SRC_LABEL = { File: 'From the lyrics file', Tags: 'From the song file', LRCLIB: 'From LRCLIB', Kugou: 'From Kugou', NetEase: 'From NetEase' };
+  const ONLINE = new Set(['LRCLIB', 'Kugou', 'NetEase']);
   const hintsOf = (t) => ({
     title: t.title || '', artist: t.artist || '', album: t.album || '',
     duration: t.duration || (t === current() ? deck.duration || 0 : 0),
@@ -73,7 +74,8 @@
     data = null;
     render('loading');
     let r;
-    try { r = await api.lyrics.get(t.path, hintsOf(t)); } catch (err) { r = { none: true, error: cleanErr(err) }; }
+    // force (Look again): really search online again instead of getting the saved answer back
+    try { r = await api.lyrics.get(t.path, hintsOf(t), force ? 'fresh' : 'auto'); } catch (err) { r = { none: true, error: cleanErr(err) }; }
     if (my !== seq || shownFor !== t) return;
     if (!r.error) remember(t, r);
     data = r;
@@ -220,7 +222,8 @@
           catch (err) { toast(cleanErr(err), true); }
         },
       }] : []),
-      ...(has && data.source === 'LRCLIB' ? [{
+      // any lyrics found online (LRCLIB, Kugou, NetEase) can be thrown out; your own .lrc file and the song's tags can't
+      ...(data && (has || data.instrumental) && ONLINE.has(data.source) ? [{
         label: 'Wrong lyrics, remove', icon: ICON.x,
         act: async () => { await api.lyrics.pick(t.path, null).catch(() => {}); data = { none: true }; remember(t, data); render(); },
       }] : []),

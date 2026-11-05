@@ -8,6 +8,12 @@
     <rect width="96" height="64" rx="12" fill="url(#pn${id})"/><rect width="96" height="64" rx="12" fill="url(#pg${id})"/>
     <g fill="none" stroke="#fff" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round">${body}</g></svg>`;
   const NOTES = [
+    { v: '0.2.6', title: 'Wrong lyrics? Remove them', text: 'Lyrics from any online source can be removed from the ••• menu, and they stay gone. Look again really searches again.',
+      art: wash(21, '<path d="M26 24h30M26 32h22M26 40h26"/><path d="M62 26l12 12M74 26L62 38"/>') },
+    { v: '0.2.6', title: 'Tidier lyrics search', text: 'An even gap, a field that stays put, and no stray dot or bright line.',
+      art: wash(22, '<rect x="14" y="24" width="48" height="16" rx="6"/><rect x="66" y="24" width="18" height="16" rx="6"/>') },
+    { v: '0.2.6', title: 'Softer playing marker', text: 'The playing song’s cover fades its marker in and out instead of flashing up.',
+      art: wash(23, '<rect x="30" y="16" width="32" height="32" rx="7" opacity=".5"/><path d="M40 40v-8M46 40V28M52 40v-6"/>') },
     { v: '0.2.5', title: 'Calm, smooth glass', text: 'The background holds still once a song’s colours settle, so the glass edges stop flickering and everything runs smoother.',
       art: wash(18, '<path d="M14 40c10-8 20-8 34 0s24 8 34 0" opacity=".45"/><path d="M14 30h68"/>') },
     { v: '0.2.5', title: 'Bright covers stay readable', text: 'A white or bright cover dims the background just enough to keep the text clear. Dark covers are untouched.',

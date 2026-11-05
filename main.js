@@ -626,15 +626,16 @@ async function lyricsSearch(q) {
   const all = lists.flatMap((x) => (x.status === 'fulfilled' ? x.value : []));
   return all.sort((a, b) => (b.synced ? 1 : 0) - (a.synced ? 1 : 0)).slice(0, 30);
 }
-// mode: 'auto' (local → cache → online) | 'local' (never touch the network)
+// mode: 'auto' (local → cache → online) | 'fresh' (local → online, ignoring what was saved: Look again) | 'local' (never touch the network)
 ipcMain.handle('lyrics-get', async (_e, p, hints = {}, mode = 'auto') => {
   const local = lyricsSidecar(p) || (await lyricsEmbedded(p));
   if (local) return local;
-  const cached = lyricsCacheGet(p);
-  // a remembered "nothing found" is retried after a week, in case LRCLIB has it by then
-  const staleMiss = cached && cached.none && Date.now() - (cached.at || 0) > 7 * 864e5;
+  const cached = mode === 'fresh' ? null : lyricsCacheGet(p);
+  // a remembered "nothing found" is retried after a week, in case LRCLIB has it by then;
+  // lyrics you removed as wrong stay removed (until you search and pick some yourself)
+  const staleMiss = cached && cached.none && !cached.removed && Date.now() - (cached.at || 0) > 7 * 864e5;
   if (cached && !staleMiss) return cached.none ? { none: true } : cached;
-  if (mode !== 'auto') return { none: true };
+  if (mode === 'local') return { none: true };
   let r;
   try { r = await lyricsAuto(hints); } catch { return { none: true, error: "Couldn't reach the lyrics service. Check your connection." }; }
   try { lyricsCacheSet(p, r || { none: true, at: Date.now() }); } catch { /* cache is best effort */ }
@@ -643,7 +644,8 @@ ipcMain.handle('lyrics-get', async (_e, p, hints = {}, mode = 'auto') => {
 ipcMain.handle('lyrics-search', async (_e, q) => {
   try { return await lyricsSearch(q); } catch { throw new Error("Couldn't reach the lyrics service. Check your connection."); }
 });
-ipcMain.handle('lyrics-pick', (_e, p, r) => { lyricsCacheSet(p, r && (r.synced || r.plain || r.instrumental) ? r : { none: true, at: Date.now() }); return true; });
+// r = the lyrics you picked; null = "Wrong lyrics, remove" (remembered as removed, never looked up again by itself)
+ipcMain.handle('lyrics-pick', (_e, p, r) => { lyricsCacheSet(p, r && (r.synced || r.plain || r.instrumental) ? r : { none: true, removed: true, at: Date.now() }); return true; });
 // writes the lyrics as a .lrc (or .txt) next to the song so other players see them too
 ipcMain.handle('lyrics-save-file', (_e, p, r) => {
   const base = p.slice(0, p.length - path.extname(p).length);

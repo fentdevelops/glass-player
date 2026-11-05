@@ -3,7 +3,7 @@
 A liquid-glass music and video player for Windows (Electron). This file lists everything built so far,
 how to use it, where it lives in the code, and what's still waiting on you.
 
-**Current version:** 0.2.5 · **Code:** https://github.com/pxlarized2/glass-player (public) · **Releases:** the repo's Releases page. Installed copies update themselves from there.
+**Current version:** 0.2.6 · **Code:** https://github.com/pxlarized2/glass-player (public) · **Releases:** the repo's Releases page. Installed copies update themselves from there.
 
 ---
 
@@ -220,6 +220,12 @@ how to use it, where it lives in the code, and what's still waiting on you.
 ### Smooth resizing (0.2.2)
 - **Cards:** card grids (Library playlists, artists, albums) used to stretch wider while their rows kept the old height, so cards overlapped, then snapped into a new grid 140 ms after you stopped. Now every frame of a drag gives the rows the cards’ real height, and when a column comes or goes the cards glide from where they were to their new spots. A width sweep from 380 to 960 px and back (117 frames) found no overlap at any frame.
 - **Lyrics:** the space above and below the lines came from the panel’s width, so the whole text slid up and down as you dragged. It now comes from the stage’s height, and on every size change the sung line is put back exactly where it was (plain lyrics keep their place in the text). Measured: the sung line stays within 6 px across every width, including the switch to and from the corner layout.
+
+### Lyrics fixes and small polish (0.2.6)
+- **Wrong lyrics, remove** is in the lyrics ••• menu for lyrics from any online source (LRCLIB, Kugou, NetEase), not only LRCLIB, and for ones wrongly marked instrumental. A removal is remembered as removed, so it no longer comes back by itself a week later; your own .lrc files and the song’s tags are never offered for removal.
+- **Look again** really searches online again (it used to get the saved answer straight back).
+- **Lyrics search bar:** no dot under the search icon (it gets a soft pressed background instead), no divider line under the bar, a calm focus glow instead of a bright ring, the field no longer grows into the Search button, and the button matches the field’s height and shape.
+- **Playing marker:** the dark veil with moving bars on the playing song’s cover fades in and out with the song instead of switching on at once and popping up from small.
 
 ### Calm glass, bright covers, soft artwork (0.2.5)
 - **Glass edges no longer flicker.** The colour wash behind everything was repainted 24 times a second, drifting and pulsing with the beat. Each repaint made every glass panel redo its blur and bent rim, and the rims bend whatever is behind them, so dark parts of the cover (a figure in the artwork) flickered along the bottom edges. It also cost a lot of frame rate on big screens. The wash now only moves while it glides to a new song’s colours (about 3 s) or follows a video; once settled it holds still (measured: 0 repaints in 4 s of playback, was about 100).

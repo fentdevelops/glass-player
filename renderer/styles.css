@@ -454,9 +454,16 @@ body.playing .ibtn.play .i-pause { opacity: 1; transform: none; }
 .dots svg { width: 16px; height: 16px; fill: currentColor; }
 .row:hover .dots, .row.menu-open .dots, .dots:focus-visible { opacity: .9; transform: none; }
 .dots:hover { background-color: var(--fill-3); opacity: 1; transform: scale(1.1); }
-.eq { position: absolute; inset: 0; display: none; align-items: flex-end; justify-content: center; gap: 2px; padding-bottom: 12px; background: rgba(0, 0, 0, .4); }
-.row.current .eq { display: flex; animation: pop-in .5s var(--soft); }
-.row.compact .eq { position: static; background: none; padding: 0; height: 14px; }
+/* the playing song's cover gets a soft dark veil with moving bars: it fades in and out with the song (it used to
+   switch on at once and pop up from small, which read as a square flashing up) */
+.eq {
+  position: absolute; inset: 0; display: flex; align-items: flex-end; justify-content: center; gap: 2px; padding-bottom: 12px;
+  background: rgba(0, 0, 0, .4); opacity: 0; pointer-events: none; transition: opacity .7s var(--glide);
+}
+.row.current .eq { opacity: 1; }
+.row.compact .eq { position: static; background: none; padding: 0; height: 14px; display: none; }
+.row.compact.current .eq { display: flex; animation: eq-in .7s var(--glide) backwards; }
+@keyframes eq-in { from { opacity: 0; } }
 .row.compact.current .num { display: none; }
 .eq i { width: 3px; height: 30%; border-radius: 2px; background: #fff; }
 body.playing .row.current .eq i { animation: eq .9s ease-in-out infinite alternate; }
@@ -810,6 +817,15 @@ body.lyrics-on.ly-compact .ly-head { min-height: 56px; padding-left: 60px; }
 .ly-lookup .lookup { padding: 0 4px; margin: 0 -2px; }
 .ly-lookup.open { margin-bottom: 6px; }
 .ly-lookup .lookup-results { max-height: 230px; }
+/* lyrics search bar: no dot under the search icon (the open bar already says it's on), no divider line, a calm
+   field that doesn't grow into the Search button, and a button the same height and shape as the field */
+.ly-head #lyFind.on::after { display: none; }
+.ly-head #lyFind.on { background-color: var(--fill-2); }
+.ly-lookup .lookup { border-bottom: 0; }
+.ly-lookup .lookup-bar { gap: 10px; padding: 6px 4px 4px; align-items: center; }
+.ly-lookup .search:hover, .ly-lookup .search:focus-within { transform: none; }
+.ly-lookup .search:focus-within { box-shadow: inset 0 1px 2px rgba(0, 0, 0, .1), 0 0 0 1px rgba(255, 255, 255, .2), 0 0 18px 2px rgba(255, 255, 255, .08); }
+.ly-lookup .lookup-bar .btn { height: 38px; border-radius: 13px; flex: none; }
 .ly-item { grid-template-columns: minmax(0, 1fr) auto; padding: 8px 10px; }
 .lk-src.on { background: #fff; color: #111; }
 
