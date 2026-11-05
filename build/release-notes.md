@@ -1,5 +1,5 @@
-## Glass 0.2.12
+## Glass 0.2.13
 
-**Cleaner tags.** Tags are now just a name and a colour, with a small coloured dot on songs, in menus and in Edit info. Your existing tags keep their name, colour and songs.
+**Bright spots stay readable.** A picture background now gets a soft shadow over only its bright parts, so a white patch in a mostly dark cover can't wash out the player bar, while everything else keeps its full colour. It works for your own background image too.
 
-Installed copies update themselves. New install: download `Glass-Player-Setup-0.2.12.exe` below.
+Installed copies update themselves. New install: download `Glass-Player-Setup-0.2.13.exe` below.

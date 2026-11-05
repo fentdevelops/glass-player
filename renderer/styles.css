@@ -1198,6 +1198,9 @@ body.wide .side-grip, body.fs .side-grip { display: none; }
   transform: scale(1.04); transition: opacity 1.2s var(--glide), transform 2.4s var(--glide);
 }
 .wall i.on { opacity: 1; transform: none; }
+/* the shadow over the picture's bright parts (liquid.js): same box and fit as the picture, so it lines up */
+.wall i b { position: absolute; inset: 0; background: center / cover no-repeat; opacity: 0; transition: opacity .9s var(--glide); }
+.wall i b.on { opacity: 1; }
 body.wall-art .wall { display: block; }
 body.wall-art #amb { opacity: calc(var(--glow, .55) * .45); mix-blend-mode: soft-light; }
 

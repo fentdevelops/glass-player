@@ -278,16 +278,16 @@ let level = 0;
 // have settled it holds still. It used to drift and pulse with the beat 24 times a second, which made the glass rims
 // flicker (they bend whatever is behind them) and cost a lot of frame rate on big screens.
 let ambClock = 0, ambLast = 0;
-// Bright covers (a white one, say) would turn the background, and the see-through glass on it, nearly white, and the
-// white text with it. So the background behind the glass is dimmed just enough to keep text readable, only for
-// bright covers; normal and dark ones are left exactly as they are. It eases with the colours on each new song.
-// Not with your own image as background: the cover says nothing about how bright that picture is.
+// A bright cover would turn the colour wash, and the see-through glass on it, nearly white, and the white text with it.
+// So on the colours background the wash is dimmed just enough to keep text readable, only for bright covers; normal
+// and dark ones are left exactly as they are. It eases with the colours on each new song. Picture backgrounds (the
+// artwork, your own image) don't need this: they get a shadow over just their bright parts (liquid.js).
 let dim = 0, dimTarget = 0;
 function dimFor([r, g, b]) {
   const y = (0.2126 * r + 0.7152 * g + 0.0722 * b) / 255;
   return Math.max(0, Math.min(1, (y - 0.45) / 0.35)) * 0.62;
 }
-const dimNow = () => (S.ui.wall === 'custom' ? 0 : dimTarget);
+const dimNow = () => (S.ui.wall === 'colors' ? dimTarget : 0);
 const ambSettled = () => Math.abs(dimNow() - dim) < 0.004 && pal.every((c, i) => c.every((v, k) => Math.abs(palTarget[i][k] - v) < 0.6));
 function drawAmbient(ts) {
   const w = amb.width, h = amb.height;

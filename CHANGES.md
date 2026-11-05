@@ -3,7 +3,7 @@
 A liquid-glass music and video player for Windows (Electron). This file lists everything built so far,
 how to use it, where it lives in the code, and what's still waiting on you.
 
-**Current version:** 0.2.12 · **Code:** https://github.com/pxlarized2/glass-player (public) · **Releases:** the repo's Releases page. Installed copies update themselves from there.
+**Current version:** 0.2.13 · **Code:** https://github.com/pxlarized2/glass-player (public) · **Releases:** the repo's Releases page. Installed copies update themselves from there.
 
 ---
 
@@ -217,6 +217,10 @@ how to use it, where it lives in the code, and what's still waiting on you.
 ### Smooth resizing (0.2.2)
 - **Cards:** card grids (Library playlists, artists, albums) used to stretch wider while their rows kept the old height, so cards overlapped, then snapped into a new grid 140 ms after you stopped. Now every frame of a drag gives the rows the cards’ real height, and when a column comes or goes the cards glide from where they were to their new spots. A width sweep from 380 to 960 px and back (117 frames) found no overlap at any frame.
 - **Lyrics:** the space above and below the lines came from the panel’s width, so the whole text slid up and down as you dragged. It now comes from the stage’s height, and on every size change the sung line is put back exactly where it was (plain lyrics keep their place in the text). Measured: the sung line stays within 6 px across every width, including the switch to and from the corner layout.
+
+### Bright spots stay readable (0.2.13)
+- The artwork and Your image backgrounds get a soft shadow over only their bright parts. Glass makes a tiny brightness map of the picture, once per picture: no shadow up to mid brightness, most of the way for white, spread slightly past the bright area so the soft edge falls outside it. A mostly dark cover with a white patch used to wash out the player bar because its average wasn’t bright; now only the patch is shaded and the rest keeps its full colour. A fully white cover becomes a soft grey as before. Your own image gets this too, which the old dimming had to skip.
+- The Colours background keeps the overall dimming for bright covers, since it has no picture to shade.
 
 ### Cleaner tags (0.2.12)
 - Tags are a name and a colour, shown with a small coloured dot on songs, in menus and in Edit info. Existing tags keep their name, colour and songs.

@@ -8,6 +8,8 @@
     <rect width="96" height="64" rx="12" fill="url(#pn${id})"/><rect width="96" height="64" rx="12" fill="url(#pg${id})"/>
     <g fill="none" stroke="#fff" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round">${body}</g></svg>`;
   const NOTES = [
+    { v: '0.2.13', title: 'Bright spots stay readable', text: 'A soft shadow now sits over only the bright parts of the background, so a white patch can\u2019t wash out the player while everything else keeps its colour.',
+      art: wash(32, '<circle cx="48" cy="32" r="18" fill="rgba(0,0,0,.28)" stroke="none"/><circle cx="48" cy="32" r="8" fill="#fff" stroke="none"/>') },
     { v: '0.2.12', title: 'Cleaner tags', text: 'Tags are now just a name and a colour.',
       art: wash(31, '<path d="M26 32V20a2 2 0 0 1 2-2h14l26 14-26 14H28a2 2 0 0 1-2-2z"/><circle cx="36" cy="26" r="2.4" fill="#fff"/>') },
     { v: '0.2.11', title: 'Real artists', text: 'Edit info lists real artists instead of collab strings, and typing a name suggests real artists with their photos. Names like Earth, Wind & Fire stay in one piece.',
