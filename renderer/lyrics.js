@@ -298,10 +298,9 @@
 
   // ---------- room for the cover? ----------
   // When the stage gets too narrow for cover and lyrics side by side (the queue panel was widened, the window
-  // shrunk), the lyrics flow out to fill it and the glass takes the cover in like a water drop: it drifts into
-  // their top-left corner, shrinking and softening as the glass absorbs it, and the small cover surfaces from
-  // inside with a ripple. Widening lets it rise back out. A small gap between the two widths keeps it from
-  // flickering at the edge.
+  // shrunk), the lyrics flow out to fill it and the glass takes the cover in: it drifts into their top-left corner,
+  // shrinking and softening, while the small cover fades in there. Widening brings the cover back at its own spot,
+  // fading in and growing from its middle. A small gap between the two widths keeps it from flickering at the edge.
   const stage = $('#stage');
   const ROOM_OFF = 640, ROOM_ON = 680;      // stage widths: narrower than OFF → compact; wider than ON → side by side
   let compact = false;
@@ -317,8 +316,8 @@
     else body.classList.toggle('ly-compact', want);
     if (open && lines.length) setTimeout(() => tick(true), shown ? 760 : 0);
   }
-  // The moving cover is a stand-in drawn at full size and only ever scaled down, so it stays sharp the whole way
-  // (scaling the small corner cover up to full size was what made it look blurry mid-way).
+  // Going into the corner, the moving cover is a stand-in drawn at full size and only ever scaled down, so it stays
+  // sharp the whole way.
   let ghost = null;
   function drop(toCorner) {
     const wrapEl = $('#artWrap'), img = $('#artImg'), meta = $('#nowMeta');
@@ -329,54 +328,35 @@
     body.classList.toggle('ly-compact', toCorner);
     const i1 = img.getBoundingClientRect(), p1 = pane.getBoundingClientRect();
     if (!i0.width || !i1.width) return;
-    const big = toCorner ? i0 : i1, small = toCorner ? i1 : i0;        // the cover picture: full size, and in the corner
-    const s = small.width / big.width, dx = small.left - big.left, dy = small.top - big.top;
+    if (!toCorner) {
+      // the cover comes back at its own spot: fades in, small to big, from its middle. Nothing travels across the
+      // screen; the lyrics only shift a little as they make room, so they never sweep over the cover.
+      anim(wrapEl, [{ opacity: 0, transform: 'scale(.62)' }, { opacity: 1, transform: 'none' }], { duration: 560, easing: GLIDE });
+      const shift = Math.max(-70, Math.min(70, Math.round(p0.left - p1.left)));
+      anim(pane, [{ transform: `translateX(${shift}px)`, opacity: 0.55 }, { transform: 'none', opacity: 1 }], { duration: 560, easing: GLIDE });
+      anim(meta, [{ opacity: 0, transform: 'translateY(10px)' }, { opacity: 1, transform: 'none' }], { duration: 520, delay: 120, easing: GLIDE, fill: 'backwards' });
+      return;
+    }
+    // into the corner: shrinks toward it, then softens and fades into the glass as the small cover fades in
+    const s = i1.width / i0.width, dx = i1.left - i0.left, dy = i1.top - i0.top;
     const at = (k, sc) => `translate(${dx * k}px, ${dy * k}px) scale(${sc})`;
     const cs = getComputedStyle(img);
     const g = ghost = document.createElement('div');
     g.className = 'art-ghost';
-    Object.assign(g.style, { left: big.left + 'px', top: big.top + 'px', width: big.width + 'px', height: big.height + 'px',
+    Object.assign(g.style, { left: i0.left + 'px', top: i0.top + 'px', width: i0.width + 'px', height: i0.height + 'px',
       backgroundImage: cs.backgroundImage, backgroundColor: cs.backgroundColor });
     document.body.appendChild(g);
-    const finish = (a) => done(a).then(() => { if (ghost === g) ghost = null; g.remove(); });
-    const T = 900, R = 22, r = 12 / s;          // corner radius at full size; the corner cover's radius, in full-size units
-    if (toCorner) {
-      // drifts toward the corner and shrinks, rounds into a drop as it reaches the glass, then softens and fades
-      // into it: the glass takes it in rather than it landing on top
-      finish(anim(g, [
-        { transform: 'none', borderRadius: R + 'px', opacity: 1, filter: 'blur(0px)' },
-        { transform: at(0.8, s * 1.5), borderRadius: '50%', opacity: 1, filter: `blur(${0.6 / s}px)`, offset: 0.58 },
-        { transform: at(1, s), borderRadius: '50%', opacity: 0, filter: `blur(${5 / s}px)` },
-      ], { duration: T, easing: 'cubic-bezier(.45, 0, .2, 1)', fill: 'forwards' }));
-      // ...and the small cover surfaces from inside the glass with a ripple
-      anim(wrapEl, [{ opacity: 0, filter: 'blur(7px)', transform: 'scale(.72)' }, { opacity: 1, filter: 'blur(0px)', transform: 'none' }],
-        { duration: 520, delay: T * 0.55, easing: GLIDE, fill: 'backwards' });
-      ripple(small, p1, T * 0.6);
-      // the lyrics pour out from where they were to fill the stage
-      const ins = [p0.top - p1.top, p1.right - p0.right, p1.bottom - p0.bottom, p0.left - p1.left].map((v) => Math.max(0, Math.round(v)) + 'px');
-      anim(pane, [{ clipPath: `inset(${ins.join(' ')} round 26px)` }, { clipPath: 'inset(-30px round 56px)' }], { duration: 760, easing: GLIDE });
-    } else {
-      // the small cover lifts out of the glass as a soft drop, sharpens and swells into the full cover
-      finish(anim(g, [
-        { transform: at(1, s), borderRadius: r + 'px', opacity: 0, filter: `blur(${5 / s}px)` },
-        { transform: at(0.85, s * 1.5), borderRadius: '50%', opacity: 1, filter: `blur(${0.6 / s}px)`, offset: 0.35 },
-        { transform: 'none', borderRadius: R + 'px', opacity: 1, filter: 'blur(0px)' },
-      ], { duration: T, easing: 'cubic-bezier(.4, 0, .2, 1)' }));
-      anim(wrapEl, [{ opacity: 0 }, { opacity: 0, offset: 0.92 }, { opacity: 1 }], { duration: T, easing: 'linear' });
-      anim(pane, [{ transform: `translateX(${Math.round(p0.left - p1.left)}px)`, opacity: 0.6 }, { transform: 'none', opacity: 1 }], { duration: 760, easing: GLIDE });
-      anim(meta, [{ opacity: 0, transform: 'translateY(10px)', filter: 'blur(6px)' }, { opacity: 1, transform: 'none', filter: 'none' }], { duration: 620, delay: 300, easing: GLIDE, fill: 'backwards' });
-    }
-  }
-  // a soft ring spreading through the lyrics glass where the cover went in (kept inside the panel)
-  function ripple(at, box, delay) {
-    const clip = document.createElement('div'), ring = document.createElement('i');
-    clip.className = 'drop-ripple';
-    const size = at.width * 1.15;
-    Object.assign(ring.style, { left: at.left - box.left + at.width / 2 - size / 2 + 'px', top: at.top - box.top + at.height / 2 - size / 2 + 'px', width: size + 'px', height: size + 'px' });
-    clip.appendChild(ring);
-    pane.appendChild(clip);
-    done(anim(ring, [{ transform: 'scale(.55)', opacity: 0 }, { transform: 'scale(.85)', opacity: 0.75, offset: 0.18 }, { transform: 'scale(2.6)', opacity: 0 }],
-      { duration: 820, delay, easing: 'cubic-bezier(.2, .7, .3, 1)', fill: 'both' })).then(() => clip.remove());
+    const T = 760;
+    // corner radius in the stand-in's own units, so it reads as a rounded square all the way down
+    done(anim(g, [
+      { transform: 'none', borderRadius: '22px', opacity: 1, filter: 'blur(0px)' },
+      { transform: at(0.85, s * 1.35), borderRadius: `${14 / (s * 1.35)}px`, opacity: 1, filter: 'blur(0px)', offset: 0.65 },
+      { transform: at(1, s), borderRadius: `${12 / s}px`, opacity: 0, filter: `blur(${3 / s}px)` },
+    ], { duration: T, easing: 'cubic-bezier(.45, 0, .2, 1)', fill: 'forwards' })).then(() => { if (ghost === g) ghost = null; g.remove(); });
+    anim(wrapEl, [{ opacity: 0, transform: 'scale(.85)' }, { opacity: 1, transform: 'none' }], { duration: 420, delay: T * 0.55, easing: GLIDE, fill: 'backwards' });
+    // the lyrics pour out from where they were to fill the stage
+    const ins = [p0.top - p1.top, p1.right - p0.right, p1.bottom - p0.bottom, p0.left - p1.left].map((v) => Math.max(0, Math.round(v)) + 'px');
+    anim(pane, [{ clipPath: `inset(${ins.join(' ')} round 26px)` }, { clipPath: 'inset(-30px round 56px)' }], { duration: 700, easing: GLIDE });
   }
   new ResizeObserver(() => fitRoom(true)).observe(stage);
   fitRoom(false);

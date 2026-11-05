@@ -8,6 +8,8 @@
     <rect width="96" height="64" rx="12" fill="url(#pn${id})"/><rect width="96" height="64" rx="12" fill="url(#pg${id})"/>
     <g fill="none" stroke="#fff" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round">${body}</g></svg>`;
   const NOTES = [
+    { v: '0.2.7', title: 'The cover comes back cleanly', text: 'Making the queue panel smaller again fades the cover in at its spot, small to big. No more slow trip across the screen.',
+      art: wash(24, '<rect x="36" y="20" width="24" height="24" rx="5"/><rect x="29" y="13" width="38" height="38" rx="8" opacity=".4"/>') },
     { v: '0.2.6', title: 'Wrong lyrics? Remove them', text: 'Lyrics from any online source can be removed from the ••• menu, and they stay gone. Look again really searches again.',
       art: wash(21, '<path d="M26 24h30M26 32h22M26 40h26"/><path d="M62 26l12 12M74 26L62 38"/>') },
     { v: '0.2.6', title: 'Tidier lyrics search', text: 'An even gap, a field that stays put, and no stray dot or bright line.',

@@ -767,7 +767,7 @@ body.lyrics-on .lyrics {
 }
 /* No room for cover and lyrics side by side (a wide queue panel, a small window): the lyrics take the whole
    stage and the cover sits small in their top-left corner. lyrics.js sets .ly-compact from the stage's width
-   and plays the change as a water drop: the cover falls into the corner while the lyrics flow out to fill. */
+   and animates the change: the cover melts into the corner while the lyrics flow out to fill. */
 body.lyrics-on.ly-compact:not(.is-video) .now {
   grid-template-columns: minmax(0, 1fr); grid-template-areas: "ly"; grid-template-rows: auto; padding: 0 14px;
 }
@@ -790,19 +790,12 @@ body.lyrics-on.ly-compact .ly-head { min-height: 56px; padding-left: 60px; }
   body.lyrics-on .now-meta p { font-size: 16px; }
   .lyrics .ly-lines p { font-size: clamp(24px, 1.7cqi, 34px); }   /* outranks the base rule further down */
 }
-/* lyrics.js drop(): the cover's full-size stand-in while the glass takes it in or lets it out (only ever scaled
-   down, so it stays sharp), and the ripple it leaves in the lyrics glass */
+/* lyrics.js drop(): the cover's full-size stand-in while the glass takes it in (only ever scaled down, so it stays sharp) */
 .art-ghost {
   position: fixed; z-index: 40; pointer-events: none; transform-origin: 0 0;
   border-radius: 22px; background: center / cover no-repeat var(--fill-1);
   box-shadow: 0 16px 40px -10px rgba(0, 0, 0, .45), inset 0 0 0 1px rgba(255, 255, 255, .1);
   will-change: transform, opacity, filter;
-}
-.drop-ripple { position: absolute; inset: 0; z-index: 4; border-radius: inherit; overflow: hidden; pointer-events: none; }
-.drop-ripple i {
-  position: absolute; border-radius: 50%;
-  border: 1.5px solid rgba(255, 255, 255, .5);
-  box-shadow: 0 0 22px rgba(255, 255, 255, .22), inset 0 0 14px rgba(255, 255, 255, .18);
 }
 /* closing: the panel is pinned where it was while the cover glides back, then slides out */
 .lyrics.ly-leaving {
