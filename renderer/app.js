@@ -63,6 +63,13 @@ function applyUi() {
   r.setProperty('--tint-a', (0.08 + t * 0.5).toFixed(3));
   r.setProperty('--tint-b', (0.18 + t * 0.5).toFixed(3));
   r.setProperty('--wall-blur', Math.max(0, Math.min(40, +S.ui.wallBlur || 0)) + 'px');   // Settings > Glass > Background blur
+  // Settings > Glass > Glass colour: a light tint on every panel, and the dark layer behind leans the same way
+  const m = /^#([0-9a-f]{6})$/i.exec(S.ui.tintColor || '');
+  if (m) {
+    const n = parseInt(m[1], 16), c = [(n >> 16) & 255, (n >> 8) & 255, n & 255];
+    r.setProperty('--glass-tint', `rgba(${c.join(',')}, .17)`);
+    r.setProperty('--tint-rgb', c.map((v) => Math.round(14 + (v - 14) * 0.28)).join(','));
+  } else { r.removeProperty('--glass-tint'); r.removeProperty('--tint-rgb'); }
   window.Liquid?.apply();
 }
 let libVersion = 0, favVersion = 0, tagVersion = 0;
@@ -439,9 +446,28 @@ function applySpeed() {
     v.defaultPlaybackRate = v.playbackRate = S.play.speed || 1;
     v.preservesPitch = S.play.keepPitch !== false;
   }
+  paintSpeed();
   if (![0, 3, 6, 10].includes(S.play.crossfade)) S.play.crossfade = 0;
   deck.setCrossfade(S.play.crossfade);
 }
+// the speed button next to Lyrics: shows the speed ("1×", "1.25×") and opens the choices
+const SPEEDS = [0.5, 0.75, 1, 1.25, 1.5, 1.75, 2];
+const speedText = (v) => `${+(v || 1).toFixed(2)}\u00d7`;
+function paintSpeed() {
+  const b = $('#btnSpeed');
+  if (!b) return;
+  const v = S.play.speed || 1, txt = speedText(v), lab = $('#speedLabel');
+  if (lab.textContent !== txt) { lab.textContent = txt; anim(lab, [{ transform: 'scale(.6)', opacity: 0 }, { transform: 'none', opacity: 1 }], { duration: 420, easing: SOFT }); }
+  b.classList.toggle('on', v !== 1);
+  b.title = `Speed: ${txt}`;
+}
+$('#btnSpeed').addEventListener('click', (e) => {
+  const rect = e.currentTarget.getBoundingClientRect();
+  openMenu(rect, () => [{ header: 'Speed' },
+    ...SPEEDS.map((v) => ({ label: speedText(v) + (v === 1 ? '  normal' : ''), checked: (S.play.speed || 1) === v, keep: true, act: () => { S.play.speed = v; applySpeed(); save(); } })),
+    '-',
+    { label: 'Keep pitch', checked: S.play.keepPitch !== false, keep: true, act: () => { S.play.keepPitch = S.play.keepPitch === false; applySpeed(); save(); } }]);
+});
 // sleep timer: pause after N minutes, or when the current song ends
 let sleepTimer = 0, sleepAtEnd = false, sleepUntil = 0;
 function setSleep(mins) {
@@ -871,7 +897,7 @@ function thumbHTML(t, n) {
 function rowItem(t, ctx, i, n, col, grouped = false) {
   const compact = isCompact();
   return {
-    kind: 'row', key: `${ctx}:${t.path}`, h: rowH(), track: t, ctx, i, col,
+    kind: 'row', key: `${ctx}:${t.path}`, h: rowH(), track: t, ctx, i, col, grouped,
     letter: letterOf(sortField(t, S.lib.sort)),
     html: () => `<div class="vi row${compact ? ' compact' : ''}${grouped ? ' in-group' : ''}${t.missing || t.error ? ' error' : ''}">
       ${compact ? `<span class="num">${n}</span><div class="eq"><i></i><i></i><i></i></div>` : thumbHTML(t, n)}
@@ -1018,7 +1044,7 @@ function buildItemsInner() {
     if (S.lib.layout === 'grid') {
       return tileItems(tracks.map((t) => ({
         key: t.path, name: titleOf(t), sub: artistOf(t), art: artStyle(t.thumb, titleOf(t)), icon: t.thumb ? '' : ICON.note,
-        letter: letterOf(sortField(t, S.lib.sort)), track: t, act: () => (t === current() ? clickPlaying() : playCollection(tracks, t)),
+        letter: letterOf(sortField(t, S.lib.sort)), track: t, act: () => (t === current() ? clickPlaying() : playCollection(randomQueueFor(t), t)),
       })), 'sg');
     }
     tracks.forEach((t, i) => items.push(rowItem(t, 'lib', i, i + 1, tracks)));
@@ -1292,7 +1318,21 @@ function rowActivate(it) {
   const t = it.track;
   if (t === current()) { clickPlaying(); return; }
   if (it.ctx === 'queue') play(it.i);
-  else playCollection(it.col || [t], t);
+  else if (playsInOrder(it)) playCollection(it.col || [t], t);
+  else playCollection(randomQueueFor(t), t);
+}
+// albums, playlists (and Favorites) and folders play in their order; a song picked from anywhere else
+// (search, recommendations, All songs, an artist) starts a random queue from the whole library
+function playsInOrder(it) {
+  if (it.ctx === 'pl') return true;
+  const by = S.libOpen ? S.libOpen.by : it.grouped ? S.lib.group : null;
+  return !S.filter && (by === 'album' || by === 'folder');
+}
+function randomQueueFor(t) {
+  const vid = isVideoPath(t.path);
+  const pool = [...lib.values()].filter((x) => x !== t && !x.missing && !x.error && isVideoPath(x.path) === vid);
+  for (let k = pool.length - 1; k > 0; k--) { const j = Math.floor(Math.random() * (k + 1)); [pool[k], pool[j]] = [pool[j], pool[k]]; }
+  return [t, ...pool.slice(0, 200)];
 }
 // album drop-down: songs ghost out from under the header (faded, soft, staggered) and fold back up on close;
 // everything that stays on screen glides to its new place instead of jumping
@@ -2238,6 +2278,7 @@ deck.on('trackchange', ({ item: t, reason, transition }) => {
   showNow(true);
   stateChanged(false);
   paintHeader();
+  window.Undo?.quiet();            // the song moving on by itself isn't an undo step
   save();
 });
 deck.on('error', ({ item: t }) => { if (t) { t.error = true; libChanged(); } });
@@ -2476,6 +2517,7 @@ function snapshot() {
 }
 function save() {
   if (!loaded) return;
+  window.Undo?.touch();            // every saved change can be undone (undo.js)
   clearTimeout(saveTimer);
   saveTimer = setTimeout(() => api.storeSet(snapshot()).catch(() => {}), 500);
 }
@@ -2509,6 +2551,8 @@ async function restore() {
   if (s.play) S.play = { ...S.play, ...s.play };
   if (s.sound) S.sound = { ...S.sound, ...s.sound };
   window.Sound?.apply();
+  S.ui.style = 'liquid';          // the Frosted style was removed
+  S.play.skip = 5;                 // arrow keys: 5 s (Shift: 30 s); the setting was removed
   applySpeed();
   deck.setRepeatOne(S.repeat === 'one');
   applyUi();
@@ -2529,6 +2573,7 @@ async function restore() {
     play(Math.min(Math.max(0, s.cur ?? 0), S.queue.length - 1), false);
   } else showNow(false);
   loaded = true;
+  window.Undo?.init();
   paintSource(false);
   if (S.source === 'spotify') window.Spot?.activate();
   rebuild(true);

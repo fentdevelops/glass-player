@@ -60,9 +60,11 @@ function createWindow() {
     minWidth: 900,
     minHeight: 600,
     frame: false,
-    // Windows 11 acrylic: the desktop behind the player shows through, heavily blurred
-    backgroundColor: '#00000000',
-    backgroundMaterial: 'acrylic',
+    // Windows 11 rounds a frameless window's corners; asked for explicitly
+    roundedCorners: true,
+    // Windows 11 acrylic: the desktop behind the player shows through, heavily blurred. With Transparency
+    // effects off, acrylic is just solid grey and can cost the rounded corners, so a solid dark window is used.
+    ...(transparencyOn() ? { backgroundColor: '#00000000', backgroundMaterial: 'acrylic' } : { backgroundColor: '#15151b' }),
     show: false,
     title: 'Glass Player',
     webPreferences: {
@@ -539,28 +541,89 @@ async function lrclibJSON(url) {
   if (!r.ok) throw new Error('HTTP ' + r.status);
   return r.json();
 }
-// exact match by tags first (fast, precise), then a loose search; prefer synced, closest duration
+// ---- more synced lyrics: Kugou and NetEase Cloud Music answer plain requests with timed lyrics (LRC) ----
+// (QQ Music only answers requests that claim to come from its own website, so it isn't used.)
+// Genius has words only, never timings, so it stays a "search in your browser" link.
+async function getJSON(url, ms = 8000) {
+  const r = await fetch(url, { headers: lrcHeaders, signal: AbortSignal.timeout(ms) });
+  if (!r.ok) throw new Error('HTTP ' + r.status);
+  return r.json();
+}
+// credit lines some services put at the top ("Lyricist: …", 作词 : …) and "instrumental, enjoy" notes
+const CREDIT = /^\s*(作词|作曲|编曲|制作人|制作|混音|母带|和声|监制|出品|发行|词|曲|演唱|lyricist|lyrics by|composer|composed by|producer|produced by|arranger|written by|mixed by|mastered by)\s*[:：]/i;
+const cleanSynced = (lines) => (lines || []).filter((l, i) => !(i < 8 && CREDIT.test(l.text)) && !/^纯音乐/.test(l.text));
+const norm = (s) => String(s || '').toLowerCase().replace(/\(.*?\)|\[.*?\]|feat\..*$|ft\..*$/g, '').replace(/[^\p{L}\p{N}]+/gu, '');
+const sameSong = (a, b) => { const x = norm(a), y = norm(b); return !!x && !!y && (x === y || x.includes(y) || y.includes(x)); };
+function fromService(source, lrc, info) {
+  const r = shapeLyrics(source, lrc, null, info);
+  if (!r || !r.synced) return null;
+  r.synced = cleanSynced(r.synced);
+  if (r.synced.length < 5) return null;
+  r.plain = plainOf(r.synced);
+  return r;
+}
+async function kugouSearch(h, max = 3) {
+  const kw = [h.artist, h.title].filter(Boolean).join(' - ') || h.q;
+  if (!kw) return [];
+  const j = await getJSON(`https://lyrics.kugou.com/search?ver=1&man=yes&client=pc&keyword=${encodeURIComponent(kw)}&duration=${h.duration ? Math.round(h.duration * 1000) : ''}&hash=`);
+  const out = await Promise.all((j.candidates || []).slice(0, max).map(async (c) => {
+    try {
+      const l = await getJSON(`https://lyrics.kugou.com/download?ver=1&client=pc&id=${encodeURIComponent(c.id)}&accesskey=${encodeURIComponent(c.accesskey)}&fmt=lrc&charset=utf8`);
+      return fromService('Kugou', Buffer.from(l.content || '', 'base64').toString('utf8'), { title: c.song, artist: c.singer, duration: (c.duration || 0) / 1000 });
+    } catch { return null; }
+  }));
+  return out.filter(Boolean);
+}
+async function neteaseSearch(h, max = 3) {
+  const q = [h.title, h.artist].filter(Boolean).join(' ') || h.q;
+  if (!q) return [];
+  const j = await getJSON(`https://music.163.com/api/search/get?s=${encodeURIComponent(q)}&type=1&limit=${max}`);
+  const out = await Promise.all((((j.result || {}).songs) || []).slice(0, max).map(async (s) => {
+    try {
+      const l = await getJSON(`https://music.163.com/api/song/lyric?os=pc&id=${encodeURIComponent(s.id)}&lv=-1&kv=-1&tv=-1`);
+      return fromService('NetEase', (l.lrc || {}).lyric || '', { title: s.name, artist: (s.artists || []).map((a) => a.name).join(', '), album: (s.album || {}).name, duration: (s.duration || 0) / 1000 });
+    } catch { return null; }
+  }));
+  return out.filter(Boolean);
+}
+// exact LRCLIB match by tags first (fast, precise); without synced lyrics there, every source is asked at once
+// and the best synced match wins: same title, closest length
 async function lyricsAuto(h) {
   const title = String(h.title || '').trim(), artist = String(h.artist || '').trim();
+  let exact = null;
   if (title && artist) {
     const qs = new URLSearchParams({ track_name: title, artist_name: artist });
     if (h.album) qs.set('album_name', h.album);
     if (h.duration) qs.set('duration', Math.round(h.duration));
     const hit = await lrclibJSON(`${LRCLIB}/get?${qs}`).catch(() => null);
-    if (hit && (hit.syncedLyrics || hit.plainLyrics || hit.instrumental)) return hit.instrumental ? { source: 'LRCLIB', instrumental: true, synced: null, plain: null } : fromLrclib(hit);
+    if (hit && hit.instrumental) return { source: 'LRCLIB', instrumental: true, synced: null, plain: null };
+    if (hit && hit.syncedLyrics) return fromLrclib(hit);
+    if (hit && hit.plainLyrics) exact = fromLrclib(hit);
   }
-  const list = await lyricsSearch(h.q || [artist, title].filter(Boolean).join(' '));
-  if (!list.length) return null;
+  const q = h.q || [artist, title].filter(Boolean).join(' ');
+  const lists = await Promise.allSettled([lyricsSearchLrclib(q), kugouSearch({ ...h, q }), neteaseSearch({ ...h, q })]);
+  const list = lists.flatMap((x) => (x.status === 'fulfilled' ? x.value : []));
+  if (!list.length) return exact;
   const d = h.duration || 0;
-  const score = (r) => (r.synced ? 0 : 30) + (d && r.duration ? Math.abs(r.duration - d) : 15);
-  const best = list.filter((r) => !d || !r.duration || Math.abs(r.duration - d) < 8).sort((a, b) => score(a) - score(b))[0];
-  return best || null;
+  const fits = (r) => (!d || !r.duration || Math.abs(r.duration - d) < 6) && (!title || !r.title || sameSong(r.title, title));
+  const score = (r) => (r.synced ? 0 : 30) + (d && r.duration ? Math.abs(r.duration - d) : 12) + (r.source === 'LRCLIB' ? 0 : 1);
+  const best = list.filter(fits).sort((a, b) => score(a) - score(b))[0];
+  return best && (best.synced || !exact) ? best : exact || best || null;
 }
-async function lyricsSearch(q) {
+async function lyricsSearchLrclib(q) {
   q = String(q || '').trim().slice(0, 200);
   if (!q) return [];
   const rows = (await lrclibJSON(`${LRCLIB}/search?q=${encodeURIComponent(q)}`)) || [];
   return rows.slice(0, 20).map(fromLrclib).filter(Boolean);
+}
+// the lyrics search box: every source together, synced first
+async function lyricsSearch(q) {
+  q = String(q || '').trim().slice(0, 200);
+  if (!q) return [];
+  const lists = await Promise.allSettled([lyricsSearchLrclib(q), kugouSearch({ q }, 4), neteaseSearch({ q }, 4)]);
+  if (lists.every((x) => x.status === 'rejected')) throw lists[0].reason;
+  const all = lists.flatMap((x) => (x.status === 'fulfilled' ? x.value : []));
+  return all.sort((a, b) => (b.synced ? 1 : 0) - (a.synced ? 1 : 0)).slice(0, 30);
 }
 // mode: 'auto' (local → cache → online) | 'local' (never touch the network)
 ipcMain.handle('lyrics-get', async (_e, p, hints = {}, mode = 'auto') => {
@@ -634,9 +697,18 @@ ipcMain.handle('artist-info', async (_e, name) => {
 // ---- updates from GitHub Releases ----
 // Installed (NSIS) builds download new versions in the background and install on restart (popup bottom right).
 // The portable exe can't replace itself, so it only checks and offers the download page.
-// Off in dev and tests, and until package.json build.publish names the GitHub repo.
+// Off in dev and tests. The repo comes from resources/app-update.yml, which electron-builder writes into
+// every build (the packaged package.json has no "build" section); package.json build.publish is the fallback.
 const pkgInfo = (() => { try { return require('./package.json'); } catch { return {}; } })();
-const ghPub = [].concat((pkgInfo.build && pkgInfo.build.publish) || []).find((p) => p && p.provider === 'github' && p.owner && p.repo);
+function readPub() {
+  try {
+    const y = fs.readFileSync(path.join(process.resourcesPath, 'app-update.yml'), 'utf8');
+    const get = (k) => ((new RegExp(`^${k}:[ \\t]*['"]?([^'"\\r\\n]+)`, 'm').exec(y) || [])[1] || '').trim();
+    if (get('provider') === 'github' && get('owner') && get('repo')) return { provider: 'github', owner: get('owner'), repo: get('repo') };
+  } catch { /* dev run: no app-update.yml */ }
+  return [].concat((pkgInfo.build && pkgInfo.build.publish) || []).find((p) => p && p.provider === 'github' && p.owner && p.repo) || null;
+}
+const ghPub = readPub();
 const isPortable = !!process.env.PORTABLE_EXECUTABLE_DIR;
 let updateState = { state: 'idle', version: app.getVersion() };
 const sendUpdate = (patch) => { updateState = { ...updateState, ...patch }; win?.webContents.send('update', updateState); };
@@ -679,6 +751,13 @@ app.whenReady().then(() => {
 });
 
 // ---- Windows glass: is "Transparency effects" on? (read only; the user flips it in Windows Settings) ----
+function transparencyOn() {
+  try {
+    const out = require('child_process').execFileSync('reg', ['query', 'HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Themes\\Personalize', '/v', 'EnableTransparency'], { windowsHide: true, encoding: 'utf8', timeout: 3000 });
+    const m = /EnableTransparency\s+REG_DWORD\s+0x([0-9a-f]+)/i.exec(out);
+    return m ? parseInt(m[1], 16) !== 0 : true;
+  } catch { return true; }
+}
 ipcMain.handle('sys:transparency', () => new Promise((resolve) => {
   require('child_process').execFile('reg', ['query', 'HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Themes\\Personalize', '/v', 'EnableTransparency'],
     { windowsHide: true }, (err, out) => {

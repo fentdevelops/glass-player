@@ -1,4 +1,4 @@
-// electron-builder afterPack: VMP-sign the packaged app with castlabs EVS, so Widevine
+// electron-builder afterSign (runs after the exe gets its icon and version info, so the signature stays valid): VMP-sign the packaged app with castlabs EVS, so Widevine
 // (and with it Spotify's in-app player) accepts it. Needs a free castlabs account, made once with:
 //   py -m castlabs_evs.account signup
 // If signing isn't set up the build still finishes, with a warning.

@@ -1,12 +1,13 @@
 {
   "name": "glass-player",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "description": "Liquid glass music and video player",
   "main": "main.js",
   "scripts": {
     "start": "electron .",
     "dist": "electron-builder --win",
-    "dist:portable": "electron-builder --win portable"
+    "dist:portable": "electron-builder --win portable",
+    "release": "electron-builder --win nsis portable --publish always -c.directories.output=dist-deck"
   },
   "author": "",
   "license": "ISC",
@@ -75,11 +76,19 @@
         "role": "Viewer"
       }
     ],
-    "afterPack": "scripts/vmp-sign.js",
+    "afterSign": "scripts/vmp-sign.js",
     "electronDist": "node_modules/electron/dist",
     "electronVersion": "44.10.1",
     "directories": {
       "buildResources": "build"
-    }
+    },
+    "publish": [
+      {
+        "provider": "github",
+        "owner": "pxlarized2",
+        "repo": "glass-player",
+        "releaseType": "release"
+      }
+    ]
   }
 }

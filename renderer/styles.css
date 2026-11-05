@@ -75,7 +75,7 @@ input { font: inherit; color: inherit; }
 /* ---------- ambient ---------- */
 .ambient { position: fixed; inset: 0; z-index: 0; pointer-events: none; }
 #amb { position: absolute; inset: -10%; width: 120%; height: 120%; opacity: var(--glow, .55); filter: blur(28px) saturate(1.2); transition: opacity .8s var(--glide); }
-.tint { position: absolute; inset: 0; background: linear-gradient(180deg, rgba(14, 14, 20, var(--tint-a, .28)), rgba(14, 14, 20, var(--tint-b, .38))); }
+.tint { position: absolute; inset: 0; background: linear-gradient(180deg, rgba(var(--tint-rgb, 14, 14, 20), var(--tint-a, .28)), rgba(var(--tint-rgb, 14, 14, 20), var(--tint-b, .38))); transition: background .6s var(--glide); }
 
 /* ---------- glass ---------- */
 .glass {
@@ -596,7 +596,8 @@ body.playing .row.current .eq i { animation: eq .9s ease-in-out infinite alterna
 
 /* ---------- modal ---------- */
 .modal-root { position: fixed; inset: 0; z-index: 80; display: grid; place-items: center; }
-.backdrop { position: absolute; inset: 0; background: rgba(10, 10, 14, .32); -webkit-backdrop-filter: blur(10px); backdrop-filter: blur(10px); }
+/* behind a sheet: darker and softer, so nothing behind competes with it */
+.backdrop { position: absolute; inset: 0; background: rgba(6, 6, 10, .58); -webkit-backdrop-filter: blur(14px) saturate(.85); backdrop-filter: blur(14px) saturate(.85); }
 .modal {
   --r: 24px;
   width: min(560px, calc(100vw - 48px)); padding: 22px 22px 18px; max-height: calc(100vh - 40px); overflow-y: auto;
@@ -1302,7 +1303,7 @@ body.maximized .win-rim, body.fs .win-rim { opacity: 0; }
 /* ---------- update popup (updates.js): bottom right, stays until you act ---------- */
 .update-pop {
   --r: 18px;
-  position: fixed; right: 22px; bottom: 116px; z-index: 70; width: 300px; padding: 14px 14px 12px;
+  position: fixed; right: 22px; bottom: 134px; z-index: 70; width: 300px; padding: 14px 14px 12px;
   background: rgba(58, 58, 66, .86); -webkit-backdrop-filter: blur(30px) saturate(160%); backdrop-filter: blur(30px) saturate(160%);
 }
 .update-pop.small { width: auto; padding: 0; background: rgba(58, 58, 66, .8); }
@@ -1318,6 +1319,26 @@ body.maximized .win-rim, body.fs .win-rim { opacity: 0; }
   transition: transform var(--t-hover) var(--glide), background-color var(--t-hover) var(--glide); }
 .up-pill svg { width: 18px; height: 18px; }
 .up-pill:hover { transform: scale(1.04); background-color: var(--fill-1); }
+
+/* ---------- "Glass updated" card (updates.js): what's new after an update, bottom right ---------- */
+.wn-pop {
+  --r: 20px;
+  position: fixed; right: 22px; bottom: 134px; z-index: 71; width: 330px; padding: 14px 14px 12px;
+  background: rgba(46, 46, 54, .88); -webkit-backdrop-filter: blur(30px) saturate(160%); backdrop-filter: blur(30px) saturate(160%);
+}
+.wn-head { display: flex; align-items: flex-start; gap: 10px; }
+.wn-head .up-text { flex: 1; }
+.wn-x { flex: none; width: 28px; height: 28px; margin: -4px -4px 0 0; border-radius: 50%; display: grid; place-items: center; color: var(--ink-2);
+  transition: background-color var(--t-hover) var(--glide), color var(--t-hover) var(--glide), transform var(--t-hover) var(--glide); }
+.wn-x svg { width: 13px; height: 13px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; }
+.wn-x:hover { background-color: var(--fill-2); color: #fff; transform: scale(1.08); }
+.wn-x:active { transform: scale(.92); transition-duration: var(--t-press); }
+.wn-list { display: flex; flex-direction: column; gap: 6px; margin-top: 12px; }
+.wn-item { display: flex; align-items: center; gap: 10px; padding: 6px; border-radius: 14px; background: rgba(255, 255, 255, .05); box-shadow: inset 0 0 0 1px rgba(255, 255, 255, .08); }
+.wn-art { flex: none; width: 60px; height: 40px; border-radius: 9px; overflow: hidden; box-shadow: inset 0 0 0 1px rgba(255, 255, 255, .2), 0 6px 14px -8px rgba(0, 0, 0, .6); }
+.wn-art svg { display: block; width: 100%; height: 100%; }
+.wn-item .pn-text b { font-size: 12.5px; }
+.wn-item .pn-text span { font-size: 11.5px; line-height: 1.4; }
 
 /* ---------- zoom (zoom.js): a liquid glass pill at the top while Ctrl + / Ctrl - change the size ---------- */
 .zoom-pop {
@@ -1427,3 +1448,111 @@ body.sp-unlinked .vfs-btn { display: none !important; }
 .sps-bar i { display: block; width: 100%; height: 100%; border-radius: 4px; background: #fff; transform-origin: left center; animation: sps-breathe 1.4s var(--glide) infinite alternate; }
 @keyframes sps-breathe { from { transform: scaleX(.12); opacity: .55; } to { transform: scaleX(.92); opacity: 1; } }
 .sps-foot { margin-top: 10px; }
+
+/* setup fields: red with a message the moment they can't work, a soft green edge when they're fine */
+.sps-f small { font-weight: 400; color: var(--ink-3); margin-left: 4px; }
+.sps-in { position: relative; display: block; }
+.sps-in input { width: 100%; }
+.sps-f input { transition: box-shadow var(--t-hover) var(--glide), background-color var(--t-hover) var(--glide); }
+.sps-f.bad input, .sps-f.bad input:focus { box-shadow: inset 0 1px 2px rgba(0, 0, 0, .2), 0 0 0 1.5px rgba(255, 110, 110, .9); background-color: rgba(255, 80, 80, .08); }
+.sps-f.good input { box-shadow: inset 0 1px 2px rgba(0, 0, 0, .15), 0 0 0 1px rgba(150, 240, 180, .45); }
+.ferr { display: block; min-height: 0; font-style: normal; font-size: 11.5px; font-weight: 600; color: #ffb3b3; }
+.ferr:empty { display: none; }
+/* show / hide password */
+.sps-eye { position: absolute; right: 6px; top: 50%; translate: 0 -50%; width: 30px; height: 30px; border-radius: 9px; display: grid; place-items: center; opacity: .75;
+  transition: opacity var(--t-hover) var(--glide), background-color var(--t-hover) var(--glide), transform var(--t-hover) var(--glide); }
+.sps-eye:hover { opacity: 1; background-color: var(--fill-2); transform: scale(1.06); }
+.sps-eye svg { grid-area: 1 / 1; width: 17px; height: 17px; fill: none; stroke: #fff; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; transition: opacity .3s var(--glide), transform .4s var(--glide); }
+.sps-eye .eye-off, .sps-eye.on .eye-on { opacity: 0; transform: scale(.7); }
+.sps-eye.on .eye-off { opacity: 1; transform: none; }
+.sps-in input[type="password"], .sps-in input[name="sps_password"] { padding-right: 42px; }
+/* live progress: a real 0-100% bar and the tool's own lines */
+.sps-task { margin-top: 12px; padding: 10px 12px 8px; border-radius: 13px; background: rgba(0, 0, 0, .22); box-shadow: inset 0 0 0 1px rgba(255, 255, 255, .1); }
+.sps-ptop { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; margin-bottom: 7px; font-size: 12.5px; }
+.sps-pct { font-variant-numeric: tabular-nums; font-weight: 700; }
+.sps-pbar { height: 6px; border-radius: 6px; background: rgba(255, 255, 255, .12); overflow: hidden; }
+.sps-pbar i { display: block; height: 100%; border-radius: 6px; background: linear-gradient(90deg, rgba(255, 255, 255, .75), #fff); transition: width .6s var(--glide); }
+.sps-log { margin-top: 8px; max-height: 104px; overflow-y: auto; font: 11px/1.55 "Cascadia Mono", Consolas, ui-monospace, monospace; color: rgba(255, 255, 255, .72); white-space: pre-wrap; word-break: break-word; }
+.sps-log div:last-child { color: #fff; }
+
+/* ---------- the window: every layer clipped to Windows 11's rounded corners ---------- */
+html, body { border-radius: 8px; }
+body { clip-path: inset(0 round 8px); }
+body.maximized, body.fs { clip-path: none; border-radius: 0; }
+
+/* ---------- glass colour (Settings > Glass): a light tint under every panel's sheen ---------- */
+.glass, body.liquid .glass { background-color: var(--glass-tint, transparent); }
+
+/* ---------- Settings sheet: darker, roomier, sections glide in ---------- */
+.modal.settings-sheet { background: rgba(30, 30, 38, .9); width: min(580px, calc(100vw - 48px)); }
+.settings-sheet .set-sec { animation: set-in .6s var(--glide) both; }
+.settings-sheet .set-sec:nth-child(2) { animation-delay: .05s; }
+.settings-sheet .set-sec:nth-child(3) { animation-delay: .1s; }
+.settings-sheet .set-sec:nth-child(4) { animation-delay: .15s; }
+.settings-sheet .set-sec:nth-child(n+5) { animation-delay: .2s; }
+@keyframes set-in { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: none; } }
+.set-scroll { scroll-behavior: smooth; }
+
+/* glow + darkness: big and easy to read, with the value next to each */
+.set-big { display: flex; flex-direction: column; gap: 6px; padding: 12px 14px 14px; margin: 4px 0 10px; border-radius: 16px; background: rgba(255, 255, 255, .05); box-shadow: inset 0 0 0 1px rgba(255, 255, 255, .1); }
+.set-bigrow { display: flex; align-items: flex-end; justify-content: space-between; gap: 12px; margin-top: 4px; }
+.set-bigrow b { display: block; font-size: 14px; }
+.set-bigrow span { display: block; font-size: 12px; color: var(--ink-2); }
+.set-num { font-style: normal; font: 700 18px/1 "Segoe UI Variable Display", "Segoe UI", sans-serif; font-variant-numeric: tabular-nums; }
+.range.big { width: 100%; height: 26px; --th: 7px; }
+.range.big:hover, .range.big:active { --th: 10px; }
+
+/* tint palette */
+.tint-pal { display: flex; flex-wrap: wrap; gap: 9px; margin: 2px 0 12px; }
+.tint-sw { position: relative; width: 30px; height: 30px; border-radius: 50%; cursor: pointer; background: var(--c, transparent);
+  box-shadow: inset 0 0 0 1.5px rgba(255, 255, 255, .35), 0 4px 10px -4px rgba(0, 0, 0, .5);
+  transition: transform var(--t-hover) var(--glide), box-shadow var(--t-hover) var(--glide); }
+.tint-sw:hover { transform: scale(1.12); }
+.tint-sw.on { box-shadow: inset 0 0 0 2px #fff, 0 0 0 3px rgba(255, 255, 255, .28), 0 4px 10px -4px rgba(0, 0, 0, .5); transform: scale(1.08); }
+.tint-sw.none { background: linear-gradient(135deg, transparent 46%, rgba(255, 255, 255, .6) 47% 53%, transparent 54%), rgba(255, 255, 255, .06); }
+.tint-sw.custom { background: conic-gradient(from 0deg, #ff7a7a, #ffe17a, #7ee0a1, #6fd6e8, #7c8cff, #ff7cc8, #ff7a7a); overflow: hidden; }
+.tint-sw.custom.on { background: var(--c); }
+.tint-sw.custom input { position: absolute; inset: 0; opacity: 0; cursor: pointer; width: 100%; height: 100%; border: 0; padding: 0; }
+
+/* EQ curve */
+.eq-graph { margin: 4px 0 12px; padding: 8px 6px 2px; border-radius: 16px; background: rgba(0, 0, 0, .18); box-shadow: inset 0 0 0 1px rgba(255, 255, 255, .08); }
+.eq-svg { display: block; width: 100%; height: auto; touch-action: none; user-select: none; }
+.eq-grid { stroke: rgba(255, 255, 255, .08); stroke-width: 1; stroke-dasharray: 3 5; }
+.eq-grid.zero { stroke: rgba(255, 255, 255, .2); stroke-dasharray: none; }
+.eq-db { fill: rgba(255, 255, 255, .45); font: 600 9px "Segoe UI", sans-serif; text-anchor: end; }
+.eq-line { fill: none; stroke: #fff; stroke-width: 2.4; stroke-linecap: round; }
+.eq-glow { fill: none; stroke: rgba(255, 255, 255, .55); stroke-width: 7; }
+.eq-hit { fill: transparent; cursor: ns-resize; }
+.eq-dot { fill: #fff; stroke: rgba(30, 30, 38, .9); stroke-width: 2.5; transition: r .35s var(--glide); cursor: ns-resize; pointer-events: none; }
+.eq-pt:hover .eq-dot, .eq-pt.drag .eq-dot { r: 9; }
+.eq-hz { fill: rgba(255, 255, 255, .6); font: 600 10.5px "Segoe UI", sans-serif; text-anchor: middle; }
+.eq-val { fill: #fff; font: 700 10.5px "Segoe UI", sans-serif; text-anchor: middle; opacity: 0; transition: opacity .3s var(--glide); pointer-events: none; }
+.eq-pt:hover .eq-val, .eq-pt.drag .eq-val { opacity: 1; }
+
+/* What's new */
+.pn-list { display: flex; flex-direction: column; gap: 8px; margin-top: 4px; }
+.pn-card { display: flex; align-items: center; gap: 12px; padding: 8px; border-radius: 15px; background: rgba(255, 255, 255, .05); box-shadow: inset 0 0 0 1px rgba(255, 255, 255, .08);
+  transition: transform var(--t-hover) var(--glide), background-color var(--t-hover) var(--glide); }
+.pn-card:hover { transform: translateX(3px); background: rgba(255, 255, 255, .08); }
+.pn-art { flex: none; width: 96px; height: 64px; border-radius: 12px; overflow: hidden; box-shadow: inset 0 0 0 1px rgba(255, 255, 255, .2), 0 6px 16px -8px rgba(0, 0, 0, .6); }
+.pn-art svg { display: block; width: 100%; height: 100%; }
+.pn-text b { display: block; font-size: 13.5px; font-weight: 650; }
+.pn-text span { display: block; margin-top: 2px; font-size: 12px; line-height: 1.45; color: var(--ink-2); }
+
+/* the speed button next to Lyrics */
+.speed-btn { width: auto; min-width: 38px; padding: 0 9px; font: 700 12.5px/1 "Segoe UI", sans-serif; font-variant-numeric: tabular-nums; letter-spacing: .2px; }
+.speed-btn span { display: inline-block; }
+.speed-btn.on { background-color: rgba(255, 255, 255, .16); box-shadow: inset 0 0 0 1px rgba(255, 255, 255, .3); }
+body.src-spotify .speed-btn { display: none; }
+
+/* ---------- undo / redo pill (undo.js) ---------- */
+.undo-pop {
+  --r: 999px;
+  position: fixed; top: 52px; left: 50%; translate: -50% 0; z-index: 97;
+  display: flex; align-items: center; gap: 9px; padding: 9px 16px 9px 13px; white-space: nowrap;
+}
+.undo-pop svg { position: relative; z-index: 3; width: 17px; height: 17px; fill: none; stroke: #fff; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; transition: transform .5s var(--glide); }
+.undo-pop.redo svg { transform: scaleX(-1); }
+.undo-pop b { position: relative; z-index: 3; font-size: 13px; font-weight: 650; }
+.undo-pop span { position: relative; z-index: 3; font-size: 11.5px; color: var(--ink-2); }
+.undo-pop span:empty { display: none; }

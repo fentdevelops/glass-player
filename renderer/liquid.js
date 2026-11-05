@@ -117,7 +117,7 @@
   let artUrl = '';
   const wallFor = () => (S.ui.wall === 'custom' && S.ui.wallImg ? S.ui.wallImg : artUrl);
   function apply() {
-    on = S.ui.style !== 'frosted';
+    on = true;                       // always liquid now (the Frosted style was removed)
     body.classList.toggle('liquid', on);
     body.classList.toggle('wall-art', S.ui.wall !== 'colors');
     setWall(wallFor());

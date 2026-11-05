@@ -46,6 +46,7 @@ contextBridge.exposeInMainWorld('glass', {
     account: (d) => ipcRenderer.invoke('evs:account', d),
     sign: () => ipcRenderer.invoke('evs:sign'),
     relaunch: () => ipcRenderer.invoke('evs:relaunch'),
+    onProgress: (cb) => ipcRenderer.on('evs:progress', (_e, d) => cb(d)),
   },
   spotify: {
     status: () => ipcRenderer.invoke('sp:status'),

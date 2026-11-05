@@ -129,6 +129,7 @@
     const imgs = (al && al.images) || tr.images || [];
     if (o) { if (imgs.length) applyArt(o, imgs); return o; }
     o = {
+      raw: tr.album || !album ? tr : { ...tr, album },
       sp: true, path: 'sp:' + tr.uri, uri: tr.uri, id: tr.id, name: tr.name || 'Unknown', title: tr.name || 'Unknown',
       artist: (tr.artists || []).map((a) => a.name).filter(Boolean).join(', ') || (tr.show && tr.show.name) || '',
       artistRef: tr.artists && tr.artists[0] && tr.artists[0].id ? { id: tr.artists[0].id, name: tr.artists[0].name } : null,
@@ -263,6 +264,16 @@
     ]);
     if (info.status === 'fulfilled') e.info = { ...ref, ...info.value };
     if (top.status === 'fulfilled') e.top = ((top.value && top.value.tracks) || []).map((x) => T(x)).filter(Boolean);
+    else {
+      // Spotify removed "top tracks" for apps on the 2026 API: their best-known songs come from search instead
+      const name = (info.status === 'fulfilled' && info.value && info.value.name) || ref.name || '';
+      if (name) {
+        try {
+          const j = await call('GET', '/search', { q: `artist:"${name.replace(/"/g, '')}"`, type: 'track', limit: 10 });
+          e.top = ((j && j.tracks && j.tracks.items) || []).filter((x) => x && (x.artists || []).some((a) => a.id === ref.id)).map((x) => T(x)).filter(Boolean);
+        } catch { /* no popular songs then */ }
+      }
+    }
     if (albums.status === 'fulfilled') e.albums = ((albums.value && albums.value.items) || []).filter(Boolean);
     if ([info, top, albums].every((r) => r.status === 'rejected')) e.error = explain(info.reason);
     checkLikes(e.top.map((t) => t.id));
@@ -343,21 +354,34 @@
     e.busy = false;
     refresh();
   }
-  // which of these tracks are in Liked Songs (50 ids per request)
-  let likeQ = new Set(), likeT = 0;
+  // Which of these tracks are in Liked Songs. Spotify's 2026 API checks, saves and removes through one
+  // library endpoint that takes URIs (40 per request); apps on the old API still answer /me/tracks.
+  // After a refusal it stops asking for this session instead of retrying on every song.
+  let likeQ = new Set(), likeT = 0, likeApi = 'library';
+  const trackUri = (id) => `spotify:track:${id}`;
+  async function likesContain(batch) {
+    if (likeApi === 'library') {
+      try { return await call('GET', '/me/library/contains', { uris: batch.map(trackUri).join(',') }); }
+      catch (e) { if (e.status !== 404 && e.status !== 405) throw e; likeApi = 'tracks'; }
+    }
+    return call('GET', '/me/tracks/contains', { ids: batch.join(',') });
+  }
   function checkLikes(ids) {
+    if (likeApi === 'off') return;
     for (const id of ids) if (id && !likedIds.has(id)) likeQ.add(id);
     if (!likeQ.size) return;
     clearTimeout(likeT);
     likeT = setTimeout(async () => {
-      const batch = [...likeQ].slice(0, 50);
+      const batch = [...likeQ].slice(0, 40);
       batch.forEach((id) => likeQ.delete(id));
       try {
-        const r = await call('GET', '/me/tracks/contains', { ids: batch.join(',') });
+        const r = await likesContain(batch);
         batch.forEach((id, i) => likedIds.set(id, !!(r && r[i])));
         stateChanged();
         if (player && player.item && batch.includes(player.item.id)) paintHeart($('#btnFav'), !!likedIds.get(player.item.id), false);
-      } catch { /* hearts just stay empty */ }
+      } catch (e) {
+        if (e.status === 401 || e.status === 403) { likeApi = 'off'; likeQ.clear(); sp.log(`liked-songs check off: ${e.status} ${e.message}`); return; }
+      }
       if (likeQ.size) checkLikes([]);
     }, 200);
   }
@@ -578,10 +602,22 @@
     try { await call(method, path, query); } catch (e) { toast(explain(e), true); }
     soon(after);
   }
+  // The song you pick shows at once (cover, title, colours glide in); the music follows when Spotify starts it.
+  // For a few seconds Spotify may still report the old song: those reports don't pull the screen back.
+  let expect = null;
+  function showPending(t) {
+    if (!t || !t.raw || Spot.isCurrent(t)) return;
+    expect = { uri: t.uri, until: Date.now() + 6000 };
+    player = { ...(player || {}), item: t.raw, progress_ms: 0, is_playing: true };
+    recvAt = performance.now();
+    lastSec = -1;
+    render(true);
+  }
   function playRow(it) {
     const t = it.track;
     if (!t.playable) { toast('Spotify can’t play this one here', true); return; }
     if (Spot.isCurrent(t)) { togglePlaySp(); return; }
+    showPending(t);
     if (it.skip) { skipTo(it.skip, t); return; }
     if (it.spContext) return play({ context_uri: it.spContext, offset: { uri: t.uri } });
     const col = it.col || [t], i = Math.max(0, col.indexOf(t));
@@ -605,6 +641,7 @@
     if (shuffle) await setShuffle(true);
     if (context) return play(shuffle || /:artist:/.test(context) ? { context_uri: context } : { context_uri: context, offset: { position: 0 } });
     const start = shuffle ? Math.floor(Math.random() * col.length) : 0;
+    showPending(col[start]);
     return play({ uris: col.slice(start, start + 100).map((t) => t.uri) });
   }
   function togglePlaySp() {
@@ -661,7 +698,11 @@
     if (player && player.item && player.item.id === t.id) paintHeart($('#btnFav'), on, btn !== $('#btnFav'));
     stateChanged();
     try {
-      await call(on ? 'PUT' : 'DELETE', '/me/tracks', { ids: t.id });
+      if (likeApi === 'tracks') await call(on ? 'PUT' : 'DELETE', '/me/tracks', { ids: t.id });
+      else {
+        try { await call(on ? 'PUT' : 'DELETE', '/me/library', null, { uris: [t.uri || trackUri(t.id)] }); }
+        catch (e) { if (e.status !== 404 && e.status !== 405) throw e; likeApi = 'tracks'; await call(on ? 'PUT' : 'DELETE', '/me/tracks', { ids: t.id }); }
+      }
       if (on && !data.likedSet.has(t)) { data.liked.unshift(t); data.likedSet.add(t); if (data.likedTotal != null) data.likedTotal++; }
       if (!on && data.likedSet.has(t)) { data.liked.splice(data.liked.indexOf(t), 1); data.likedSet.delete(t); if (data.likedTotal != null) data.likedTotal--; }
       refresh();
@@ -796,6 +837,12 @@
   function setPlayer(j) {
     const prev = player && player.item ? player.item.uri : null;
     const was = player;
+    // a song was just picked: until Spotify reports it (or a few seconds pass), keep showing it
+    if (expect) {
+      if (j && j.item && j.item.uri === expect.uri) expect = null;
+      else if (Date.now() < expect.until && was && was.item) j = { ...(j || {}), item: was.item, progress_ms: 0, is_playing: true };
+      else expect = null;
+    }
     player = j || null;
     // what changed on Spotify's side (track, play/pause, device), for spotify-log.txt
     if (player) {
@@ -952,6 +999,16 @@
     ]);
   });
   Spot.reload = () => { resetData(); refresh(); soon(50); toast('Reloading from Spotify'); };
+  // the library keeps itself fresh: quietly reloaded when you come back after 10 minutes, and every 30
+  let lastLoad = Date.now();
+  const autoReload = () => {
+    if (!status.connected || Date.now() - lastLoad < 10 * 60000) return;
+    lastLoad = Date.now();
+    resetData(); refresh(); soon(50);
+    sp.log('library reloaded by itself');
+  };
+  window.addEventListener('focus', autoReload);
+  setInterval(() => { if (Date.now() - lastLoad >= 30 * 60000) autoReload(); }, 5 * 60000);
   async function disconnect() {
     window.SpotPlayer?.stop();
     try { await sp.disconnect(); } catch { /* fall through to local reset */ }
@@ -1019,7 +1076,7 @@
     e.stopPropagation();
     if (!status.connected) { toast('Connect Spotify first'); return; }
     if (b.id === 'btnPlay') togglePlaySp();
-    else if (b.id === 'btnNext') { data.queue = null; cmd('POST', '/me/player/next', null, 250); }
+    else if (b.id === 'btnNext') { const n = data.queue && data.queue.next && data.queue.next[0]; if (n) showPending(n); data.queue = null; cmd('POST', '/me/player/next', null, 250); }
     else if (b.id === 'btnPrev') { data.queue = null; cmd('POST', '/me/player/previous', null, 250); }
     else if (b.id === 'btnShuffle') setShuffle(!(player && player.shuffle_state));
     else if (b.id === 'btnRepeat') cycleRepeat();

@@ -3,7 +3,7 @@
 A liquid-glass music and video player for Windows (Electron). This file lists everything built so far,
 how to use it, where it lives in the code, and what's still waiting on you.
 
-**Current version:** 0.2.0 · **Latest build:** `dist-deck/Glass Player 0.2.0.exe` (portable; has everything below, including the gapless engine). `dist-latest/` holds the earlier 0.2.0 build without it.
+**Current version:** 0.2.1 · **Code:** https://github.com/pxlarized2/glass-player (public) · **Releases:** the repo's Releases page. Installed copies update themselves from there.
 
 ---
 
@@ -11,10 +11,7 @@ how to use it, where it lives in the code, and what's still waiting on you.
 
 | What | Why | How |
 |---|---|---|
-| Free castlabs account | Spotify can only play *inside* Glass if the app is VMP-signed | Run `py -m castlabs_evs.account signup`, then ask for a rebuild (signing happens automatically) |
-| Reconnect Spotify once | Glass now asks Spotify for in-app playback, recently played and top songs | Settings → Spotify → **Reconnect** |
-| GitHub repo | Needed for auto-updates and backups | Decide public or private, and share your GitHub username (public is recommended so updates need no keys) |
-| Close the old app before using a new build | A running Glass locks its exe | New builds go to `dist-latest/` so they don't clash |
+| Check the window corners | The rounded-corner fix was checked off-screen only | Look at the four corners of the installed Glass on your screen |
 
 ---
 
@@ -133,7 +130,7 @@ how to use it, where it lives in the code, and what's still waiting on you.
   - **Ready:** **Restart to update**. "Later" shrinks it to a small pill that stays.
   - **Portable exe:** **Download**, since a portable exe can't replace itself
 - **Settings → Updates** shows your version, with a **Check now** button.
-- Updates switch on once the project is published on GitHub. A release workflow (`.github/workflows/release.yml`) builds and publishes a new version whenever a version tag is pushed.
+- Updates come from the public GitHub repo's Releases (see "Public repo and updates" below for how a release is made).
 
 ---
 
@@ -198,6 +195,39 @@ how to use it, where it lives in the code, and what's still waiting on you.
   2. **castlabs account:** Glass gets castlabs' free signing tool ready, installing Python and `castlabs-evs` if they're missing. It then creates the account from the form (or logs in with "I have one"); castlabs emails a code, which you type into Glass.
   3. **Sign and restart:** Glass signs its own installed copy (Widevine/VMP, which Spotify requires), marks it signed and restarts. Spotify then plays inside Glass with no Spotify app.
 - **Passwords** go to castlabs' tool privately (over stdin, never on a command line), and Glass doesn't store them.
+- **Fields check themselves as you type:** red with a plain message when something won't work (email, names, account name, password length, the code), a soft green edge when it's fine. castlabs' answers land on the field they're about: "That account name is taken", "That code isn't right", "Wrong account name or password", castlabs' own password rules.
+- **Show / hide password** with the eye button.
+- **The account name is filled in for you:** your Spotify name, or "glassy-firstname-1234". If it's taken, Glass picks another (your name plus a number) and carries on. A name that's already yours and signed in counts as done.
+- **Real progress:** installs, sign-up and signing show a 0–100% bar with the tool's own lines underneath.
+- **Builds sign themselves** once the account exists. Signing now runs as electron-builder's "after sign" step; it used to run before the exe got its icon and version info, which broke the signature.
+
+### Settings, rebuilt
+- **Order:** Glass, Sound, Playback, Spotify, Updates, What's new. The sheet is darker with a darker, blurred backdrop, and its sections glide in.
+- **Glass on top:** big Glow and Darkness sliders with their % shown, and a **Glass colour** palette (9 colours, none, or any colour from a picker) that tints every glass panel and the dark layer behind them.
+- **Equalizer curve** instead of presets: five points you drag on a smooth, glowing curve (-12 to +12 dB). Double-click a point to reset it.
+- **Removed:** the sleep timer, the arrow-key skip setting (arrows skip 5 s, Shift 30 s), the Frosted style (always liquid now) and the Reload library button (Spotify's library refreshes itself when you come back after 10 minutes, and every half hour).
+- **What's new** at the bottom: the latest changes, each with its own picture.
+- **Speed** moved to the player: a **1×** button next to Lyrics that shows the current speed and opens the speeds (0.5× to 2×, with Keep pitch).
+
+### Undo
+- **Ctrl+Z** undoes, **Ctrl+Shift+Z** (or Ctrl+Y) redoes: queue changes, switching songs (back to the same spot), favorites, playlists, song info, tags, album covers, renaming a file (renamed back) and removing songs from the library. A glass pill at the top says what was undone. Songs moving on by themselves don't count.
+
+### Playing a song from search
+- **Albums, playlists, Favorites and folders** play in their order.
+- **A song picked anywhere else** (search, recommendations, All songs, an artist) plays first, followed by a random queue from your whole library.
+
+### Spotify feels instant
+- **The song you pick shows at once** (cover, title, colours) and the music follows. Spotify's slightly late reports no longer flick the screen back to the old song.
+
+### More lyrics sources
+- **Kugou and NetEase Cloud Music** are asked alongside LRCLIB; the best synced match wins (same title, closest length), and credit lines are stripped. The lyrics search box lists all three, synced first. QQ Music only answers requests that claim to come from its own site, so it's not used. Genius has no timed lyrics, so it stays a browser link.
+
+### Window corners
+- **The whole page is clipped** to Windows 11's 8 px rounded corners, and rounded corners are asked for explicitly. With Transparency effects off, the window uses a solid dark background instead of acrylic (which was solid grey anyway).
+
+### Spotify's 2026 API
+- **Liked songs** use Spotify's new library endpoint (`/me/library` with song links). The old one answered "403 Forbidden", which left hearts empty and filled the log. If it's refused, Glass stops asking for that session.
+- **Artist pages:** Spotify removed "top tracks", so the "Popular" songs now come from a search for the artist.
 - **Future builds** are signed automatically once the account exists (`scripts/vmp-sign.js`).
 - **Needs** Spotify Premium (you have it) and the installed Glass, not the portable exe.
 
@@ -217,6 +247,14 @@ how to use it, where it lives in the code, and what's still waiting on you.
 - **Knows by itself:** Glass compares the playing song's picture with its album's real cover, fetched once per album. Any other picture, wide or square, is the video's picture. The song then gets the switch, and the cover frame **widens a little toward 16:9 and settles back** once, as a hint.
 - **What Video shows:** the video's picture, a still frame. Spotify only plays the moving video inside its own apps: its developer API has no video stream and no video/audio switch, and its terms don't allow pairing its songs with other videos.
 
+### Public repo and updates (0.2.1)
+- **The code is public** at https://github.com/pxlarized2/glass-player, checked for passwords, keys, tokens and personal paths first (none, in any commit).
+- **Glass updates itself.** It checks GitHub 8 s after it opens and every 3 hours, downloads a new version in the background, and installs it when you restart (the popup bottom right has **Restart to update**) or the next time you close Glass. The portable exe can't replace itself, so it offers the download page instead.
+- **Fixed: updates never switched on.** The packaged app has no `build` section in its package.json, so Glass couldn't see where to look. It now reads the repo from `resources/app-update.yml`, which every build carries. 0.2.0 had this bug, so 0.2.0 → 0.2.1 was installed by hand; later versions arrive by themselves.
+- **"Glass updated" card:** the first time a new version opens, a glass card bottom right shows what's new (up to three changes with their pictures). **All changes** opens Settings at What's new. It leaves by itself after 20 s unless you're hovering it, and shows once per version. A fresh install doesn't show it.
+- **Releases are built on your PC,** so they're signed for Spotify. The GitHub Actions release workflow was removed: GitHub's servers don't have your castlabs account, so their builds would have broken Spotify inside Glass after an update.
+- **The update popups sit higher,** clear of the player bar.
+
 ---
 
 ## Under the hood
@@ -224,9 +262,14 @@ how to use it, where it lives in the code, and what's still waiting on you.
 - **Electron:** castlabs Electron **44.10.1** (adds Widevine, which Spotify's in-app player needs). Version 45 only exists as an alpha there.
 - **Build:**
   ```bash
-  npx electron-builder --win portable -c.directories.output=dist-latest
+  npx electron-builder --win nsis portable -c.directories.output=dist-deck
   ```
-  `build.electronDist` points at the local castlabs Electron. `scripts/vmp-sign.js` signs each build once your castlabs account exists, and otherwise warns and continues.
+  `build.electronDist` points at the local castlabs Electron. `scripts/vmp-sign.js` signs each build with your castlabs account (it warns and continues if the account is missing).
+- **Publish a new version:** raise `version` in package.json, add its notes to `renderer/notes.js` (`v: 'x.y.z'`), commit and push, then:
+  ```bash
+  GH_TOKEN="$(gh auth token)" npm run release
+  ```
+  That builds, signs and uploads the installer, the portable exe and `latest.yml` to a new GitHub release `vX.Y.Z`. Installed copies pick it up within 3 hours, or at their next start.
 - **New dependencies:** `electron-updater`. The castlabs signing tool `castlabs-evs` is installed for Python (`py`).
 - **Your data** (library, edits, tags, plays, settings) is stored in the app's user folder, not in your music files. The only things that write to song files are Edit info's "Also save into the MP3 file's tags" box and "Save as .lrc".
 
@@ -249,10 +292,12 @@ how to use it, where it lives in the code, and what's still waiting on you.
 | `renderer/zoom.js` | Zoom pill (the zoom keys are handled in `main.js`) |
 | `renderer/spplayer.js` | Spotify in-app player (Web Playback SDK) |
 | `renderer/spotify.js` | Spotify mode (browse, queue, artist pages, recommendations) |
-| `renderer/updates.js` | Update popup |
+| `renderer/updates.js` | Update popup, and the "Glass updated" card after an update |
 | `renderer/settings.js` | Settings: Sound, Playback, Spotify, Updates, Glass |
 | `scripts/vmp-sign.js` | Signs builds for Widevine |
-| `.github/workflows/release.yml` | Builds and publishes releases on GitHub |
+| `renderer/undo.js` | Undo / redo (Ctrl+Z, Ctrl+Shift+Z) and the "Undone" pill |
+| `renderer/eqgraph.js` | The draggable, glowing equalizer curve in Settings |
+| `renderer/notes.js` | What's new: each change with its version and picture |
 
 ### How changes were checked
 Every change was tested in an offscreen copy of the app with a separate test profile, so your library and screen were never touched. The tests used a generated test tone, a made-up library, fake Spotify data, and a few of your real songs (read only). Lyrics were checked with made-up lines and line counts only.

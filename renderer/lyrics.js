@@ -24,7 +24,7 @@
     if (deck.paused) deck.play();
   }
 
-  const SRC_LABEL = { File: 'From the lyrics file', Tags: 'From the song file', LRCLIB: 'From LRCLIB' };
+  const SRC_LABEL = { File: 'From the lyrics file', Tags: 'From the song file', LRCLIB: 'From LRCLIB', Kugou: 'From Kugou', NetEase: 'From NetEase' };
   const hintsOf = (t) => ({
     title: t.title || '', artist: t.artist || '', album: t.album || '',
     duration: t.duration || (!t.sp && t === current() ? deck.duration || 0 : 0),
@@ -164,16 +164,16 @@
         ? results.map((r, i) => {
           const off = d && r.duration && Math.abs(r.duration - d) > 6;
           return `<button type="button" class="lk-item ly-item" data-r="${i}" style="--d:${i * 40}ms">
-            <span class="lk-text"><b>${esc(r.title || 'Unknown')}</b><small>${esc([r.artist, r.album, r.duration ? fmt(r.duration) : ''].filter(Boolean).join(' · '))}${off ? ' · different length' : ''}</small></span>
+            <span class="lk-text"><b>${esc(r.title || 'Unknown')}</b><small>${esc([r.artist, r.album, r.duration ? fmt(r.duration) : '', r.source].filter(Boolean).join(' · '))}${off ? ' · different length' : ''}</small></span>
             <span class="lk-src${r.synced ? ' on' : ''}">${r.instrumental ? 'Instrumental' : r.synced ? 'Synced' : 'Plain'}</span></button>`;
         }).join('')
-        : '<div class="lk-empty">No LRCLIB matches. Try just the song name.</div>';
+        : '<div class="lk-empty">No matches. Try just the song name.</div>';
     const gnHTML = `<div class="ly-sec">Genius <span>opens in your browser</span></div>
       <button type="button" class="lk-item ly-item ly-genius" data-genius style="--d:${results.length * 40}ms">
         <span class="lk-art">G</span>
         <span class="lk-text"><b>Search on Genius</b><small>“${esc(text)}”</small></span>
         <span class="lk-src genius">Genius ↗</span></button>`;
-    out.innerHTML = `<div class="ly-sec">LRCLIB <span>shows here, synced when available</span></div>` + lrHTML + gnHTML;
+    out.innerHTML = `<div class="ly-sec">Lyrics <span>LRCLIB, Kugou and NetEase · synced first</span></div>` + lrHTML + gnHTML;
   }
   findBtn.addEventListener('click', () => (wrap.classList.contains('open') ? closeSearch() : openSearch()));
   $('#lyGo').addEventListener('click', runSearch);

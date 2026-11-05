@@ -236,16 +236,26 @@ function mockApi(method, p, q, body) {
   }
   if (method === 'GET' && p === '/me') return { id: 'mock', display_name: 'Mock Listener', product: 'premium' };
   if (method === 'GET' && p === '/me/tracks') return pageOf(m.catalog.filter((t) => m.liked.has(t.id)), q.limit, q.offset, (t) => ({ added_at: '2026-01-01', track: t }));
-  if (method === 'GET' && p === '/me/tracks/contains') return String(q.ids || '').split(',').map((id) => m.liked.has(id));
-  if ((method === 'PUT' || method === 'DELETE') && p === '/me/tracks') { for (const id of String(q.ids || '').split(',')) method === 'PUT' ? m.liked.add(id) : m.liked.delete(id); return null; }
+  // 2026 API: the per-type like endpoints are refused, the library endpoint takes URIs
+  if (p === '/me/tracks/contains' || ((method === 'PUT' || method === 'DELETE') && p === '/me/tracks')) throw new SpotifyError('Forbidden', 403);
+  if (method === 'GET' && p === '/me/library/contains') {
+    const uris = String(q.uris || '').split(',').filter(Boolean);
+    if (!uris.length || uris.length > 40) throw new SpotifyError('Invalid uris', 400);
+    return uris.map((u) => m.liked.has(u.split(':').pop()));
+  }
+  if ((method === 'PUT' || method === 'DELETE') && p === '/me/library') {
+    for (const u of (body && body.uris) || []) { const id = String(u).split(':').pop(); method === 'PUT' ? m.liked.add(id) : m.liked.delete(id); }
+    return null;
+  }
   if (method === 'GET' && p === '/me/playlists') return pageOf(m.playlists.map(({ items, ...pl }) => pl), q.limit, q.offset);
   const plm = /^\/playlists\/([^/]+)\/tracks$/.exec(p);
   if (method === 'GET' && plm) { const pl = m.playlists.find((x) => x.id === plm[1]); if (!pl) throw new SpotifyError('Not found', 404); return pageOf(pl.items, q.limit, q.offset, (t) => ({ track: t })); }
   if (method === 'GET' && p === '/search') {
     if (Number(q.limit) > 10) throw new SpotifyError('Invalid limit', 400);   // like apps whose search page size was capped
     const s = String(q.q || '').toLowerCase(), types = String(q.type || 'track').split(',');
+    const byArtist = /^artist:"([^"]+)"$/.exec(s);
     const out = {};
-    if (types.includes('track')) out.tracks = pageOf(m.catalog.filter((t) => `${t.name} ${t.artists.map((a) => a.name).join(' ')}`.toLowerCase().includes(s)), q.limit, q.offset);
+    if (types.includes('track')) out.tracks = pageOf(m.catalog.filter((t) => (byArtist ? t.artists.some((a) => a.name.toLowerCase() === byArtist[1]) : `${t.name} ${t.artists.map((a) => a.name).join(' ')}`.toLowerCase().includes(s))), q.limit, q.offset);
     if (types.includes('artist')) out.artists = pageOf(m.artistList.filter((a) => a.name.toLowerCase().includes(s)), q.limit, 0);
     if (types.includes('album')) out.albums = pageOf(m.albumList.filter((a) => `${a.name} ${a.artists[0].name}`.toLowerCase().includes(s)), q.limit, 0);
     if (types.includes('playlist')) out.playlists = pageOf(m.playlists.filter((x) => x.name.toLowerCase().includes(s)).map(({ items, ...pl }) => pl), q.limit, 0);
@@ -262,7 +272,7 @@ function mockApi(method, p, q, body) {
   if (method === 'GET' && arm) {
     const ar = m.artistList.find((a) => a.id === arm[1]);
     if (!ar) throw new SpotifyError('Not found', 404);
-    if (arm[2] === '/top-tracks') return { tracks: m.catalog.filter((t) => t.artists[0].id === ar.id).slice(0, 10) };
+    if (arm[2] === '/top-tracks') throw new SpotifyError('Not found', 404);   // removed in the 2026 API
     if (arm[2] === '/albums') return pageOf(m.albumList.filter((a) => a.artists[0].id === ar.id), q.limit, q.offset);
     return ar;
   }
@@ -304,16 +314,25 @@ const os = require('os');
 const EVS_FAKE = !!(process.env.GLASS_SHOT && process.env.GLASS_EVS_FAKE);   // tests: pretend, never touch castlabs
 const fake = { python: true, evs: true, account: null, signed: false, pending: null };
 let pyCmd = null;
-function run(cmd, args, input, ms = 180000) {
+const ANSI = /\x1b\[[0-9;]*[A-Za-z]/g;
+function run(cmd, args, input, ms = 180000, onLine = null) {
   return new Promise((resolve) => {
-    let out = '', err = '', p;
-    try { p = spawn(cmd, args, { windowsHide: true, env: { ...process.env, EVS_NO_ASK: '1', PYTHONIOENCODING: 'utf-8' } }); }
+    let out = '', err = '', p, part = '';
+    try { p = spawn(cmd, args, { windowsHide: true, env: { ...process.env, EVS_NO_ASK: '1', PYTHONIOENCODING: 'utf-8', PYTHONUNBUFFERED: '1' } }); }
     catch (e) { resolve({ code: -1, out, err: e.message }); return; }
     const t = setTimeout(() => { try { p.kill(); } catch { /* gone */ } }, ms);
-    p.stdout.on('data', (d) => { out += d; });
-    p.stderr.on('data', (d) => { err += d; });
+    // every line the tool prints (both streams), for the live log in the setup window
+    const feed = (d) => {
+      if (!onLine) return;
+      part += String(d);
+      const bits = part.split(/\r\n|\n|\r/);
+      part = bits.pop();
+      for (const b of bits) { const l = b.replace(ANSI, '').trim(); if (l) onLine(l); }
+    };
+    p.stdout.on('data', (d) => { out += d; if (!onLine || !String(d).trim().startsWith('{')) feed(d); });
+    p.stderr.on('data', (d) => { err += d; feed(d); });
     p.on('error', (e) => { clearTimeout(t); resolve({ code: -1, out, err: e.message }); });
-    p.on('close', (code) => { clearTimeout(t); resolve({ code, out, err }); });
+    p.on('close', (code) => { clearTimeout(t); if (part.trim() && onLine && !part.trim().startsWith('{')) onLine(part.replace(ANSI, '').trim()); resolve({ code, out, err }); });
     p.stdin.on('error', () => {});
     p.stdin.end(input == null ? '' : input);
   });
@@ -326,19 +345,71 @@ async function python() {
   }
   return null;
 }
-function evsAccount() {
-  try {
-    const f = process.env.EVS_CONFIG_FILE || path.join(os.homedir(), '.config', 'evs', 'config.json');
-    const a = JSON.parse(fs.readFileSync(f, 'utf8')).Auth || {};
-    return a.AccountName && a.RefreshToken ? a.AccountName : null;
-  } catch { return null; }
+const evsConfig = () => {
+  try { return JSON.parse(fs.readFileSync(process.env.EVS_CONFIG_FILE || path.join(os.homedir(), '.config', 'evs', 'config.json'), 'utf8')); } catch { return {}; }
+};
+function evsAccount() { const a = evsConfig().Auth || {}; return a.AccountName && a.RefreshToken ? a.AccountName : null; }
+// castlabs' answers (Amazon Cognito errors underneath) in plain words, on the field they're about
+function friendlyPw(p) {
+  p = String(p || '').toLowerCase();
+  if (p.includes('uppercase')) return 'castlabs wants a capital letter in it';
+  if (p.includes('lowercase')) return 'castlabs wants a small letter in it';
+  if (p.includes('numeric') || p.includes('number')) return 'castlabs wants a number in it';
+  if (p.includes('symbol')) return 'castlabs wants a symbol in it, like ! or #';
+  if (p.includes('long')) return '8 or more characters';
+  return '';
+}
+function explainEvs(msg) {
+  const m = String(msg || '');
+  const has = (x) => m.includes(x);
+  if (has('UsernameExistsException') || /user already exists/i.test(m)) return { field: 'account', error: 'That account name is taken' };
+  if (has('InvalidPasswordException')) return { field: 'password', error: friendlyPw(m.split('policy:')[1]) || 'castlabs wants a stronger password' };
+  if (has('CodeMismatchException')) return { field: 'code', error: 'That code isn\u2019t right' };
+  if (has('ExpiredCodeException')) return { field: 'code', error: 'That code expired. Send a new one.' };
+  if (has('UserNotConfirmedException')) return { field: 'code', error: '', needsCode: true };
+  if (has('NotAuthorizedException')) return { field: 'password', error: 'Wrong account name or password' };
+  if (has('UserNotFoundException')) return { field: 'account', error: 'No castlabs account with that name' };
+  if (has('InvalidParameterException') && /email/i.test(m)) return { field: 'email', error: 'castlabs didn\u2019t accept that email' };
+  if (has('InvalidParameterException') && /username/i.test(m)) return { field: 'account', error: 'castlabs didn\u2019t accept that account name' };
+  if (has('LimitExceededException') || has('TooManyRequests')) return { error: 'Too many tries. Wait a few minutes, then try again.' };
+  if (/getaddrinfo|ConnectTimeout|EndpointConnectionError|ConnectionError|timed out/i.test(m)) return { error: 'Couldn\u2019t reach castlabs. Check your internet connection.' };
+  return { error: m.replace(/^[\s\S]*?An error occurred \((\w+)\) when calling the \w+ operation: /, '').slice(0, 220) || 'castlabs said no' };
+}
+// rough progress from what the tools print: each pattern moves the bar to at least that far
+const STAGES = {
+  prepare: [[/winget|Found Python/i, 8], [/Downloading .*python/i, 15], [/verified installer hash/i, 25], [/Starting package install/i, 30], [/Successfully installed\b(?!.*castlabs)/i, 45],
+    [/Collecting|Requirement already satisfied/i, 55], [/Downloading/i, 65], [/Installing collected packages/i, 82], [/Successfully installed/i, 96]],
+  sign: [[/^Signing:/i, 8], [/Checking existing signature/i, 16], [/Existing signature invalid/i, 24], [/No cached signature|Checking cached signature/i, 30],
+    [/Acquiring upload slot/i, 38], [/(\d{1,3})(?:\.\d+)?\s*%/, null], [/Requesting signature/i, 80], [/Signature request successful|Retain existing signature|Using cached signature/i, 94]],
+};
+function progressFor(task, sender) {
+  let pct = 0, n = 0;
+  const send = (d) => { try { if (!sender.isDestroyed()) sender.send('evs:progress', { task, ...d }); } catch { /* window gone */ } };
+  send({ pct: 3 });
+  return {
+    line(l) {
+      n++;
+      let to = pct;
+      for (const [re, at] of STAGES[task] || []) {
+        const m = re.exec(l);
+        if (!m) continue;
+        if (at === null) to = Math.max(to, 38 + Math.min(100, +m[1]) * 0.4);   // upload percentage: 38 -> 78
+        else to = Math.max(to, at);
+      }
+      if (!STAGES[task]) to = Math.min(88, 12 + n * 18);                     // account steps: a few lines each
+      pct = Math.max(pct, to);
+      send({ pct, line: l });
+    },
+    done(ok) { send({ pct: ok ? 100 : pct }); },
+  };
 }
 async function evsStatus() {
   const portable = !!process.env.PORTABLE_EXECUTABLE_DIR;
-  if (EVS_FAKE) return { portable, signed: fake.signed, python: fake.python, evs: fake.evs, account: fake.account };
+  if (EVS_FAKE) return { portable, signed: fake.signed, python: fake.python, evs: fake.evs, account: fake.account, cachedAccount: fake.pending || '' };
   const py = await python();
   const evs = py ? (await run(py, ['-c', 'import castlabs_evs'], null, 20000)).code === 0 : false;
-  return { portable, signed: vmpSigned(), python: !!py, evs, account: evsAccount() };
+  const cached = (evsConfig().Account || {}).AccountName || '';
+  return { portable, signed: vmpSigned(), python: !!py, evs, account: evsAccount(), cachedAccount: cached };
 }
 const lastLine = (s) => String(s || '').trim().split(/\r?\n/).filter(Boolean).pop() || '';
 const EVS_WRAPPER = String.raw`import json, sys, io, contextlib
@@ -346,7 +417,7 @@ d = json.loads(sys.stdin.read())
 buf = io.StringIO()
 try:
     from castlabs_evs.account import Account
-    with contextlib.redirect_stdout(buf):
+    with contextlib.redirect_stdout(sys.stderr):
         a = Account(no_ask=True)
         act = d.get('action')
         if act == 'signup':
@@ -396,44 +467,73 @@ function register() {
   // ----- setup steps -----
   ipcMain.handle('evs:status', () => evsStatus());
   // castlabs' tool ready: Python (installed for this user with winget if missing), then castlabs-evs
-  ipcMain.handle('evs:prepare', async () => {
-    if (EVS_FAKE) { fake.python = fake.evs = true; return { ok: true }; }
-    if (!(await python())) {
-      const w = await run('winget', ['install', '-e', '--id', 'Python.Python.3.12', '--scope', 'user', '--silent', '--accept-package-agreements', '--accept-source-agreements', '--disable-interactivity'], null, 600000);
-      pyCmd = null;
-      if (!(await python())) return { ok: false, error: 'Couldn\u2019t install Python automatically. Install it from python.org, then open this again.' + (w.code ? ` (winget ${w.code})` : '') };
+  ipcMain.handle('evs:prepare', async (e) => {
+    const pr = progressFor('prepare', e.sender);
+    if (EVS_FAKE) {
+      for (const l of ['Collecting castlabs-evs', 'Downloading castlabs_evs-1.3.3-py3-none-any.whl (32 kB)', 'Installing collected packages: castlabs-evs', 'Successfully installed castlabs-evs-1.3.3']) { pr.line(l); await new Promise((r) => setTimeout(r, 250)); }
+      fake.python = fake.evs = true; pr.done(true); return { ok: true };
     }
-    const r = await run(pyCmd, ['-m', 'pip', 'install', '--user', '--upgrade', '--disable-pip-version-check', 'castlabs-evs'], null, 600000);
+    if (!(await python())) {
+      pr.line('Python isn\u2019t installed: getting it with winget');
+      const w = await run('winget', ['install', '-e', '--id', 'Python.Python.3.12', '--scope', 'user', '--silent', '--accept-package-agreements', '--accept-source-agreements', '--disable-interactivity'], null, 600000, pr.line);
+      pyCmd = null;
+      if (!(await python())) { pr.done(false); return { ok: false, error: 'Couldn\u2019t install Python automatically. Install it from python.org, then open this again.' + (w.code ? ` (winget ${w.code})` : '') }; }
+      pr.line('Found Python');
+    }
+    const r = await run(pyCmd, ['-m', 'pip', 'install', '--user', '--upgrade', '--disable-pip-version-check', 'castlabs-evs'], null, 600000, pr.line);
+    pr.done(r.code === 0);
     if (r.code !== 0) return { ok: false, error: 'Couldn\u2019t install castlabs\u2019 tool: ' + lastLine(r.err || r.out).slice(0, 200) };
     return { ok: true };
   });
   // castlabs account: signup (sends a code by email), confirm, resend, login
-  ipcMain.handle('evs:account', async (_e, d) => {
+  ipcMain.handle('evs:account', async (e, d) => {
     d = d && typeof d === 'object' ? d : {};
     const action = String(d.action || '');
     if (!['signup', 'confirm', 'resend', 'login'].includes(action)) return { ok: false, error: 'Unknown step' };
+    const pr = progressFor(action, e.sender);
+    const fail = (raw) => { pr.done(false); return { ok: false, ...explainEvs(raw) }; };
     if (EVS_FAKE) {
-      if (action === 'signup') { fake.pending = d.account; return { ok: true }; }
-      if (action === 'resend') return { ok: true };
-      if (action === 'confirm') { if (d.code !== '123456') return { ok: false, error: 'Invalid verification code provided, please try again.' }; fake.account = fake.pending; return { ok: true }; }
-      if (action === 'login') { if (d.password !== 'right-password') return { ok: false, error: 'Incorrect username or password.' }; fake.account = d.account; return { ok: true }; }
+      pr.line(action === 'signup' ? 'Signing up for castLabs EVS' : action === 'login' ? 'Refreshing authorization tokens' : 'Confirming EVS account');
+      await new Promise((r) => setTimeout(r, 300));
+      if (action === 'signup') { if (['taken-name', 'mocklistener'].includes(d.account)) return fail('Signup request failed: Account not created: An error occurred (UsernameExistsException) when calling the SignUp operation: User already exists'); fake.pending = d.account; pr.done(true); return { ok: true }; }
+      if (action === 'resend') { pr.done(true); return { ok: true }; }
+      if (action === 'confirm') { if (d.code !== '123456') return fail('An error occurred (CodeMismatchException) when calling the ConfirmSignUp operation: Invalid verification code provided, please try again.'); fake.account = fake.pending; pr.done(true); return { ok: true }; }
+      if (action === 'login') { if (d.password !== 'right-password') return fail('An error occurred (NotAuthorizedException) when calling the InitiateAuth operation: Incorrect username or password.'); fake.account = d.account; pr.done(true); return { ok: true }; }
     }
     const py = await python();
-    if (!py) return { ok: false, error: 'Python isn\u2019t installed yet' };
+    if (!py) return fail('Python isn\u2019t installed yet');
     const payload = JSON.stringify({ action, account: String(d.account || ''), password: String(d.password || ''), email: String(d.email || ''), first: String(d.first || ''), last: String(d.last || ''), code: String(d.code || '') });
-    const r = await run(py, ['-c', EVS_WRAPPER], payload, 120000);
-    try { return JSON.parse(lastLine(r.out)); }
-    catch { return { ok: false, error: lastLine(r.err || r.out).slice(0, 300) || 'castlabs didn\u2019t answer' }; }
+    const r = await run(py, ['-c', EVS_WRAPPER], payload, 120000, pr.line);
+    let res;
+    try { res = JSON.parse(lastLine(r.out)); } catch { res = { ok: false, error: lastLine(r.err || r.out) || 'castlabs didn\u2019t answer' }; }
+    if (res.ok) { pr.done(true); return { ok: true }; }
+    const why = explainEvs(res.error);
+    // that name is already your castlabs account (signed in on this PC): nothing left to do
+    if (action === 'signup' && why.field === 'account' && evsAccount() && evsAccount().toLowerCase() === String(d.account).toLowerCase()) { pr.line('That account is already yours and signed in'); pr.done(true); return { ok: true, already: true }; }
+    // logging into an account whose email was never confirmed: send a fresh code and ask for it
+    if (why.needsCode) {
+      await run(py, ['-c', EVS_WRAPPER], JSON.stringify({ action: 'resend', account: String(d.account || '') }), 60000, pr.line);
+      pr.done(false);
+      return { ok: false, needsCode: true, field: 'code', error: '' };
+    }
+    pr.done(false);
+    return { ok: false, ...why };
   });
   // sign this install in place (the exe's .sig), then leave the marker Glass checks at start
-  ipcMain.handle('evs:sign', async () => {
-    if (EVS_FAKE) { fake.signed = true; return { ok: true }; }
-    if (process.env.PORTABLE_EXECUTABLE_DIR) return { ok: false, error: 'Open the installed Glass (Start menu) to sign it' };
+  ipcMain.handle('evs:sign', async (e) => {
+    const pr = progressFor('sign', e.sender);
+    if (EVS_FAKE) {
+      for (const l of ['Signing: Glass Player.exe', ' - Checking existing signature', ' - Existing signature invalid: Failed to verify signature', ' - No cached signature found', ' - Acquiring upload slot for mode: single', 'Uploading 48%', 'Uploading 100%', ' - Requesting signature: streaming', ' - Signature request successful: streaming, 1351 days left']) { pr.line(l.trim()); await new Promise((r) => setTimeout(r, 200)); }
+      fake.signed = true; pr.done(true); return { ok: true };
+    }
+    if (process.env.PORTABLE_EXECUTABLE_DIR) { pr.done(false); return { ok: false, error: 'Open the installed Glass (Start menu) to sign it' }; }
     const py = await python();
-    if (!py) return { ok: false, error: 'Python isn\u2019t installed yet' };
-    const r = await run(py, ['-m', 'castlabs_evs.vmp', '-n', 'sign-pkg', appDir()], null, 300000);
-    if (r.code !== 0) return { ok: false, error: 'Signing failed: ' + lastLine(r.err || r.out).slice(0, 220) };
-    try { fs.writeFileSync(vmpMarker(), new Date().toISOString()); } catch (e) { return { ok: false, error: 'Signed, but couldn\u2019t mark it: ' + e.message }; }
+    if (!py) { pr.done(false); return { ok: false, error: 'Python isn\u2019t installed yet' }; }
+    const r = await run(py, ['-m', 'castlabs_evs.vmp', '-n', 'sign-pkg', appDir()], null, 300000, pr.line);
+    if (r.code !== 0) { pr.done(false); return { ok: false, error: 'Signing failed: ' + lastLine(r.err || r.out).replace(ANSI, '').slice(0, 220) }; }
+    try { fs.writeFileSync(vmpMarker(), new Date().toISOString()); } catch (err) { pr.done(false); return { ok: false, error: 'Signed, but couldn\u2019t mark it: ' + err.message }; }
+    pr.line('Glass is signed');
+    pr.done(true);
     return { ok: true };
   });
   ipcMain.handle('evs:relaunch', () => { if (EVS_FAKE) return; app.relaunch(); app.exit(0); });
