@@ -32,6 +32,7 @@
 
   // ---------- Adjust ----------
   const V = 300, OUT = 720;
+  const SHARP = 600;      // fewer of the picture's own pixels than this across the square starts to look soft
   function adjust(img) {
     return new Promise((resolve) => {
       const W = img.width, H = img.height;
@@ -51,9 +52,11 @@
         </div>
         <div class="set-chips adj-modes"><button type="button" class="schip" data-fit>Fit whole image</button><button type="button" class="schip" data-fill>Fill square</button></div>
         <p class="note adj-hint">Drag to move · scroll to zoom</p>
+        <div class="adj-warn" data-warn role="status"><p></p></div>
         <div class="modal-actions"><span class="grow"></span><button type="button" class="btn" data-x>Cancel</button><button type="button" class="btn primary" data-ok>Use cover</button></div>`, 'adj-panel');
       L.onClose = () => resolve(result);
       const view = $('[data-view]', L.panel), im = $('.adj-img', L.panel), range = $('[data-zoom]', L.panel);
+      const warn = $('[data-warn]', L.panel);
       const zMin = Math.min(zFit, zCover), zMax = zCover * 4;
       const toR = (v) => Math.round(((Math.log(v) - Math.log(zMin)) / (Math.log(zMax) - Math.log(zMin))) * 1000);
       const fromR = (r) => Math.exp(Math.log(zMin) + (r / 1000) * (Math.log(zMax) - Math.log(zMin)));
@@ -70,6 +73,10 @@
         range.value = toR(z); setFill(range);
         $('[data-fit]', L.panel).classList.toggle('on', Math.abs(z - zFit) < 1e-4);
         $('[data-fill]', L.panel).classList.toggle('on', Math.abs(z - zCover) < 1e-4 && zFit !== zCover);
+        // a heads-up, not a block: how many of the picture's own pixels end up across the square, zoom included
+        const across = Math.round(V / z);
+        warn.classList.toggle('on', across < SHARP);
+        if (across < SHARP) warn.firstElementChild.textContent = `Low quality: about ${across} pixels across${across < Math.min(W, H) ? ' at this zoom' : ''}. It may look blurry as the cover and in the background. 1000 × 1000 or bigger stays sharp.`;
       };
       const zoomTo = (nz, cx = V / 2, cy = V / 2, glide = false) => {
         nz = Math.max(zMin, Math.min(zMax, nz));

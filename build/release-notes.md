@@ -1,7 +1,5 @@
-## Glass 0.2.9
+## Glass 0.2.10
 
-**Bars that follow the music.** The bars on the playing song now react to the sound itself: one to the 808s and kicks, one to the vocals and snares, one to the hi-hats and ticks.
+**A heads-up for small pictures.** When a cover you pick is low quality, including when you zoom far into a picture, Adjust cover shows a small note that it may look blurry as the cover and in the background. It's only a note: any picture can still be used.
 
-**Lyrics open and close as one motion.** The cover and the glass panel move together with a gentle start and a soft landing, and nothing clicks into place partway through. Closing from the corner layout is clean too: the cover rises over the fading panel and the title fades in with it.
-
-Installed copies update themselves. New install: download `Glass-Player-Setup-0.2.9.exe` below.
+Installed copies update themselves. New install: download `Glass-Player-Setup-0.2.10.exe` below.

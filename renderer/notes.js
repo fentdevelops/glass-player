@@ -8,6 +8,8 @@
     <rect width="96" height="64" rx="12" fill="url(#pn${id})"/><rect width="96" height="64" rx="12" fill="url(#pg${id})"/>
     <g fill="none" stroke="#fff" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round">${body}</g></svg>`;
   const NOTES = [
+    { v: '0.2.10', title: 'A heads-up for small pictures', text: 'When a cover you pick is low quality, Adjust cover says so, so it won\u2019t surprise you as a blurry cover or background.',
+      art: wash(28, '<rect x="30" y="14" width="36" height="36" rx="7"/><path d="M48 24v12"/><circle cx="48" cy="42" r="1.4" fill="#fff"/>') },
     { v: '0.2.9', title: 'Bars that follow the music', text: 'The bars on the playing song react to the sound: one to the 808s and kicks, one to the vocals and snares, one to the hi-hats.',
       art: wash(26, '<path d="M36 46V26M48 46V36M60 46V18"/>') },
     { v: '0.2.9', title: 'Lyrics open and close as one motion', text: 'The cover and the glass panel now move together, with a gentle start and a soft landing, and nothing clicks into place.',

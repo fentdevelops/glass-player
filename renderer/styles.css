@@ -794,6 +794,10 @@ body.lyrics-on.ly-compact .ly-head, .lyrics.ly-leaving.was-compact .ly-head { mi
   box-shadow: 0 16px 40px -10px rgba(0, 0, 0, .45), inset 0 0 0 1px rgba(255, 255, 255, .1);
   will-change: transform, opacity, filter;
 }
+/* Adjust cover: a small heads-up that glides open when the picture would look soft */
+.adj-warn { display: grid; width: 300px; grid-template-rows: 0fr; opacity: 0; transition: grid-template-rows .5s var(--glide), opacity .4s var(--glide), margin .5s var(--glide); }
+.adj-warn.on { grid-template-rows: 1fr; opacity: 1; margin-top: 8px; }
+.adj-warn p { overflow: hidden; min-height: 0; margin: 0; font-size: 12px; line-height: 1.35; text-align: center; color: rgba(255, 224, 170, .95); }
 /* closing: the panel is pinned where it was while the cover glides back, then slides out */
 .lyrics.ly-leaving {
   --r: 26px;
