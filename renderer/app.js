@@ -46,7 +46,7 @@ const S = {
   // wallBlurArt: blur behind the artwork background (max, so it reads as coloured light); wallBlur: behind your own image
   ui: { glow: 55, tint: 0, tintColor: '', style: 'liquid', wall: 'colors', quickEdit: true, zoom: 1, wallBlurArt: 40, wallBlur: 0, wallImg: '', wallImgSize: '' },
   albumArt: {},             // album key -> { cover, thumb } made when songs are dragged together
-  tags: [],                 // [{ id, name, emoji, color }] (tags.js)
+  tags: [],                 // [{ id, name, color }] (tags.js)
   songTags: {},             // path -> [tag ids]
   plays: {},                // path -> play count (extras.js)
   recent: [],               // recently played paths, newest last (Search > Jump back in)
@@ -856,7 +856,7 @@ function chipList() {
   for (const x of f.formats) out.push({ k: 'fmt:' + x, label: x.toUpperCase() });
   for (const k in TOGGLES) if (f[k]) out.push({ k, label: TOGGLES[k] });
   for (const k of f.quality) out.push({ k: 'q:' + k, label: QUALITY[k] });
-  for (const id of f.tags) { const tg = S.tags.find((x) => x.id === id); if (tg) out.push({ k: 'tag:' + id, label: `${tg.emoji ? tg.emoji + ' ' : ''}${tg.name}`, color: tg.color }); }
+  for (const id of f.tags) { const tg = S.tags.find((x) => x.id === id); if (tg) out.push({ k: 'tag:' + id, label: tg.name, color: tg.color }); }
   if (out.length > 1) out.push({ k: 'clear', label: 'Clear all' });
   return out;
 }
@@ -2641,7 +2641,7 @@ async function restore() {
   // picked on purpose is kept for the artwork
   if (s.ui && 'wallBlur' in s.ui && !('wallBlurArt' in s.ui)) S.ui.wallBlurArt = +s.ui.wallBlur === 3 ? 40 : +s.ui.wallBlur;
   if (s.albumArt) S.albumArt = s.albumArt;
-  if (Array.isArray(s.tags)) S.tags = s.tags;
+  if (Array.isArray(s.tags)) { S.tags = s.tags; S.tags.forEach((tg) => { delete tg.emoji; }); }   // tags no longer have emojis
   if (s.songTags && typeof s.songTags === 'object') S.songTags = s.songTags;
   if (s.plays && typeof s.plays === 'object') S.plays = s.plays;
   if (Array.isArray(s.recent)) S.recent = s.recent.filter((p) => typeof p === 'string').slice(-40);

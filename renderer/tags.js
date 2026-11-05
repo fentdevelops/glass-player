@@ -1,12 +1,9 @@
 'use strict';
-// Tags: your own labels with an emoji and a colour, on any number of songs.
-// Data lives in app.js state: S.tags = [{ id, name, emoji, color }], S.songTags = { path: [ids] }.
+// Tags: your own labels with a colour, on any number of songs.
+// Data lives in app.js state: S.tags = [{ id, name, color }], S.songTags = { path: [ids] }.
 // Uses app.js globals: S, lib, $, $$, esc, anim, toast, openMenu, openModal, libChanged, save, plural, filtersChanged, setView, transitionView.
 (() => {
   const COLORS = ['#ff5c80', '#ff8a4c', '#ffc23d', '#9be15d', '#3ddc97', '#35c9e8', '#5b8cff', '#a77bff', '#ef6fd8', '#b8b8c4'];
-  const EMOJI = ['🔥', '❤️', '💜', '💙', '💚', '⭐', '✨', '🎧', '🎉', '🕺', '😌', '😴', '🌙', '☀️', '🌧️', '❄️',
-    '🌊', '🌸', '🍂', '🌈', '⚡', '💎', '👑', '🦋', '🚗', '🏋️', '🏃', '📚', '🧠', '🎮', '☕', '🍕',
-    '🎸', '🎹', '🎤', '🥁', '🎻', '🎷', '💿', '📼', '💔', '😢', '😈', '😂', '🥶', '🤍', '🖤', '🙏'];
   const ICON = '<svg viewBox="0 0 24 24"><path d="M3 12V4a1 1 0 0 1 1-1h8l9 9-9 9z"/><circle cx="8" cy="8" r="1.6"/></svg>';
 
   const byId = (id) => S.tags.find((x) => x.id === id);
@@ -15,14 +12,14 @@
   const newId = () => Math.random().toString(36).slice(2, 9);
 
   // ---------- look ----------
-  const dot = (tg) => `<span class="tag-dot" style="--tc:${tg.color}">${tg.emoji ? esc(tg.emoji) : ''}</span>`;
-  const chip = (tg, cls = '') => `<span class="tag ${cls}" style="--tc:${tg.color}">${tg.emoji ? `<i>${esc(tg.emoji)}</i>` : ''}<b>${esc(tg.name)}</b></span>`;
-  // on a song row: the first tag in full, the rest as emoji/colour dots
+  const dot = (tg) => `<span class="tag-dot" style="--tc:${tg.color}"></span>`;
+  const chip = (tg, cls = '') => `<span class="tag ${cls}" style="--tc:${tg.color}"><b>${esc(tg.name)}</b></span>`;
+  // on a song row: the first tag in full, the rest as colour dots
   function rowHTML(t, compact = false) {
     const list = tagsFor(t);
     if (!list.length) return '';
     const shown = list.slice(0, compact ? 3 : 4);
-    return `<span class="row-tags">${shown.map((tg, i) => (i === 0 && !compact ? chip(tg, 'sm') : `<span class="tag-mini" style="--tc:${tg.color}" title="${esc(tg.name)}">${tg.emoji ? esc(tg.emoji) : ''}</span>`)).join('')}${list.length > shown.length ? `<span class="tag-more">+${list.length - shown.length}</span>` : ''}</span>`;
+    return `<span class="row-tags">${shown.map((tg, i) => (i === 0 && !compact ? chip(tg, 'sm') : `<span class="tag-mini" style="--tc:${tg.color}" title="${esc(tg.name)}"></span>`)).join('')}${list.length > shown.length ? `<span class="tag-more">+${list.length - shown.length}</span>` : ''}</span>`;
   }
 
   // ---------- give / take ----------
@@ -58,15 +55,12 @@
   // resolves with the tag (new or edited) or null; `tracks` get the new tag straight away
   function editTag(tag, tracks = []) {
     return new Promise((resolve) => {
-      const draft = tag ? { ...tag } : { id: newId(), name: '', emoji: EMOJI[Math.floor(Math.random() * 16)], color: COLORS[S.tags.length % COLORS.length] };
+      const draft = tag ? { ...tag } : { id: newId(), name: '', color: COLORS[S.tags.length % COLORS.length] };
       let out = null;
       const L = Art.layer(`
         <h3 class="modal-title">${tag ? 'Edit tag' : 'New tag'}</h3>
         <div class="tg-preview" data-prev></div>
         <label class="field"><span>Name</span><input type="text" data-name maxlength="32" placeholder="Chill, Gym, Road trip…" value="${esc(draft.name)}" /></label>
-        <div class="field"><span>Emoji</span>
-          <div class="tg-emoji" data-emoji>${['', ...EMOJI].map((e) => `<button type="button" class="tg-e${e === draft.emoji ? ' on' : ''}" data-e="${esc(e)}" title="${e ? '' : 'No emoji'}">${e || '<svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6 6 18"/></svg>'}</button>`).join('')}</div>
-          <div class="tg-own"><input type="text" data-own maxlength="8" placeholder="Or type any emoji (Win + .)" /></div></div>
         <div class="field"><span>Colour</span>
           <div class="tg-colors" data-colors>${COLORS.map((c) => `<button type="button" class="tg-c${c === draft.color ? ' on' : ''}" data-c="${c}" style="--tc:${c}"></button>`).join('')}</div></div>
         <div class="modal-actions">
@@ -79,14 +73,11 @@
         const prev = $('[data-prev]', P);
         prev.innerHTML = chip({ ...draft, name: draft.name.trim() || 'Tag name' }, 'lg');
         if (pop) anim(prev.firstElementChild, [{ transform: 'scale(.85)' }, { transform: 'scale(1.06)' }, { transform: 'none' }], { duration: 420 });
-        $$('.tg-e', P).forEach((b) => b.classList.toggle('on', b.dataset.e === draft.emoji));
         $$('.tg-c', P).forEach((b) => b.classList.toggle('on', b.dataset.c === draft.color));
       };
       paint(false);
       setTimeout(() => name.focus(), 80);
       name.addEventListener('input', () => { draft.name = name.value; paint(false); });
-      $('[data-emoji]', P).addEventListener('click', (e) => { const b = e.target.closest('[data-e]'); if (b) { draft.emoji = b.dataset.e; $('[data-own]', P).value = ''; paint(true); } });
-      $('[data-own]', P).addEventListener('input', (e) => { const v = [...e.target.value.trim()].slice(0, 2).join(''); draft.emoji = v; paint(true); });
       $('[data-colors]', P).addEventListener('click', (e) => { const b = e.target.closest('[data-c]'); if (b) { draft.color = b.dataset.c; paint(true); } });
       const submit = () => {
         draft.name = name.value.trim().replace(/\s+/g, ' ');
@@ -153,7 +144,7 @@
   function mountField(form, t) {
     const box = $('[data-tags]', form), sel = new Set(S.songTags[t.path] || []);
     const paint = () => {
-      box.innerHTML = S.tags.map((tg) => `<button type="button" class="tg-tog${sel.has(tg.id) ? ' on' : ''}" data-id="${tg.id}" style="--tc:${tg.color}">${tg.emoji ? `<i>${esc(tg.emoji)}</i>` : ''}${esc(tg.name)}</button>`).join('')
+      box.innerHTML = S.tags.map((tg) => `<button type="button" class="tg-tog${sel.has(tg.id) ? ' on' : ''}" data-id="${tg.id}" style="--tc:${tg.color}">${esc(tg.name)}</button>`).join('')
         + `<button type="button" class="tg-tog add" data-add>${'<svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg>'}New tag</button>`;
     };
     paint();

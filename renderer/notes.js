@@ -8,6 +8,8 @@
     <rect width="96" height="64" rx="12" fill="url(#pn${id})"/><rect width="96" height="64" rx="12" fill="url(#pg${id})"/>
     <g fill="none" stroke="#fff" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round">${body}</g></svg>`;
   const NOTES = [
+    { v: '0.2.12', title: 'Cleaner tags', text: 'Tags are now just a name and a colour.',
+      art: wash(31, '<path d="M26 32V20a2 2 0 0 1 2-2h14l26 14-26 14H28a2 2 0 0 1-2-2z"/><circle cx="36" cy="26" r="2.4" fill="#fff"/>') },
     { v: '0.2.11', title: 'Real artists', text: 'Edit info lists real artists instead of collab strings, and typing a name suggests real artists with their photos. Names like Earth, Wind & Fire stay in one piece.',
       art: wash(29, '<circle cx="48" cy="25" r="9"/><path d="M31 49c2-9 9-13 17-13s15 4 17 13"/>') },
     { v: '0.2.11', title: 'Album list opens on click', text: 'Clicking anywhere on the Artist or Album field opens its list. No more aiming for the little arrow.',
