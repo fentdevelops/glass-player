@@ -40,26 +40,10 @@ contextBridge.exposeInMainWorld('glass', {
     transparency: () => ipcRenderer.invoke('sys:transparency'),
     openColors: () => ipcRenderer.invoke('sys:open-colors'),
   },
-  evs: {
-    status: () => ipcRenderer.invoke('evs:status'),
-    prepare: () => ipcRenderer.invoke('evs:prepare'),
-    account: (d) => ipcRenderer.invoke('evs:account', d),
-    sign: () => ipcRenderer.invoke('evs:sign'),
-    relaunch: () => ipcRenderer.invoke('evs:relaunch'),
-    onProgress: (cb) => ipcRenderer.on('evs:progress', (_e, d) => cb(d)),
-  },
-  spotify: {
-    status: () => ipcRenderer.invoke('sp:status'),
-    setClient: (id) => ipcRenderer.invoke('sp:setClient', id),
-    connect: () => ipcRenderer.invoke('sp:connect'),
-    cancel: () => ipcRenderer.invoke('sp:cancel'),
-    disconnect: () => ipcRenderer.invoke('sp:disconnect'),
-    api: (method, path, query, body) => ipcRenderer.invoke('sp:api', method, path, query, body),
-    token: (fresh) => ipcRenderer.invoke('sp:token', !!fresh),
-    log: (line) => ipcRenderer.send('sp:log', line),
-    // Glass is closing: the in-app player signs off Spotify first (had: there was a player to sign off)
-    onSignOff: (cb) => ipcRenderer.on('sp:sign-off', () => cb()),
-    signedOff: (had) => ipcRenderer.send('sp:off', !!had),
+  // taskbar preview buttons: Glass reports play state, the buttons report clicks
+  media: {
+    state: (s) => ipcRenderer.send('thumbar', s),
+    onAction: (cb) => ipcRenderer.on('media-action', (_e, a) => cb(a)),
   },
   onOpenPaths: (cb) => ipcRenderer.on('open-paths', (_e, tracks) => cb(tracks)),
   onMaximized: (cb) => ipcRenderer.on('maximized', (_e, v) => cb(v)),

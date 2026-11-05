@@ -1,9 +1,13 @@
-## Glass 0.2.3
+## Glass 0.2.4
 
-**Lyrics search stays in Glass.** The lyrics search now lists only LRCLIB, Kugou and NetEase results, which play along with the song inside Glass. The "Search on Genius" link is gone (Genius has the words only, with no timing, and could only open in your browser).
+**Fullscreen fits your screen.** The cover sits on the left and the lyrics on the right, centred and sized for big screens, instead of hanging from the top edge. Music keeps the glass background in fullscreen.
 
-**Releases arrive reliably.** Each new version is now published in one step with everything installed copies need to find it, so the update card shows up within half an hour.
+**The glass takes the cover in.** When the lyrics need the room, the cover sinks into their glass and surfaces small in the corner with a ripple, sharp the whole way. Widening lets it rise back out.
 
-Also in 0.2.2: lyrics make room with a water-drop cover when the queue panel is wide, cards and lyrics follow the panel smoothly while you resize, Glass checks for updates every 30 minutes, and Spotify inside Glass reconnects by itself without leaving extra "Glass Player" devices behind.
+**Windows media controls.** The volume and lock-screen pop-up shows the cover, and hovering Glass on the taskbar gives you previous, play/pause and next buttons.
 
-Installed copies update themselves. New install: download `Glass-Player-Setup-0.2.3.exe` below.
+**Updates install quietly.** Restart to update now installs in the background and Glass opens again by itself.
+
+**Also:** new installs start clean (colour background, no extra darkness or blur, Even out volume on), and the quality line under the song title shows right away after a restart.
+
+Installed copies update themselves. New install: download `Glass-Player-Setup-0.2.4.exe` below.

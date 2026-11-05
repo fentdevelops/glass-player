@@ -191,8 +191,9 @@ body.has-track .empty { display: none; }
 /* fullscreen video */
 body.fs .titlebar, body.fs .side { display: none; }
 body.fs .app { grid-template-rows: 0 1fr; }
-body.fs .body { --side: 0px; padding: 0; gap: 0; grid-template-columns: 1fr; transition: none; }
-body.fs .stage { background: #000; grid-row: 1 / -1; }
+body.fs .body { --side: 0px; padding: 0; gap: 0; grid-template-columns: 1fr; transition: none; grid-row: 1 / -1; }   /* the hidden title bar's 0 px row must not swallow it */
+body.fs .stage { grid-row: 1 / -1; }
+body.fs.is-video .stage { background: #000; }   /* black behind a video; music keeps the glass background */
 body.fs video { border-radius: 0; box-shadow: none; }
 body.fs .dock { position: fixed; left: 50%; bottom: 26px; translate: -50% 0; width: min(980px, 92vw); z-index: 10; }
 body.fs.idle .dock { opacity: 0; translate: -50% 20px; pointer-events: none; }
@@ -707,69 +708,10 @@ body.dragging .drop-overlay { opacity: 1; }
 body.dragging .drop-card { transform: scale(1); }
 .drop-card svg { width: 36px; height: 36px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; animation: float 1.4s ease-in-out infinite alternate; }
 
-/* ---------- Local / Spotify switch (titlebar) ---------- */
-.src {
-  -webkit-app-region: no-drag;
-  position: absolute; left: 50%; top: 7px; translate: -50% 0;
-  display: grid; grid-template-columns: 1fr 1fr; padding: 3px; border-radius: 13px;
-  animation: rise-in .9s var(--glide) both;
-}
-.src-ind { --k: 0; position: absolute; top: 3px; bottom: 3px; left: 3px; width: calc((100% - 6px) / 2); transform: translateX(calc(var(--k) * 100%)); transition: transform .7s var(--glide); }
-.src-ind i { position: absolute; inset: 0; border-radius: 10px; background: linear-gradient(180deg, rgba(255, 255, 255, .34), rgba(255, 255, 255, .16)); box-shadow: inset 0 1px 0 rgba(255, 255, 255, .6), 0 4px 12px -4px rgba(0, 0, 0, .35); }
-.src button {
-  position: relative; z-index: 1; height: 26px; padding: 0 16px; border-radius: 10px;
-  display: inline-flex; align-items: center; justify-content: center; gap: 7px;
-  font-weight: 600; font-size: 12.5px; color: var(--ink-2);
-  transition: transform var(--t-hover) var(--glide), color var(--t-hover) var(--glide);
-}
-.src button svg { width: 14px; height: 14px; fill: none; stroke: currentColor; stroke-width: 1.9; stroke-linecap: round; stroke-linejoin: round; }
-.src button:hover { color: #fff; transform: scale(1.05); }
-.src button:active { transform: scale(.9, .84); transition-duration: var(--t-press); }
-.src button.active { color: #fff; }
-.sp-dot { width: 7px; height: 7px; border-radius: 50%; background: rgba(255, 255, 255, .45); transition: background-color .6s var(--glide), box-shadow .6s var(--glide); }
-body.sp-on .sp-dot { background: #1ed760; }
-
-/* tools: in Spotify mode only Spotify tools and the ones shared by both show */
-.side[data-source="spotify"] .tool:not(.t-sp):not(.t-any) { display: none; }
-.side:not([data-source="spotify"]) .t-sp { display: none; }
-
-/* ---------- Spotify setup card (stage) ---------- */
-.sp-setup {
-  --r: 28px;
-  display: none; flex-direction: column; gap: 4px;
-  width: min(520px, 92%); padding: 30px 32px 24px;
-}
-body.sp-unlinked .sp-setup { display: flex; animation: rise-in .9s var(--glide) both; }
-/* body state class must differ from the card's class: a shared name also styled <body> itself and hid the whole app */
-body.sp-unlinked .now, body.sp-unlinked .empty, body.sp-unlinked video { display: none !important; }
-.sp-setup h1 { margin: 0; font: 600 24px/1.2 "Segoe UI Variable Display", "Segoe UI", sans-serif; }
-.sp-lead { margin: 4px 0 14px; color: var(--ink-2); font-size: 13.5px; }
-.sp-steps { margin: 0; padding: 0 0 0 20px; display: flex; flex-direction: column; gap: 14px; font-size: 13.5px; }
-.sp-steps li { padding-left: 4px; }
-.sp-steps li > span { display: block; margin-bottom: 8px; }
-.sp-steps li::marker { color: var(--ink-2); font-weight: 600; }
-.sp-uri {
-  display: flex; align-items: center; gap: 6px; padding: 4px 4px 4px 12px; border-radius: 11px;
-  background-color: rgba(0, 0, 0, .2); box-shadow: inset 0 1px 2px rgba(0, 0, 0, .25), 0 0 0 1px rgba(255, 255, 255, .08);
-}
-.sp-uri code { flex: 1; min-width: 0; font: 12.5px/1.4 "Cascadia Mono", Consolas, monospace; user-select: text; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.sp-uri .btn { height: 28px; padding: 0 12px; }
-.sp-actions { display: flex; align-items: center; gap: 12px; margin-top: 18px; }
-.sp-wait { font-size: 12.5px; color: var(--ink-2); opacity: 0; transform: translateX(-6px); transition: opacity .5s var(--glide), transform .6s var(--glide); }
-body.sp-waiting .sp-wait { opacity: 1; transform: none; }
-.sp-note { margin: 16px 0 0; font-size: 12px; color: var(--ink-2); }
-
-/* ---------- Spotify list bits ---------- */
-.sp-section { height: 100%; display: flex; align-items: flex-end; padding: 0 10px 6px; font-size: 11px; font-weight: 700; letter-spacing: .4px; text-transform: uppercase; color: var(--ink-2); }
-.sp-loading { height: 100%; display: flex; align-items: center; justify-content: center; gap: 10px; font-size: 13px; color: var(--ink-2); }
-.sp-loading i { width: 7px; height: 7px; border-radius: 50%; background: #fff; animation: sp-bounce 1.1s var(--glide) infinite alternate; }
-.sp-loading i:nth-child(2) { animation-delay: .18s; }
-.sp-loading i:nth-child(3) { animation-delay: .36s; }
-@keyframes sp-bounce { from { opacity: .25; transform: translateY(3px) scale(.8); } to { opacity: 1; transform: translateY(-3px); } }
-.hero-art.liked svg { fill: #fff; stroke: none; }
+/* ---------- list bits: section labels (Search, artist pages), round artist cards ---------- */
+.list-section { height: 100%; display: flex; align-items: flex-end; padding: 0 10px 6px; font-size: 11px; font-weight: 700; letter-spacing: .4px; text-transform: uppercase; color: var(--ink-2); }
 .hero-art.round, .card.round .card-art { border-radius: 50%; }
 .card.round .card-name, .card.round .card-sub { text-align: center; }
-.sp-more { height: 100%; display: flex; align-items: center; justify-content: center; }
 
 /* ---------- settings sheet ---------- */
 .set-sec { padding: 4px 0 14px; border-top: 1px solid rgba(255, 255, 255, .1); }
@@ -781,16 +723,8 @@ body.sp-waiting .sp-wait { opacity: 1; transform: none; }
 .set-row span { font-size: 12.5px; color: var(--ink-2); }
 .set-row .range { flex: none; width: 170px; }
 .set-row .btn { flex: none; }
-.set-pill { display: inline-flex; align-items: center; gap: 6px; }
-.set-pill i { width: 8px; height: 8px; border-radius: 50%; background: #ff9a6b; }
-.set-pill.on i { background: #1ed760; }
-.dev-list { display: flex; flex-wrap: wrap; gap: 6px; padding: 2px 0 6px; }
-.dev-list .btn { height: 30px; padding: 0 12px; font-size: 12.5px; }
-.dev-list .btn.on { background-color: rgba(255, 255, 255, .92); color: #16161b; }
 .set-grow { flex: 1; }
-.set-hint { font-size: 12.5px; color: var(--ink-2); }
 .set-row.warn span { color: #ffc49b; }
-.modal .sp-uri { margin: 2px 0 6px; }
 
 @media (max-width: 1100px) {
   .body { --side: 320px; }
@@ -830,7 +764,7 @@ body.lyrics-on.ly-compact:not(.is-video) .now {
   grid-template-columns: minmax(0, 1fr); grid-template-areas: "ly"; grid-template-rows: auto; padding: 0 14px;
 }
 body.lyrics-on.ly-compact .now-meta { display: none; }
-body.lyrics-on.ly-compact .art-wrap, body.art-video.lyrics-on.ly-compact .art-wrap {
+body.lyrics-on.ly-compact .art-wrap {
   grid-area: ly; justify-self: start; align-self: start; z-index: 3;
   width: 54px; aspect-ratio: 1; margin: 11px 0 0 13px;
 }
@@ -838,6 +772,30 @@ body.lyrics-on.ly-compact .art { --r: 15px; padding: 3px; }
 body.lyrics-on.ly-compact .art-img { border-radius: 12px; box-shadow: 0 6px 16px -6px rgba(0, 0, 0, .5), inset 0 0 0 1px rgba(255, 255, 255, .12); }
 body.lyrics-on.ly-compact .lyrics { z-index: 1; height: 100cqh; min-height: 0; }   /* the stage's full height, like the queue panel beside it */
 body.lyrics-on.ly-compact .ly-head { min-height: 56px; padding-left: 60px; }
+/* Big screens (fullscreen on 1440p and up): cover on the left, lyrics on the right, both grow into the space
+   instead of staying laptop-sized in the middle */
+@container stage (min-width: 1500px) and (min-height: 1000px) {
+  body.lyrics-on:not(.is-video):not(.ly-compact) .now { column-gap: clamp(48px, 5cqi, 120px); padding: 0 clamp(40px, 5cqi, 140px); }
+  body.lyrics-on:not(.ly-compact) .art-wrap { width: min(46cqh, 30cqi, 760px, 100%); }
+  body.lyrics-on:not(.ly-compact) .lyrics { height: min(72cqh, 980px); }   /* clear of the floating player bar in fullscreen */
+  body.lyrics-on .now-meta h1 { font-size: 28px; }
+  body.lyrics-on .now-meta p { font-size: 16px; }
+  .lyrics .ly-lines p { font-size: clamp(24px, 1.7cqi, 34px); }   /* outranks the base rule further down */
+}
+/* lyrics.js drop(): the cover's full-size stand-in while the glass takes it in or lets it out (only ever scaled
+   down, so it stays sharp), and the ripple it leaves in the lyrics glass */
+.art-ghost {
+  position: fixed; z-index: 40; pointer-events: none; transform-origin: 0 0;
+  border-radius: 22px; background: center / cover no-repeat var(--fill-1);
+  box-shadow: 0 16px 40px -10px rgba(0, 0, 0, .45), inset 0 0 0 1px rgba(255, 255, 255, .1);
+  will-change: transform, opacity, filter;
+}
+.drop-ripple { position: absolute; inset: 0; z-index: 4; border-radius: inherit; overflow: hidden; pointer-events: none; }
+.drop-ripple i {
+  position: absolute; border-radius: 50%;
+  border: 1.5px solid rgba(255, 255, 255, .5);
+  box-shadow: 0 0 22px rgba(255, 255, 255, .22), inset 0 0 14px rgba(255, 255, 255, .18);
+}
 /* closing: the panel is pinned where it was while the cover glides back, then slides out */
 .lyrics.ly-leaving {
   --r: 26px;
@@ -1367,28 +1325,6 @@ body.maximized .win-rim, body.fs .win-rim { opacity: 0; }
 .zoom-pop.normal .zp-val { cursor: default; }
 .zoom-pop.normal .zp-val:hover { background-color: transparent; transform: none; }
 
-/* ---------- Audio / Video under a Spotify song that comes with a music video picture ---------- */
-.av-switch {
-  position: relative; display: none; grid-template-columns: 1fr 1fr; width: max-content; margin: 14px auto 0; padding: 3px;
-  border-radius: 13px; background: rgba(255, 255, 255, .08); box-shadow: inset 0 0 0 1px rgba(255, 255, 255, .14);
-}
-body.has-vart .av-switch { display: grid; animation: rise-in .7s var(--glide) both; }
-.av-ind { position: absolute; top: 3px; bottom: 3px; left: 3px; width: calc((100% - 6px) / 2); transform: translateX(calc(var(--k, 0) * 100%)); transition: transform .7s var(--glide); }
-.av-ind i { position: absolute; inset: 0; border-radius: 10px; background: linear-gradient(180deg, rgba(255, 255, 255, .34), rgba(255, 255, 255, .16)); box-shadow: inset 0 1px 0 rgba(255, 255, 255, .6), 0 4px 12px -4px rgba(0, 0, 0, .35); }
-.av-switch button {
-  position: relative; z-index: 1; height: 28px; padding: 0 16px; border-radius: 10px;
-  display: inline-flex; align-items: center; justify-content: center; gap: 7px;
-  font-weight: 600; font-size: 12.5px; color: var(--ink-2);
-  transition: transform var(--t-hover) var(--glide), color var(--t-hover) var(--glide);
-}
-.av-switch button svg { width: 14px; height: 14px; fill: none; stroke: currentColor; stroke-width: 1.9; stroke-linecap: round; stroke-linejoin: round; }
-.av-switch button:hover { color: #fff; transform: scale(1.05); }
-.av-switch button:active { transform: scale(.9, .84); transition-duration: var(--t-press); }
-.av-switch button.active { color: #fff; }
-/* Video: the frame slides from a square into 16:9, wider and shorter, and the picture re-crops as it goes */
-body.art-video .art-wrap { width: min(calc(50vh * 1.42), 54vw, 1180px, 94%); aspect-ratio: 16 / 9; }
-body.art-video.lyrics-on .art-wrap { width: min(calc(36vh * 1.42), 36vw, 760px, 100%); }
-
 /* scrollbars (Settings and every other sheet): a white pill floating clear of the edges, no track, no arrows */
 ::-webkit-scrollbar { width: 14px; height: 14px; }
 ::-webkit-scrollbar-track { background: transparent; margin: 10px 0; }
@@ -1428,59 +1364,6 @@ body.is-video.v-hover .vfs-btn:active { transform: scale(.92); transition-durati
 body.fs .vfs-btn .i-out { opacity: 1; transform: none; }
 body.fs .vfs-btn { left: auto; top: auto; right: 26px; bottom: 26px; }
 body.fs.idle .vfs-btn { opacity: 0; pointer-events: none; }
-body.sp-unlinked .vfs-btn { display: none !important; }
-
-/* ---------- "Play Spotify inside Glass" setup (spsetup.js) ---------- */
-.modal.sps { width: min(500px, calc(100vw - 48px)); }
-.sps-steps { display: flex; flex-direction: column; gap: 6px; margin: 14px 0 12px; }
-.sps-step { display: flex; align-items: center; gap: 12px; padding: 9px 10px; border-radius: 13px; opacity: .6;
-  transition: opacity .5s var(--glide), background-color .5s var(--glide); }
-.sps-step.active { opacity: 1; background-color: var(--fill-1); box-shadow: inset 0 0 0 1px rgba(255, 255, 255, .12); }
-.sps-step.done { opacity: .9; }
-.sps-step i { flex: none; width: 28px; height: 28px; border-radius: 50%; display: grid; place-items: center; font: 700 13px/1 "Segoe UI", sans-serif; font-style: normal;
-  background: rgba(255, 255, 255, .1); box-shadow: inset 0 0 0 1px rgba(255, 255, 255, .25); transition: background-color .5s var(--glide); }
-.sps-step.active i { background: #fff; color: #16161b; }
-.sps-step.done i { background: rgba(120, 220, 160, .25); box-shadow: inset 0 0 0 1px rgba(150, 240, 180, .6); }
-.sps-step i svg { width: 15px; height: 15px; fill: none; stroke: #d8ffe6; stroke-width: 2.4; stroke-linecap: round; stroke-linejoin: round; }
-.sps-step b { display: block; font-size: 13.5px; font-weight: 650; }
-.sps-step span { display: block; font-size: 12px; color: var(--ink-2); }
-.sps-panel { padding: 4px 2px 0; }
-.sps-text { margin: 0 0 12px; font-size: 13px; line-height: 1.5; color: var(--ink-2); }
-.sps-text b { color: #fff; }
-.sps-mode { margin-bottom: 12px; }
-.sps-form { display: flex; flex-direction: column; gap: 10px; }
-.sps-two { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
-.sps-bar { height: 4px; border-radius: 4px; background: rgba(255, 255, 255, .14); overflow: hidden; }
-/* working: the bar breathes in place (grows and eases back) while a step runs */
-.sps-bar i { display: block; width: 100%; height: 100%; border-radius: 4px; background: #fff; transform-origin: left center; animation: sps-breathe 1.4s var(--glide) infinite alternate; }
-@keyframes sps-breathe { from { transform: scaleX(.12); opacity: .55; } to { transform: scaleX(.92); opacity: 1; } }
-.sps-foot { margin-top: 10px; }
-
-/* setup fields: red with a message the moment they can't work, a soft green edge when they're fine */
-.sps-f small { font-weight: 400; color: var(--ink-3); margin-left: 4px; }
-.sps-in { position: relative; display: block; }
-.sps-in input { width: 100%; }
-.sps-f input { transition: box-shadow var(--t-hover) var(--glide), background-color var(--t-hover) var(--glide); }
-.sps-f.bad input, .sps-f.bad input:focus { box-shadow: inset 0 1px 2px rgba(0, 0, 0, .2), 0 0 0 1.5px rgba(255, 110, 110, .9); background-color: rgba(255, 80, 80, .08); }
-.sps-f.good input { box-shadow: inset 0 1px 2px rgba(0, 0, 0, .15), 0 0 0 1px rgba(150, 240, 180, .45); }
-.ferr { display: block; min-height: 0; font-style: normal; font-size: 11.5px; font-weight: 600; color: #ffb3b3; }
-.ferr:empty { display: none; }
-/* show / hide password */
-.sps-eye { position: absolute; right: 6px; top: 50%; translate: 0 -50%; width: 30px; height: 30px; border-radius: 9px; display: grid; place-items: center; opacity: .75;
-  transition: opacity var(--t-hover) var(--glide), background-color var(--t-hover) var(--glide), transform var(--t-hover) var(--glide); }
-.sps-eye:hover { opacity: 1; background-color: var(--fill-2); transform: scale(1.06); }
-.sps-eye svg { grid-area: 1 / 1; width: 17px; height: 17px; fill: none; stroke: #fff; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; transition: opacity .3s var(--glide), transform .4s var(--glide); }
-.sps-eye .eye-off, .sps-eye.on .eye-on { opacity: 0; transform: scale(.7); }
-.sps-eye.on .eye-off { opacity: 1; transform: none; }
-.sps-in input[type="password"], .sps-in input[name="sps_password"] { padding-right: 42px; }
-/* live progress: a real 0-100% bar and the tool's own lines */
-.sps-task { margin-top: 12px; padding: 10px 12px 8px; border-radius: 13px; background: rgba(0, 0, 0, .22); box-shadow: inset 0 0 0 1px rgba(255, 255, 255, .1); }
-.sps-ptop { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; margin-bottom: 7px; font-size: 12.5px; }
-.sps-pct { font-variant-numeric: tabular-nums; font-weight: 700; }
-.sps-pbar { height: 6px; border-radius: 6px; background: rgba(255, 255, 255, .12); overflow: hidden; }
-.sps-pbar i { display: block; height: 100%; border-radius: 6px; background: linear-gradient(90deg, rgba(255, 255, 255, .75), #fff); transition: width .6s var(--glide); }
-.sps-log { margin-top: 8px; max-height: 104px; overflow-y: auto; font: 11px/1.55 "Cascadia Mono", Consolas, ui-monospace, monospace; color: rgba(255, 255, 255, .72); white-space: pre-wrap; word-break: break-word; }
-.sps-log div:last-child { color: #fff; }
 
 /* ---------- the window: every layer clipped to Windows 11's rounded corners ---------- */
 html, body { border-radius: 8px; }
@@ -1550,7 +1433,6 @@ body.maximized, body.fs { clip-path: none; border-radius: 0; }
 .speed-btn { width: auto; min-width: 38px; padding: 0 9px; font: 700 12.5px/1 "Segoe UI", sans-serif; font-variant-numeric: tabular-nums; letter-spacing: .2px; }
 .speed-btn span { display: inline-block; }
 .speed-btn.on { background-color: rgba(255, 255, 255, .16); box-shadow: inset 0 0 0 1px rgba(255, 255, 255, .3); }
-body.src-spotify .speed-btn { display: none; }
 
 /* ---------- undo / redo pill (undo.js) ---------- */
 .undo-pop {

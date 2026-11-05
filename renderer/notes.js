@@ -8,6 +8,14 @@
     <rect width="96" height="64" rx="12" fill="url(#pn${id})"/><rect width="96" height="64" rx="12" fill="url(#pg${id})"/>
     <g fill="none" stroke="#fff" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round">${body}</g></svg>`;
   const NOTES = [
+    { v: '0.2.4', title: 'Fullscreen fits your screen', text: 'Cover on the left, lyrics on the right, centred and sized for big screens.',
+      art: wash(14, '<rect x="14" y="16" width="26" height="26" rx="5"/><path d="M50 20h32M50 29h26M50 38h30"/><path d="M8 52h80" opacity=".5"/>') },
+    { v: '0.2.4', title: 'The glass takes the cover in', text: 'When the lyrics need room, the cover sinks into their glass and surfaces small in the corner, sharp all the way.',
+      art: wash(15, '<circle cx="34" cy="26" r="10"/><circle cx="62" cy="38" r="6" opacity=".7"/><circle cx="62" cy="38" r="13" opacity=".35"/>') },
+    { v: '0.2.4', title: 'Windows media controls', text: 'The volume and lock-screen pop-up shows the cover, and Glass’s taskbar preview has play, pause and skip buttons.',
+      art: wash(16, '<path d="M30 24v16M33 32l12-8v16z"/><path d="M52 24v16M60 24v16"/><path d="M78 24v16M75 32l-10-7v14z"/>') },
+    { v: '0.2.4', title: 'Updates install quietly', text: 'Restart to update now installs in the background and Glass opens again by itself.',
+      art: wash(17, '<path d="M48 18a14 14 0 1 1-13 9"/><path d="M33 20l2 8 8-2"/>') },
     { v: '0.2.3', title: 'Lyrics search stays in Glass', text: 'Search lists only lyrics that play along inside Glass, from LRCLIB, Kugou and NetEase. The Genius link is gone.',
       art: wash(13, '<circle cx="42" cy="30" r="11"/><path d="M50 38l9 9"/><path d="M64 22h14M64 30h10" opacity=".7"/>') },
     { v: '0.2.2', title: 'Lyrics make room', text: 'With a wide queue panel, the lyrics fill the space and the cover drops into their corner like a water drop.',
@@ -16,12 +24,8 @@
       art: wash(10, '<rect x="18" y="18" width="34" height="28" rx="5" opacity=".55"/><path d="M60 32h20M74 26l6 6-6 6M66 26l-6 6 6 6"/>') },
     { v: '0.2.2', title: 'Updates find you', text: 'Glass looks for new versions every half hour and tells you when one is ready.',
       art: wash(11, '<path d="M38 42V30a10 10 0 0 1 20 0v12l4 4H34z"/><path d="M44 50a4 4 0 0 0 8 0"/>') },
-    { v: '0.2.2', title: 'Steadier Spotify in Glass', text: 'It reconnects by itself, and there is no second Glass Player on Spotify that plays nothing.',
-      art: wash(12, '<circle cx="38" cy="32" r="11"/><circle cx="60" cy="32" r="11" opacity=".35"/><path d="M53 25l14 14" opacity=".6"/>') },
     { v: '0.2.1', title: 'Glass updates itself', text: 'New versions download quietly in the background and install when you restart.',
       art: wash(8, '<circle cx="48" cy="32" r="19" opacity=".45"/><path d="M48 20v20M40 33l8 8 8-8"/><path d="M38 47h20"/>') },
-    { title: 'Spotify plays inside Glass', text: 'No Spotify app needed. Glass sets itself up in three quick steps.',
-      art: wash(1, '<circle cx="48" cy="32" r="17" fill="rgba(255,255,255,.18)"/><path d="M39 26c6-2 13-1 18 2M40 32c5-1.5 10-1 14 1.5M41 38c4-1 7-.6 10 1"/>') },
     { title: 'Undo anything', text: 'Ctrl+Z puts back what you just did. Ctrl+Shift+Z does it again.',
       art: wash(2, '<path d="M36 26h18a10 10 0 0 1 0 20H42"/><path d="M42 19l-7 7 7 7"/>') },
     { title: 'Equalizer curve', text: 'Drag the points on a smooth, glowing curve. Double-click one to reset it.',

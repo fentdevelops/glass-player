@@ -170,7 +170,7 @@
   // where the playing song is, so undoing a song change goes back to the same spot
   setInterval(() => {
     const t = current();
-    if (!t || S.source !== 'local' || applying) return;
+    if (!t || applying) return;
     posOf.delete(t.path); posOf.set(t.path, deck.currentTime);
     if (posOf.size > 60) posOf.delete(posOf.keys().next().value);
   }, 400);

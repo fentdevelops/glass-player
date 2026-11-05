@@ -1,7 +1,7 @@
 'use strict';
-// Lyrics panel, for local songs and Spotify alike.
-// Lookup order lives in main (lyrics-get): local songs → sidecar .lrc/.txt → tags → saved pick → LRCLIB;
-// Spotify songs → saved pick → LRCLIB. The search lists matches from LRCLIB, Kugou and NetEase, inside Glass.
+// Lyrics panel.
+// Lookup order lives in main (lyrics-get): sidecar .lrc/.txt → tags → saved pick → LRCLIB.
+// The search lists matches from LRCLIB, Kugou and NetEase, inside Glass.
 // Synced lyrics follow playback (current line glides to centre, click a line to jump); plain lyrics just scroll.
 // Uses app.js globals: api, S, $, body, deck, current, esc, anim, toast, cleanErr, guessQuery, openMenu, ICON, fmt, save.
 (() => {
@@ -9,16 +9,14 @@
   const wrap = $('#lyLookup'), q = $('#lyQ'), out = $('#lyResults'), findBtn = $('#lyFind');
   let open = false, shownFor = null, data = null, lines = [], curLine = -2, seq = 0;
   let userScrollUntil = 0, results = [], searchSeq = 0;
-  const cache = new Map();   // song key (file path, or "sp:spotify:track:…") -> lyrics result, this session
+  const cache = new Map();   // song file path -> lyrics result, this session
   const remember = (t, r) => { cache.set(t.path, r); if (cache.size > 400) cache.delete(cache.keys().next().value); };
 
-  // ---------- whichever player is active ----------
-  const isSp = () => S.source === 'spotify';
-  const nowSong = () => (isSp() ? window.Spot?.nowTrack?.() || null : current() || null);
-  const nowTime = () => (isSp() ? window.Spot?.position?.() || 0 : deck.currentTime || 0);
-  const isPlaying = () => (isSp() ? !!window.Spot?.isPlaying?.() : !deck.paused);
+  // ---------- the player ----------
+  const nowSong = () => current() || null;
+  const nowTime = () => deck.currentTime || 0;
+  const isPlaying = () => !deck.paused;
   function seekTo(sec) {
-    if (isSp()) { window.Spot?.seek?.(sec * 1000); return; }
     deck.seek(sec);
     if (deck.paused) deck.play();
   }
@@ -26,7 +24,7 @@
   const SRC_LABEL = { File: 'From the lyrics file', Tags: 'From the song file', LRCLIB: 'From LRCLIB', Kugou: 'From Kugou', NetEase: 'From NetEase' };
   const hintsOf = (t) => ({
     title: t.title || '', artist: t.artist || '', album: t.album || '',
-    duration: t.duration || (!t.sp && t === current() ? deck.duration || 0 : 0),
+    duration: t.duration || (t === current() ? deck.duration || 0 : 0),
     q: guessQuery(t),
   });
 
@@ -44,11 +42,11 @@
     if (state === 'loading') {
       html = '<div class="ly-skel">' + [72, 54, 80, 46, 66, 58].map((w, i) => `<i style="width:${w}%;--d:${i * 70}ms"></i>`).join('') + '</div>';
     } else if (state === 'idle') {
-      html = `<div class="ly-empty">${EMPTY_ICON}<b>Nothing playing</b><span>${isSp() ? 'Play something on Spotify and its lyrics show up here.' : 'Play a song and its lyrics show up here.'}</span></div>`;
+      html = `<div class="ly-empty">${EMPTY_ICON}<b>Nothing playing</b><span>Play a song and its lyrics show up here.</span></div>`;
     } else if (!data || data.none) {
       html = `<div class="ly-empty">${EMPTY_ICON}
         <b>${data?.error ? esc(data.error) : 'No lyrics found'}</b>
-        <span>${data?.error ? '' : shownFor?.sp ? 'Search with different words.' : 'Search with different words, or put a .lrc file next to the song.'}</span>
+        <span>${data?.error ? '' : 'Search with different words, or put a .lrc file next to the song.'}</span>
         <button class="btn" data-ly-search>Search lyrics</button></div>`;
     } else if (data.instrumental) {
       html = '<div class="ly-empty"><svg viewBox="0 0 24 24"><path d="M9 18V5l11-2v13" /><circle cx="6" cy="18" r="3" /><circle cx="17" cy="16" r="3" /></svg><b>Instrumental</b><span>No words in this one.</span></div>';
@@ -215,7 +213,7 @@
     const has = data && !data.none && !data.instrumental;
     openMenu(e.currentTarget.getBoundingClientRect(), () => [
       { label: 'Search lyrics…', icon: ICON.find, act: openSearch },
-      ...(has && data.source === 'LRCLIB' && !t.sp ? [{
+      ...(has && data.source === 'LRCLIB' ? [{
         label: data.synced ? 'Save as .lrc next to the song' : 'Save as .txt next to the song', icon: ICON.folder,
         act: async () => {
           try { const name = await api.lyrics.saveFile(t.path, data); data = { ...data, source: 'File', file: name }; remember(t, data); paintSrc(); toast(`Saved ${name}`); }
@@ -297,9 +295,10 @@
 
   // ---------- room for the cover? ----------
   // When the stage gets too narrow for cover and lyrics side by side (the queue panel was widened, the window
-  // shrunk), the lyrics flow out to fill it and the cover drops into their top-left corner like a water drop:
-  // it shrinks as it falls, rounds into a drop, lands with a small splash and settles. Widening plays the
-  // drop rising back out. A small gap between the two widths keeps it from flickering at the edge.
+  // shrunk), the lyrics flow out to fill it and the glass takes the cover in like a water drop: it drifts into
+  // their top-left corner, shrinking and softening as the glass absorbs it, and the small cover surfaces from
+  // inside with a ripple. Widening lets it rise back out. A small gap between the two widths keeps it from
+  // flickering at the edge.
   const stage = $('#stage');
   const ROOM_OFF = 640, ROOM_ON = 680;      // stage widths: narrower than OFF → compact; wider than ON → side by side
   let compact = false;
@@ -315,58 +314,76 @@
     else body.classList.toggle('ly-compact', want);
     if (open && lines.length) setTimeout(() => tick(true), shown ? 760 : 0);
   }
+  // The moving cover is a stand-in drawn at full size and only ever scaled down, so it stays sharp the whole way
+  // (scaling the small corner cover up to full size was what made it look blurry mid-way).
+  let ghost = null;
   function drop(toCorner) {
-    const wrapEl = $('#artWrap'), art = $('#art'), img = $('#artImg'), meta = $('#nowMeta');
-    [wrapEl, art, img, meta, pane].forEach((el) => el.getAnimations().forEach((a) => a.cancel()));
-    const a0 = wrapEl.getBoundingClientRect(), p0 = pane.getBoundingClientRect();
+    const wrapEl = $('#artWrap'), img = $('#artImg'), meta = $('#nowMeta');
+    [wrapEl, img, meta, pane].forEach((el) => el.getAnimations().forEach((a) => a.cancel()));
+    ghost?.remove();
+    ghost = null;
+    const i0 = img.getBoundingClientRect(), p0 = pane.getBoundingClientRect();
     body.classList.toggle('ly-compact', toCorner);
-    const a1 = wrapEl.getBoundingClientRect(), p1 = pane.getBoundingClientRect();
-    if (!a0.width || !a1.width) return;
-    const s = a0.width / a1.width;
-    const dx = a0.left + a0.width / 2 - (a1.left + a1.width / 2), dy = a0.top + a0.height / 2 - (a1.top + a1.height / 2);
-    const from = `translate(${dx}px, ${dy}px) scale(${s})`;
-    const big = 22, small = 12;              // the cover's corner radius, big and in the corner
-    const T = 900;
+    const i1 = img.getBoundingClientRect(), p1 = pane.getBoundingClientRect();
+    if (!i0.width || !i1.width) return;
+    const big = toCorner ? i0 : i1, small = toCorner ? i1 : i0;        // the cover picture: full size, and in the corner
+    const s = small.width / big.width, dx = small.left - big.left, dy = small.top - big.top;
+    const at = (k, sc) => `translate(${dx * k}px, ${dy * k}px) scale(${sc})`;
+    const cs = getComputedStyle(img);
+    const g = ghost = document.createElement('div');
+    g.className = 'art-ghost';
+    Object.assign(g.style, { left: big.left + 'px', top: big.top + 'px', width: big.width + 'px', height: big.height + 'px',
+      backgroundImage: cs.backgroundImage, backgroundColor: cs.backgroundColor });
+    document.body.appendChild(g);
+    const finish = (a) => done(a).then(() => { if (ghost === g) ghost = null; g.remove(); });
+    const T = 900, R = 22, r = 12 / s;          // corner radius at full size; the corner cover's radius, in full-size units
     if (toCorner) {
-      // falls and shrinks into a round drop just short of the corner, lands flattened, wobbles, settles
-      anim(wrapEl, [
-        { transform: from, easing: 'cubic-bezier(.5, 0, .7, .4)' },
-        { transform: `translate(${dx * 0.1}px, ${dy * 0.1}px) scale(.82)`, offset: 0.55, easing: 'cubic-bezier(.2, .6, .4, 1)' },
-        { transform: 'scale(1.18, .8)', offset: 0.72 },
-        { transform: 'scale(.93, 1.07)', offset: 0.86 },
-        { transform: 'none' },
-      ], { duration: T, easing: 'linear' });   // the easing is set per step above
-      anim(img, [{ borderRadius: `${big / s}px` }, { borderRadius: '50%', offset: 0.5 }, { borderRadius: '42%', offset: 0.72 }, { borderRadius: `${small}px` }], { duration: T, easing: 'ease-in-out' });
-      anim(art, [{ padding: `${9 / s}px` }, { padding: '3px', offset: 0.5 }, { padding: '3px' }], { duration: T });
+      // drifts toward the corner and shrinks, rounds into a drop as it reaches the glass, then softens and fades
+      // into it: the glass takes it in rather than it landing on top
+      finish(anim(g, [
+        { transform: 'none', borderRadius: R + 'px', opacity: 1, filter: 'blur(0px)' },
+        { transform: at(0.8, s * 1.5), borderRadius: '50%', opacity: 1, filter: `blur(${0.6 / s}px)`, offset: 0.58 },
+        { transform: at(1, s), borderRadius: '50%', opacity: 0, filter: `blur(${5 / s}px)` },
+      ], { duration: T, easing: 'cubic-bezier(.45, 0, .2, 1)', fill: 'forwards' }));
+      // ...and the small cover surfaces from inside the glass with a ripple
+      anim(wrapEl, [{ opacity: 0, filter: 'blur(7px)', transform: 'scale(.72)' }, { opacity: 1, filter: 'blur(0px)', transform: 'none' }],
+        { duration: 520, delay: T * 0.55, easing: GLIDE, fill: 'backwards' });
+      ripple(small, p1, T * 0.6);
       // the lyrics pour out from where they were to fill the stage
       const ins = [p0.top - p1.top, p1.right - p0.right, p1.bottom - p0.bottom, p0.left - p1.left].map((v) => Math.max(0, Math.round(v)) + 'px');
       anim(pane, [{ clipPath: `inset(${ins.join(' ')} round 26px)` }, { clipPath: 'inset(-30px round 56px)' }], { duration: 760, easing: GLIDE });
     } else {
-      // the drop lifts out of the corner, swells back into the cover and settles; the title rises in under it
-      anim(wrapEl, [
-        { transform: from, easing: 'cubic-bezier(.4, 0, .6, 1)' },
-        { transform: `translate(${dx * 0.8}px, ${dy * 0.8}px) scale(${s * 1.4})`, offset: 0.3, easing: 'cubic-bezier(.3, .7, .3, 1)' },
-        { transform: 'scale(1.05, .95)', offset: 0.74 },
-        { transform: 'scale(.99, 1.01)', offset: 0.88 },
-        { transform: 'none' },
-      ], { duration: T, easing: 'linear' });   // the easing is set per step above
-      anim(img, [{ borderRadius: `${small / s}px` }, { borderRadius: '50%', offset: 0.3 }, { borderRadius: `${big}px` }], { duration: T, easing: 'ease-in-out' });
-      anim(art, [{ padding: `${3 / s}px` }, { padding: '9px', offset: 0.6 }, { padding: '9px' }], { duration: T });
+      // the small cover lifts out of the glass as a soft drop, sharpens and swells into the full cover
+      finish(anim(g, [
+        { transform: at(1, s), borderRadius: r + 'px', opacity: 0, filter: `blur(${5 / s}px)` },
+        { transform: at(0.85, s * 1.5), borderRadius: '50%', opacity: 1, filter: `blur(${0.6 / s}px)`, offset: 0.35 },
+        { transform: 'none', borderRadius: R + 'px', opacity: 1, filter: 'blur(0px)' },
+      ], { duration: T, easing: 'cubic-bezier(.4, 0, .2, 1)' }));
+      anim(wrapEl, [{ opacity: 0 }, { opacity: 0, offset: 0.92 }, { opacity: 1 }], { duration: T, easing: 'linear' });
       anim(pane, [{ transform: `translateX(${Math.round(p0.left - p1.left)}px)`, opacity: 0.6 }, { transform: 'none', opacity: 1 }], { duration: 760, easing: GLIDE });
-      anim(meta, [{ opacity: 0, transform: 'translateY(10px)', filter: 'blur(6px)' }, { opacity: 1, transform: 'none', filter: 'none' }], { duration: 620, delay: 260, easing: GLIDE, fill: 'backwards' });
+      anim(meta, [{ opacity: 0, transform: 'translateY(10px)', filter: 'blur(6px)' }, { opacity: 1, transform: 'none', filter: 'none' }], { duration: 620, delay: 300, easing: GLIDE, fill: 'backwards' });
     }
+  }
+  // a soft ring spreading through the lyrics glass where the cover went in (kept inside the panel)
+  function ripple(at, box, delay) {
+    const clip = document.createElement('div'), ring = document.createElement('i');
+    clip.className = 'drop-ripple';
+    const size = at.width * 1.15;
+    Object.assign(ring.style, { left: at.left - box.left + at.width / 2 - size / 2 + 'px', top: at.top - box.top + at.height / 2 - size / 2 + 'px', width: size + 'px', height: size + 'px' });
+    clip.appendChild(ring);
+    pane.appendChild(clip);
+    done(anim(ring, [{ transform: 'scale(.55)', opacity: 0 }, { transform: 'scale(.85)', opacity: 0.75, offset: 0.18 }, { transform: 'scale(2.6)', opacity: 0 }],
+      { duration: 820, delay, easing: 'cubic-bezier(.2, .7, .3, 1)', fill: 'both' })).then(() => clip.remove());
   }
   new ResizeObserver(() => fitRoom(true)).observe(stage);
   fitRoom(false);
 
   window.Lyrics = {
-    // the song on screen changed (local showNow, or Spotify's now playing); null = nothing playing
+    // the song on screen changed (showNow); null = nothing playing
     track(t) {
       if (t === shownFor && t) return;
       if (open) load(t || null); else { shownFor = null; data = null; }
     },
-    // Local ⇄ Spotify: drop what was showing and follow the other player
-    sourceChanged() { shownFor = null; data = null; seq++; closeSearch(); if (open) load(nowSong()); },
     // called every frame by tick() in app.js (cheap: a binary search, DOM only when the line changes)
     tick() { if (open && lines.length && isPlaying()) tick(); },
     seeked() { if (open && lines.length) { userScrollUntil = 0; tick(true); } },
@@ -379,5 +396,5 @@
       api.lyrics.get(t.path, hintsOf(t)).then((r) => { if (!r.error) remember(t, r); }).catch(() => {});
     },
   };
-  for (const v of deck.elements) v.addEventListener('seeked', () => { if (!isSp() && v === deck.videoElement) window.Lyrics.seeked(); });
+  for (const v of deck.elements) v.addEventListener('seeked', () => { if (v === deck.videoElement) window.Lyrics.seeked(); });
 })();

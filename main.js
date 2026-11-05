@@ -74,7 +74,7 @@ function createWindow() {
       nodeIntegration: false,
       // keep timers precise while minimised so track transitions stay gapless
       backgroundThrottling: false,
-      // music may start without a click (Spotify's player starts songs it's sent from your phone or the dock)
+      // music may start without a click (a song opened from Explorer, Autoplay)
       autoplayPolicy: 'no-user-gesture-required',
       offscreen: OFFSCREEN_TEST,
     },
@@ -83,17 +83,6 @@ function createWindow() {
   // tests: a size bigger than this screen (ultrawide, portrait) is set after creation
   if (testW && testH) win.setBounds({ width: testW, height: testH });
   // zoom keys are taken before the page and the default menu see them
-  require('./spotify-main').watchPlayer(win.webContents);
-  // before the window goes, Glass's Spotify player signs off, so Spotify doesn't keep an old "Glass Player"
-  // that plays nothing (closing waits for Spotify to confirm, 1.5 s at most)
-  let signedOff = false;
-  win.on('close', (e) => {
-    if (signedOff) return;
-    signedOff = true;
-    e.preventDefault();
-    const w = win;
-    require('./spotify-main').signOff(w.webContents).then(() => { if (!w.isDestroyed()) w.close(); });
-  });
   win.webContents.on('before-input-event', (e, input) => {
     const dir = zoomKey(input);
     if (dir === null) return;
@@ -639,9 +628,7 @@ async function lyricsSearch(q) {
 }
 // mode: 'auto' (local → cache → online) | 'local' (never touch the network)
 ipcMain.handle('lyrics-get', async (_e, p, hints = {}, mode = 'auto') => {
-  // Spotify songs ("sp:spotify:track:…") have no file: straight to the saved pick, then LRCLIB
-  const isSpotify = String(p).startsWith('sp:');
-  const local = isSpotify ? null : lyricsSidecar(p) || (await lyricsEmbedded(p));
+  const local = lyricsSidecar(p) || (await lyricsEmbedded(p));
   if (local) return local;
   const cached = lyricsCacheGet(p);
   // a remembered "nothing found" is retried after a week, in case LRCLIB has it by then
@@ -659,7 +646,6 @@ ipcMain.handle('lyrics-search', async (_e, q) => {
 ipcMain.handle('lyrics-pick', (_e, p, r) => { lyricsCacheSet(p, r && (r.synced || r.plain || r.instrumental) ? r : { none: true, at: Date.now() }); return true; });
 // writes the lyrics as a .lrc (or .txt) next to the song so other players see them too
 ipcMain.handle('lyrics-save-file', (_e, p, r) => {
-  if (String(p).startsWith('sp:')) throw new Error('Spotify songs have no file to save next to');
   const base = p.slice(0, p.length - path.extname(p).length);
   const stamp = (t) => `[${String(Math.floor(t / 60)).padStart(2, '0')}:${(t % 60).toFixed(2).padStart(5, '0')}]`;
   const file = base + (r.synced ? '.lrc' : '.txt');
@@ -669,7 +655,7 @@ ipcMain.handle('lyrics-save-file', (_e, p, r) => {
 });
 
 // ---- artist info for artist pages: a short summary + photo from Wikipedia (keyless, cached a week) ----
-// Spotify's API has no bios or play counts, so Wikipedia is the description source; the page links back to the article.
+// The page links back to the article.
 const MUSIC_WORDS = /\b(singer|rapper|musician|band|group|duo|trio|dj|disc jockey|producer|songwriter|composer|vocalist|guitarist|drummer|pianist|record|hip hop|rock|pop|orchestra|ensemble|artist)\b/i;
 let artistCache = null;
 const artistCacheFile = () => ud('artist-info.json');
@@ -760,7 +746,8 @@ async function checkUpdates(manual = false) {
 }
 ipcMain.handle('update:state', () => updateState);
 ipcMain.handle('update:check', () => checkUpdates(true));
-ipcMain.handle('update:install', () => { if (autoUpdater && updateState.state === 'ready') setImmediate(() => autoUpdater.quitAndInstall(false, true)); });
+// Restart to update: the new version installs silently in the background (no setup window) and Glass reopens
+ipcMain.handle('update:install', () => { if (autoUpdater && updateState.state === 'ready') setImmediate(() => autoUpdater.quitAndInstall(true, true)); });
 ipcMain.handle('update:open', () => { if (updateState.url && /^https:\/\/github\.com\//.test(updateState.url)) shell.openExternal(updateState.url); });
 // A new release reaches an open Glass within half an hour, and soon after you come back to the window:
 // it downloads quietly, then a small card says it's ready to restart (renderer/updates.js).
@@ -787,8 +774,13 @@ ipcMain.handle('sys:transparency', () => new Promise((resolve) => {
 }));
 ipcMain.handle('sys:open-colors', () => shell.openExternal('ms-settings:colors'));
 
-// ---- Spotify (Web API + Connect playback control) ----
-require('./spotify-main').register();
+// ---- links that open in the browser: only https, only these hosts (artist pages: "Read more on Wikipedia") ----
+const LINK_HOSTS = ['en.wikipedia.org'];
+ipcMain.handle('open-external', (_e, url) => {
+  const u = new URL(String(url));
+  if (u.protocol !== 'https:' || !LINK_HOSTS.includes(u.hostname)) throw new Error('Blocked link');
+  return shell.openExternal(u.toString());
+});
 
 // ---- zoom: Ctrl + / Ctrl = / Ctrl - / Ctrl 0 (and the numpad keys) ----
 // Electron's built-in zoom-in shortcut needs Shift on most keyboards, so the keys are handled here.
@@ -816,12 +808,62 @@ ipcMain.on('zoom-set', (_e, f) => {
   if (win && v >= ZOOMS[0] && v <= ZOOMS[ZOOMS.length - 1]) win.webContents.setZoomFactor(v);
 });
 
+// ---- taskbar preview buttons: previous · play/pause · next (hover Glass on the taskbar) ----
+// The icons are drawn here, white with soft edges, so no image files are needed.
+const glyphs = {};
+function glyph(kind) {
+  if (glyphs[kind]) return glyphs[kind];
+  const N = 32, SS = 4, buf = Buffer.alloc(N * N * 4);
+  const tri = (ax, ay, bx, by, cx, cy) => (x, y) => {
+    const d1 = (x - bx) * (ay - by) - (ax - bx) * (y - by), d2 = (x - cx) * (by - cy) - (bx - cx) * (y - cy), d3 = (x - ax) * (cy - ay) - (cx - ax) * (y - ay);
+    return !((d1 < 0 || d2 < 0 || d3 < 0) && (d1 > 0 || d2 > 0 || d3 > 0));
+  };
+  const rect = (x0, y0, x1, y1) => (x, y) => x >= x0 && x <= x1 && y >= y0 && y <= y1;
+  const shapes = {
+    play: [tri(10, 7, 10, 25, 25, 16)],
+    pause: [rect(9, 8, 13.5, 24), rect(18.5, 8, 23, 24)],
+    prev: [rect(7, 8, 10, 24), tri(24, 8, 24, 24, 11, 16)],
+    next: [rect(22, 8, 25, 24), tri(8, 8, 8, 24, 21, 16)],
+  }[kind];
+  for (let y = 0; y < N; y++) {
+    for (let x = 0; x < N; x++) {
+      let hit = 0;
+      for (let sy = 0; sy < SS; sy++) for (let sx = 0; sx < SS; sx++) if (shapes.some((f) => f(x + (sx + 0.5) / SS, y + (sy + 0.5) / SS))) hit++;
+      const a = Math.round((255 * hit) / (SS * SS)), i = (y * N + x) * 4;
+      buf[i] = buf[i + 1] = buf[i + 2] = buf[i + 3] = a;   // white, premultiplied
+    }
+  }
+  return (glyphs[kind] = nativeImage.createFromBitmap(buf, { width: N, height: N, scaleFactor: 2 }));
+}
+let thumbKey = '';
+ipcMain.on('thumbar', (_e, s) => {
+  if (!win || process.platform !== 'win32') return;
+  const playing = !!(s && s.playing), has = !!(s && s.has), key = `${playing}|${has}`;
+  if (key === thumbKey) return;
+  const send = (a) => () => { if (win && !win.isDestroyed()) win.webContents.send('media-action', a); };
+  const ok = win.setThumbarButtons(has ? [
+    { tooltip: 'Previous', icon: glyph('prev'), click: send('prev') },
+    { tooltip: playing ? 'Pause' : 'Play', icon: glyph(playing ? 'pause' : 'play'), click: send('toggle') },
+    { tooltip: 'Next', icon: glyph('next'), click: send('next') },
+  ] : []);
+  thumbKey = ok ? key : '';   // not shown yet: tried again with the next change
+});
+
 ipcMain.on('win', (_e, action) => {
   if (!win) return;
   if (action === 'min') win.minimize();
   else if (action === 'max') win.isMaximized() ? win.unmaximize() : win.maximize();
   else if (action === 'close') win.close();
 });
+
+// ---- files an older Glass kept in its data folder that nothing uses any more: removed at start ----
+// Each one only if it's there; one that can't be removed now is tried again next time.
+const OLD_FILES = ['spotify.json', 'spotify.json.tmp', 'spotify-log.txt', 'spotify-log.txt.old'];
+function removeOldFiles() {
+  for (const f of OLD_FILES) {
+    try { fs.rmSync(ud(f), { force: true }); } catch { /* in use or not allowed */ }
+  }
+}
 
 // ---- single instance: "Open with" on a running player adds to its queue ----
 if (!app.requestSingleInstanceLock()) {
@@ -834,10 +876,8 @@ if (!app.requestSingleInstanceLock()) {
     const tracks = resolvePaths(argPaths(argv));
     if (tracks.length) win.webContents.send('open-paths', tracks);
   });
-  // castlabs Electron: wait for the Widevine CDM so Spotify's in-app player can play protected audio
-  app.whenReady().then(async () => {
-    const { components } = require('electron');
-    if (components) { try { await components.whenReady(); } catch (err) { console.warn('Widevine not ready:', err && err.message); } }
+  app.whenReady().then(() => {
+    removeOldFiles();
     createWindow();
   });
   app.on('window-all-closed', () => app.quit());

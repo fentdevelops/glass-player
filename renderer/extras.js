@@ -37,6 +37,8 @@ function qualityText(t) {
     !lossless && t.bitrate ? `${Math.round(t.bitrate / 1000)} kbps` : '', QUALITY[q]].filter(Boolean).join(' · ');
 }
 const qBadge = (t) => { const q = qualityOf(t); return q ? `<span class="q q-${q}" title="${esc(qualityText(t) + ' — ' + QUALITY_TIPS[q])}">${QUALITY[q]}</span>` : ''; };
+// a song restored at start is shown before this file loads: fill in its quality line now
+if (current()) $('#nowQ').textContent = qualityText(current());
 
 // ---------- play counts ----------
 let playCounted = null;
@@ -82,7 +84,7 @@ function artistInfo(name) {
     .catch(() => { artistInfos.set(k, null); rebuild(false); });
   return undefined;
 }
-// shared by local and Spotify artist pages
+// the header of an artist's page
 function artistHeroItem(o) {
   const loading = o.info === undefined;
   const bio = o.info?.extract || '';
@@ -102,9 +104,9 @@ function artistHeroItem(o) {
     </div>
     ${bio ? `<div class="ahero-bio"><p>${esc(bio)}</p><button class="ahero-src" data-ext="${esc(o.info.url)}">Read more on Wikipedia ↗</button></div>`
       : loading ? '<div class="ahero-bio loading"><i></i><i></i><i></i></div>' : ''}
-  </div>`, { col: o.col, spContext: o.spContext });
+  </div>`, { col: o.col });
 }
-const sectionItem = (key, label) => miscItem('sec:' + key, 40, `<div class="sp-section">${esc(label)}</div>`);
+const sectionItem = (key, label) => miscItem('sec:' + key, 40, `<div class="list-section">${esc(label)}</div>`);
 
 // a local artist's page: everything Glass knows about them
 function localArtistItems(g, back) {
@@ -148,7 +150,7 @@ function localArtistItems(g, back) {
 
 // ---------- open an album / artist page from anywhere ----------
 function openLibGroup(by, key, name) {
-  if (S.source !== 'local' || !key) return;
+  if (!key) return;
   closeMenu();
   if (S.filter) { S.filter = ''; $('#search').value = ''; }
   if (S.view !== 'library') {
@@ -161,7 +163,7 @@ function openLibGroup(by, key, name) {
 const openArtistOf = (t) => { const a = mainArtist(t); if (t.artist) openLibGroup('artist', a.toLowerCase(), a); };
 const openAlbumOf = (t) => { const ag = albumGroupOf(t); openLibGroup('album', ag.key, ag.name); };
 // "Artist x Artist — Album" under the song and in the dock: every artist is its own link, then the album
-// parts: [{ name, before, after, sep, plain }] (artistParts for local songs; Spotify passes its artist list)
+// parts: [{ name, before, after, sep, plain }] (artistParts)
 function nowSubHTML(parts, album) {
   if (typeof parts === 'string') parts = parts ? [{ name: parts }] : [];
   const who = parts.map((p, i) => esc(p.before || '')
@@ -170,7 +172,6 @@ function nowSubHTML(parts, album) {
   return `${who ? `<span class="nartists">${who}</span>` : ''}${who && album ? '<span class="nsep"> — </span>' : ''}${album ? `<button class="nlink" data-go="album" title="Go to album">${esc(album)}</button>` : ''}`;
 }
 function goLink(kind, ai = 0) {
-  if (S.source === 'spotify') { window.Spot?.goNow(kind, ai); return; }
   const t = current();
   if (!t) return;
   // album / artist links open that page and find the playing song in it
@@ -181,7 +182,7 @@ function goLink(kind, ai = 0) {
 // one click opens the artist / album / source; a double click (quick edits on) renames it instead,
 // so under the cover a single click waits a moment to see whether a second one follows
 let goTimer = 0;
-const quickOn = () => S.ui.quickEdit !== false && S.source === 'local' && !!current();
+const quickOn = () => S.ui.quickEdit !== false && !!current();
 const goLater = (fn) => { clearTimeout(goTimer); if (quickOn()) goTimer = setTimeout(fn, 260); else fn(); };
 $('#nowSub').addEventListener('click', (e) => {
   const b = e.target.closest('[data-go]');
@@ -191,9 +192,9 @@ $('#nowSub').addEventListener('click', (e) => {
 $('#nowTitle').addEventListener('click', (e) => { if (!e.target.closest('input')) goLater(() => goLink('from')); });
 // the dock has no inline renaming: links go straight away
 $('#dockTitle').addEventListener('click', () => goLink('from'));
-// the hover tip always names the current source
+// the hover tip always names where the song plays from
 for (const el of [$('#nowTitle'), $('#dockTitle')]) el.addEventListener('mouseenter', () => {
-  el.title = S.source === 'spotify' ? window.Spot?.fromTip?.() || '' : current() ? `Playing from ${fromLabel()}` : '';
+  el.title = current() ? `Playing from ${fromLabel()}` : '';
 });
 $('#dockSub').addEventListener('click', (e) => { const b = e.target.closest('[data-go]'); if (b) goLink(b.dataset.go, +b.dataset.ai || 0); });
 

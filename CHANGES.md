@@ -3,7 +3,7 @@
 A liquid-glass music and video player for Windows (Electron). This file lists everything built so far,
 how to use it, where it lives in the code, and what's still waiting on you.
 
-**Current version:** 0.2.3 · **Code:** https://github.com/pxlarized2/glass-player (public) · **Releases:** the repo's Releases page. Installed copies update themselves from there.
+**Current version:** 0.2.4 · **Code:** https://github.com/pxlarized2/glass-player (public) · **Releases:** the repo's Releases page. Installed copies update themselves from there.
 
 ---
 
@@ -20,7 +20,7 @@ how to use it, where it lives in the code, and what's still waiting on you.
 - **v1–v2:** player with Queue, Albums and Playlists, a ••• menu, Edit info (MP3 tag writing + file rename), playlists with images, moving colour ambience, bass-reactive artwork.
 - **v3:** Favorites; Edit info → **Find online** (Apple Music + Deezer, no keys).
 - **v4:** Windows acrylic window, Apple-style grey/white glass, fast virtualised lists (tested with 10k songs), Library grouping, sorting and layouts, A–Z rail, wide mode, on-disk metadata and cover cache.
-- **v5:** typo-tolerant search, Library filters with chips, Local/Spotify switch (browse + control Spotify on your devices).
+- **v5:** typo-tolerant search, Library filters with chips.
 
 ---
 
@@ -32,7 +32,6 @@ how to use it, where it lives in the code, and what's still waiting on you.
 - **Synced lyrics** follow the song: the sung line glides to the middle, others fade back, gaps show pulsing dots. Click a line to jump there. Scrolling by hand pauses following for about 4 s.
 - **Search lyrics** in the panel, searching as you type: LRCLIB results marked Synced or Plain, with a warning when a result's length doesn't match the song. A **Search on Genius ↗** row opens Genius in your browser. Genius doesn't allow apps to fetch lyrics, so its text isn't pulled in.
 - **••• menu:** Save as `.lrc` next to the song, Wrong lyrics → remove, Look again.
-- **Works for Spotify songs too**, following Spotify's playback position. Switching between Local and Spotify no longer leaves stale lyrics on screen.
 - **Remembers results** (a "not found" is retried after a week) and pre-loads the next song's lyrics while the panel is open.
 - **Opening lyrics** slides the cover and title aside while the lyrics glide in. Closing reverses it.
 
@@ -47,19 +46,16 @@ how to use it, where it lives in the code, and what's still waiting on you.
 - **The list stays where you scroll it** when a new song starts.
 
 ### Tabs
-- **Queue · Search · Library** (same in Spotify mode).
-- **Search, empty box:** recommendations.
-  - **Local:** Jump back in, Made for you, Most played, Recently added. A **Browse** row (Albums · Artists · All songs · Folders) opens the full grouped view, and the shuffle button gives new picks.
-  - **Spotify:** your recently played and top songs.
+- **Queue · Search · Library**.
+- **Search, empty box:** recommendations (Jump back in, Made for you, Most played, Recently added). A **Browse** row (Albums · Artists · All songs · Folders) opens the full grouped view, and the shuffle button gives new picks.
 - **Search, typing:** matching Artists and Albums first, then Songs. Typing `#tagname` searches by tag.
-- **Library:** playlists, plus Favorites (local) and Liked Songs (Spotify).
+- **Library:** playlists, plus Favorites.
 
 ### Artist pages
 - **Header:** photo, a short description, a bio from **Wikipedia** (with "Read more" link), songs, albums, total time, plays and genres.
 - **Sections:** Most played, Albums (each opens that album), All songs.
-- **Spotify artists:** followers, popularity, genres, Popular songs, Albums and singles. Spotify's API has no bios or real play counts.
 - **Plays** are counted by Glass: a play counts after 30 s, or half the song if it's shorter.
-- **Under the playing song**, the **artist** and **album** names are links to their pages, in both Local and Spotify.
+- **Under the playing song**, the **artist** and **album** names are links to their pages.
 
 ### Cover art
 - **Change cover** menu (Edit info, playlists, new and edited albums):
@@ -88,7 +84,7 @@ how to use it, where it lives in the code, and what's still waiting on you.
 
 ### Playback
 - **Instant skips:** the next song is chosen ahead (even on shuffle) and pre-loaded: audio, tags, full cover and lyrics. Measured on your files, the cover appears 2–3 ms after a skip (was 8–31 ms).
-- **Autoplay** (like Spotify): when the queue is nearly done, it adds similar songs (same artist, album, genre, folder; at most 4 per artist), shown under an "Autoplay" label. It can be turned off in Settings.
+- **Autoplay:** when the queue is nearly done, it adds similar songs (same artist, album, genre, folder; at most 4 per artist), shown under an "Autoplay" label. It can be turned off in Settings.
 - **Clicking the song that's playing** restarts it (or pauses it, if you choose that in Settings).
 - **Sleep timer:** 15 min, 30 min, 1 hr, or end of song.
 
@@ -97,7 +93,6 @@ how to use it, where it lives in the code, and what's still waiting on you.
 - **5-band EQ** with presets: Flat, Bass, Treble, Vocal, Rock, Pop, Electronic, Acoustic, Late night, Custom.
 - **Reverb** (Room, Plate or Hall), **Even out volume**, **Mono**, and **Reset sound**.
 - **Headroom:** volume is lowered a little as you boost, so heavy bass doesn't distort.
-- These effects apply to local songs only. Spotify audio plays through Spotify's own protected player.
 
 ### Playback settings (Settings → Playback)
 - **Autoplay**
@@ -118,11 +113,6 @@ how to use it, where it lives in the code, and what's still waiting on you.
   - **Quick edits**
 - **Resizable side panel:** drag its left edge (sideways only); double-click the edge to reset.
 - **Smooth hovers:** every hover glides in and back out (song rows used to snap).
-
-### Spotify
-- **Playing inside Glass** (needs Premium, VMP signing and a reconnect): Glass registers as a Spotify device called **Glass Player**. When nothing else is playing, songs play right in Glass with no Spotify app open. Other devices still work and you can switch between them.
-- **Spotify search** shows recommendations when the box is empty.
-- **Settings → Spotify** shows whether in-app playback is ready, with a **Reconnect** button.
 
 ### Updates
 - **Bottom-right popup** that stays until you act on it:
@@ -149,7 +139,6 @@ how to use it, where it lives in the code, and what's still waiting on you.
 - **The song title** (under the big cover and in the player bottom left) takes you to where the music is playing from: the playlist, album, artist page, Favorites or search you started it from. With no source (opened files) it goes to the Queue. Hover to see "Playing from …".
 - **Every artist is its own link.** "Lil Uzi Vert x ridgeclub" shows two links; ridgeclub opens ridgeclub's page.
 - **Artist pages include songs they're featured on**, not only their own.
-- **In Spotify mode** the same links use Spotify's info: the title opens the playlist, album, artist or Liked Songs it's playing from, and each artist opens their Spotify page.
 - **Double-click** still renames the title, artist or album (Quick edits), and doesn't navigate.
 
 ### Fits the screen
@@ -183,29 +172,11 @@ how to use it, where it lives in the code, and what's still waiting on you.
 - **Fullscreen button on videos:** a small frosted-glass button in the video's bottom-right corner. It appears while the mouse moves over the video and fades after a couple of seconds of stillness. In fullscreen it becomes "exit fullscreen".
 - **Why some .mp3 files play video:** 22 of the 924 .mp3 files in the library are really MP4 music videos with an .mp3 name (common with YouTube downloads), so Glass plays what's inside them. They also have no MP3 tags, hence "Unknown artist".
 
-### Spotify fixes
-- **Media keys and Windows' media controls follow the source on screen.** In Spotify mode they used to drive the local player as well, which skipped twice and paused Spotify whenever a local song started.
-- **No more skip loops inside Glass.** Glass only becomes a Spotify device ("Glass Player") once the build is signed for Spotify. If Spotify still fails twice within 30 s, Glass stops being a device, moves playback to your other device, and says so once, instead of Spotify skipping through the whole queue.
-- **Settings → Spotify** shows exactly what's missing for playing inside Glass: a Reconnect button for the playback permission, and the one-time castlabs sign-up command, with a Copy button.
-- **A small local log**, `spotify-log.txt` in Glass's data folder, records what Glass asked Spotify to do and what changed (song, play/pause, device). It holds no passwords or tokens, and helps trace any skip that's left.
-
-### Playing Spotify without the Spotify app: Glass sets itself up
-- **A setup window**, "Play Spotify inside Glass", opens by itself the first time Spotify mode is used without in-app playback (once per launch). It's also in Settings → Spotify → **Set up**. Three steps:
-  1. **Spotify permission:** opens Spotify's page in your browser; click Agree.
-  2. **castlabs account:** Glass gets castlabs' free signing tool ready, installing Python and `castlabs-evs` if they're missing. It then creates the account from the form (or logs in with "I have one"); castlabs emails a code, which you type into Glass.
-  3. **Sign and restart:** Glass signs its own installed copy (Widevine/VMP, which Spotify requires), marks it signed and restarts. Spotify then plays inside Glass with no Spotify app.
-- **Passwords** go to castlabs' tool privately (over stdin, never on a command line), and Glass doesn't store them.
-- **Fields check themselves as you type:** red with a plain message when something won't work (email, names, account name, password length, the code), a soft green edge when it's fine. castlabs' answers land on the field they're about: "That account name is taken", "That code isn't right", "Wrong account name or password", castlabs' own password rules.
-- **Show / hide password** with the eye button.
-- **The account name is filled in for you:** your Spotify name, or "glassy-firstname-1234". If it's taken, Glass picks another (your name plus a number) and carries on. A name that's already yours and signed in counts as done.
-- **Real progress:** installs, sign-up and signing show a 0–100% bar with the tool's own lines underneath.
-- **Builds sign themselves** once the account exists. Signing now runs as electron-builder's "after sign" step; it used to run before the exe got its icon and version info, which broke the signature.
-
 ### Settings, rebuilt
-- **Order:** Glass, Sound, Playback, Spotify, Updates, What's new. The sheet is darker with a darker, blurred backdrop, and its sections glide in.
+- **Order:** Glass, Sound, Playback, Updates, What's new. The sheet is darker with a darker, blurred backdrop, and its sections glide in.
 - **Glass on top:** big Glow and Darkness sliders with their % shown, and a **Glass colour** palette (9 colours, none, or any colour from a picker) that tints every glass panel and the dark layer behind them.
 - **Equalizer curve** instead of presets: five points you drag on a smooth, glowing curve (-12 to +12 dB). Double-click a point to reset it.
-- **Removed:** the sleep timer, the arrow-key skip setting (arrows skip 5 s, Shift 30 s), the Frosted style (always liquid now) and the Reload library button (Spotify's library refreshes itself when you come back after 10 minutes, and every half hour).
+- **Removed:** the sleep timer, the arrow-key skip setting (arrows skip 5 s, Shift 30 s), the Frosted style (always liquid now) and the Reload library button.
 - **What's new** at the bottom: the latest changes, each with its own picture.
 - **Speed** moved to the player: a **1×** button next to Lyrics that shows the current speed and opens the speeds (0.5× to 2×, with Keep pitch).
 
@@ -216,20 +187,11 @@ how to use it, where it lives in the code, and what's still waiting on you.
 - **Albums, playlists, Favorites and folders** play in their order.
 - **A song picked anywhere else** (search, recommendations, All songs, an artist) plays first, followed by a random queue from your whole library.
 
-### Spotify feels instant
-- **The song you pick shows at once** (cover, title, colours) and the music follows. Spotify's slightly late reports no longer flick the screen back to the old song.
-
 ### More lyrics sources
 - **Kugou and NetEase Cloud Music** are asked alongside LRCLIB; the best synced match wins (same title, closest length), and credit lines are stripped. The lyrics search box lists all three, synced first. QQ Music only answers requests that claim to come from its own site, so it's not used. Genius has no timed lyrics, so it stays a browser link.
 
 ### Window corners
 - **The whole page is clipped** to Windows 11's 8 px rounded corners, and rounded corners are asked for explicitly. With Transparency effects off, the window uses a solid dark background instead of acrylic (which was solid grey anyway).
-
-### Spotify's 2026 API
-- **Liked songs** use Spotify's new library endpoint (`/me/library` with song links). The old one answered "403 Forbidden", which left hearts empty and filled the log. If it's refused, Glass stops asking for that session.
-- **Artist pages:** Spotify removed "top tracks", so the "Popular" songs now come from a search for the artist.
-- **Future builds** are signed automatically once the account exists (`scripts/vmp-sign.js`).
-- **Needs** Spotify Premium (you have it) and the installed Glass, not the portable exe.
 
 ### Background picture and blur
 - **Settings → Glass → Background:** Artwork, Colours, or **Your image**. Your image keeps your picture behind the glass whatever plays. It's stored at full size (up to 3840 px) and works best landscape 16:9 at high resolution, like 3840 × 2160 or 1920 × 1080. The row under it shows your picture's size and says if a sharper or 16:9 one would look better.
@@ -237,42 +199,17 @@ how to use it, where it lives in the code, and what's still waiting on you.
 - **Softer window edge:** the rim around the window is thinner (1 px) with a gentler glow.
 
 ### Search box and scrollbars
-- **Each tab keeps its own search.** Typing in Search no longer carries over to Library or the Queue. Search and Library each remember their own text (separately for Local and Spotify), and it's back when you return to the tab.
+- **Each tab keeps its own search.** Typing in Search no longer carries over to Library or the Queue. Search and Library each remember their own text, and it's back when you return to the tab.
 - **The Queue has no search box.** It folds away when you open the Queue and unfolds in the other tabs. Ctrl+F from the Queue jumps to Search with the box ready.
 - **Scrollbars are a white floating pill** (Settings, Edit info and every other sheet): no track, no arrows, clear of the edges.
-
-### Spotify video
-- **Cover and icon stay the album art.** When a song is switched to its music video in Spotify, Spotify can send Glass a wide video frame as the song's picture. Glass now keeps the square album cover for the big art and the dock icon, using the last real cover of that song or album, or fetching the album's cover.
-- **Audio / Video switch** under the song, shown when a song comes with a video picture. **Video** slides the frame from a square into 16:9 (wider and shorter, the picture re-cropping as it goes), **Audio** slides it back. Glass remembers your choice.
-- **Knows by itself:** Glass compares the playing song's picture with its album's real cover, fetched once per album. Any other picture, wide or square, is the video's picture. The song then gets the switch, and the cover frame **widens a little toward 16:9 and settles back** once, as a hint.
-- **What Video shows:** the video's picture, a still frame. Spotify only plays the moving video inside its own apps: its developer API has no video stream and no video/audio switch, and its terms don't allow pairing its songs with other videos.
 
 ### Public repo and updates (0.2.1)
 - **The code is public** at https://github.com/pxlarized2/glass-player, checked for passwords, keys, tokens and personal paths first (none, in any commit).
 - **Glass updates itself.** It checks GitHub 8 s after it opens and every 3 hours, downloads a new version in the background, and installs it when you restart (the popup bottom right has **Restart to update**) or the next time you close Glass. The portable exe can't replace itself, so it offers the download page instead.
 - **Fixed: updates never switched on.** The packaged app has no `build` section in its package.json, so Glass couldn't see where to look. It now reads the repo from `resources/app-update.yml`, which every build carries. 0.2.0 had this bug, so 0.2.0 → 0.2.1 was installed by hand; later versions arrive by themselves.
 - **"Glass updated" card:** the first time a new version opens, a glass card bottom right shows what's new (up to three changes with their pictures). **All changes** opens Settings at What's new. It leaves by itself after 20 s unless you're hovering it, and shows once per version. A fresh install doesn't show it.
-- **Releases are built on your PC,** so they're signed for Spotify. The GitHub Actions release workflow was removed: GitHub's servers don't have your castlabs account, so their builds would have broken Spotify inside Glass after an update.
+- **Releases are built on your PC.** The GitHub Actions release workflow was removed.
 - **The update popups sit higher,** clear of the player bar.
-
-### Spotify inside Glass: what the log showed, and what changed (0.2.1)
-- **It never actually played.** Your `spotify-log.txt` shows 45 songs sent to Glass and every one sat at 0:00; Spotify never once reported "playing" there. Glass became the active device and accepted Play, but no sound started. Earlier I took "on Glass Player" in the log as proof it worked; it wasn't.
-- **Ruled out:** Widevine works in the installed, signed Glass (tested with a separate test profile: every audio format Spotify uses unlocks). Glass's content rules don't touch Spotify's player (it plays inside its own sdk.scdn.co frame). Electron doesn't block autoplay.
-- **The log now shows what Spotify's player sees.** Its own console warnings and errors, how Spotify's servers answer it (licence, audio, player requests; host and path only, never tokens), when sound actually starts or pauses in Glass, and the player's own state (playing, paused, still loading).
-- **Autoplay block handled:** if the browser stops the music starting by itself, Glass says "Click anywhere in Glass to start the music" and the next click starts it.
-- **Stall nudge:** 3.5 s after Play, if the song is still at 0:00 on Glass, Glass unlocks audio and resumes from inside the player, and logs whether that worked.
-- **Playlists Spotify hides:** since February 2026 Spotify refuses to list the songs of some playlists to apps (403). The page now says so and **Play** at the top still plays the playlist, instead of "Can't show this playlist" with a Retry that never works.
-- **Search** asks for 10 results at a time (Spotify's new maximum), so the first search no longer fails once before retrying.
-- **First real playback, then a drop:** with the new log, six songs played inside Glass for 13 minutes (licence, audio and player all answered fine), then at 00:51 the player lost its song mid-song, and every Play after that went to a player that no longer existed. One path could cause that without a trace: when Spotify refused the player's sign-in, Glass switched the player off for good and waited for "Reconnect" in Settings, without logging anything.
-- **The player heals itself now.** If Spotify refuses its sign-in, it goes offline for 15 s, or the song drops while Spotify still names Glass as the device, Glass gets a fresh sign-in, starts a new player and carries on with the same song at the same spot (inside the same album or playlist, or the same list of songs). If you moved playback to another device yourself, it's left there. After 3 reconnects in 10 minutes it stops and waits for Play instead of looping; **Play** (or the play button) restarts a stopped player first, then plays on it. Every step is in the log.
-- Checked with a stand-in for Spotify's player in an off-screen test: refused sign-in → back at 74 s on a new player; dropped song → back at 82 s; playback moved to another device → left alone; a 4th failure → stops; Play → back.
-- **Two "Glass Player"s on Spotify (you found this one).** Spotify keeps listing a player until the player signs off, and Glass never signed off when it closed (quitting, an update, a reinstall). Each of those left an old "Glass Player" on your account that plays nothing. When Spotify (or its device menu) sent the music there, nothing happened. The log shows it: songs changing "on Glass Player" with nothing from Glass's own player, and two switches from one "Glass Player" to another.
-  - **Glass signs off when it closes.** Closing waits for Spotify to confirm (1.5 s at most; instant without Spotify), so no new old ones are left behind. Restarting after signing for Spotify signs off first too.
-  - **Old ones are hidden.** Any "Glass Player" that isn't this Glass's own is left out of the Play on lists (the Spotify button in the dock and Settings).
-  - **Music sent to an old one comes back.** If Spotify plays on an old Glass Player, Glass moves it to its own player; Play and the play button do the same; and a song that drops because Spotify moved it to an old one is brought back.
-  - **Only one player at a time.** Starting the player twice at once (sign-in, Play and a reconnect together) used to be able to make two; now it makes one, and a replaced player is switched off.
-  - Glass can't delete an old Glass Player from Spotify's side; Spotify drops it by itself after a while. Until then the Spotify app's own device menu may still show it, and Glass pulls the music back if it's picked.
-  - Checked with the stand-in in an off-screen test: three starts at once → one player; stop/start while starting → one live player; an old Glass Player on the account → hidden from Glass's lists; music sent to it → moved back, still playing; Glass closing → player signed off.
 
 ### Lyrics when the queue panel is wide (0.2.2)
 - **The bug:** with the lyrics open and the queue panel dragged wider (or a small window), the cover vanished but the lyrics stayed squeezed into the right-hand column with an empty gap on the left. An older layout rule overrode the narrow layout, and the switch happened with no animation.
@@ -283,6 +220,15 @@ how to use it, where it lives in the code, and what's still waiting on you.
 ### Smooth resizing (0.2.2)
 - **Cards:** card grids (Library playlists, artists, albums) used to stretch wider while their rows kept the old height, so cards overlapped, then snapped into a new grid 140 ms after you stopped. Now every frame of a drag gives the rows the cards’ real height, and when a column comes or goes the cards glide from where they were to their new spots. A width sweep from 380 to 960 px and back (117 frames) found no overlap at any frame.
 - **Lyrics:** the space above and below the lines came from the panel’s width, so the whole text slid up and down as you dragged. It now comes from the stage’s height, and on every size change the sung line is put back exactly where it was (plain lyrics keep their place in the text). Measured: the sung line stays within 6 px across every width, including the switch to and from the corner layout.
+
+### Fullscreen, the glass taking the cover in, Windows controls (0.2.4)
+- **Fullscreen fits the screen.** Hiding the title bar left the content in its 0 px row, so everything hung from the top edge. The content now spans the whole screen; on big stages (1500 px wide and 1000 px tall and up) the cover sits on the left and the lyrics on the right, centred, larger, and clear of the floating player bar. The black background is only behind videos now; music keeps the glass background.
+- **The glass takes the cover in.** When the lyrics need the room, a full-size copy of the cover drifts into their corner, rounds into a drop and softens into the glass; the small cover surfaces from inside with a ripple. Widening lets it rise back out. The copy is only ever scaled down, so the picture stays sharp the whole way (before, the small cover was stretched up and looked blurry mid-way).
+- **Windows media controls.** The pop-up for the volume and media keys (and the lock screen) shows the cover, and hovering Glass on the taskbar shows previous, play/pause and next buttons.
+- **Updates install quietly.** Restart to update installs in the background with no setup window, and Glass opens again by itself.
+- **New installs start clean:** the colour background, no extra darkness, no background blur, and Even out volume on. Saved settings always win, so existing setups look the same.
+- **Quality line after a restart:** the line under the title ("MP3 · 320 kbps · HQ") was blank for the restored song until the next song; it now shows at once.
+- Under the hood: standard Electron 44.10.2.
 
 ### Lyrics search without Genius (0.2.3)
 - The lyrics search lists only LRCLIB, Kugou and NetEase results, which play along inside Glass. The "Search on Genius" link (words only, no timing, opened in the browser) is gone, and Glass no longer opens genius.com links at all.
@@ -296,18 +242,18 @@ how to use it, where it lives in the code, and what's still waiting on you.
 
 ## Under the hood
 
-- **Electron:** castlabs Electron **44.10.1** (adds Widevine, which Spotify's in-app player needs). Version 45 only exists as an alpha there.
+- **Electron:** **44.10.2**.
 - **Build:**
   ```bash
   npx electron-builder --win nsis portable -c.directories.output=dist-deck
   ```
-  `build.electronDist` points at the local castlabs Electron. `scripts/vmp-sign.js` signs each build with your castlabs account (it warns and continues if the account is missing).
+  `build.electronDist` points at the local Electron in `node_modules/electron/dist`.
 - **Publish a new version:** raise `version` in package.json, add its notes to `renderer/notes.js` (`v: 'x.y.z'`) and `build/release-notes.md`, commit and push, then:
   ```bash
   npm run release
   ```
-  `scripts/release.js` checks the commit is pushed and the notes mention the version, builds and signs, then creates the GitHub release `vX.Y.Z` once with the installer, blockmap, portable exe, `latest.yml` and the notes (needs `gh auth login`). electron-builder's own publishing is no longer used: it uploaded the two targets at once, both tried to create the release, and in 0.2.2 `latest.yml` went missing until it was added by hand. Installed copies pick a release up within half an hour (0.2.2 and later), or at their next start.
-- **New dependencies:** `electron-updater`. The castlabs signing tool `castlabs-evs` is installed for Python (`py`).
+  `scripts/release.js` checks the commit is pushed and the notes mention the version, builds, then creates the GitHub release `vX.Y.Z` once with the installer, blockmap, portable exe, `latest.yml` and the notes (needs `gh auth login`). electron-builder's own publishing is no longer used: it uploaded the two targets at once, both tried to create the release, and in 0.2.2 `latest.yml` went missing until it was added by hand. Installed copies pick a release up within half an hour (0.2.2 and later), or at their next start.
+- **New dependencies:** `electron-updater`.
 - **Your data** (library, edits, tags, plays, settings) is stored in the app's user folder, not in your music files. The only things that write to song files are Edit info's "Also save into the MP3 file's tags" box and "Save as .lrc".
 
 ### Files
@@ -315,26 +261,22 @@ how to use it, where it lives in the code, and what's still waiting on you.
 | File | What it does |
 |---|---|
 | `main.js` | Window, file scanning, metadata + quality, covers, lyrics lookup, artist info (Wikipedia), artwork tools, updates |
-| `spotify-main.js` | Spotify sign-in, Web API, scopes, token for the in-app player, test mock |
 | `preload.js` | The bridge between the window and `main.js` |
 | `renderer/app.js` | Player core: library, queue, lists, menus, Edit info, albums, tabs, filters, links to where a song plays from |
 | `renderer/deck.js` | Gapless engine: two players, preloading, crossfades, skips |
 | `renderer/deck-worklet.js` | The audio worklet that splices songs together sample by sample |
-| `renderer/lyrics.js` | Lyrics panel (local + Spotify) |
+| `renderer/lyrics.js` | Lyrics panel |
 | `renderer/sound.js` | Sound effects chain (bass, EQ, reverb, leveller, mono, fades) |
 | `renderer/art.js` | Cover Adjust, art from other songs, cover menu |
 | `renderer/tags.js` | Tags |
 | `renderer/extras.js` | Quality badges, plays, artist pages, links under the song, side-panel resize, recommendations, quick edits, cover drift |
 | `renderer/liquid.js` | Liquid glass filters + artwork wallpaper (`Liquid.watch` adds small panels like the zoom pill) |
 | `renderer/zoom.js` | Zoom pill (the zoom keys are handled in `main.js`) |
-| `renderer/spplayer.js` | Spotify in-app player (Web Playback SDK) |
-| `renderer/spotify.js` | Spotify mode (browse, queue, artist pages, recommendations) |
 | `renderer/updates.js` | Update popup, and the "Glass updated" card after an update |
-| `renderer/settings.js` | Settings: Sound, Playback, Spotify, Updates, Glass |
-| `scripts/vmp-sign.js` | Signs builds for Widevine |
+| `renderer/settings.js` | Settings: Sound, Playback, Updates, Glass |
 | `renderer/undo.js` | Undo / redo (Ctrl+Z, Ctrl+Shift+Z) and the "Undone" pill |
 | `renderer/eqgraph.js` | The draggable, glowing equalizer curve in Settings |
 | `renderer/notes.js` | What's new: each change with its version and picture |
 
 ### How changes were checked
-Every change was tested in an offscreen copy of the app with a separate test profile, so your library and screen were never touched. The tests used a generated test tone, a made-up library, fake Spotify data, and a few of your real songs (read only). Lyrics were checked with made-up lines and line counts only.
+Every change was tested in an offscreen copy of the app with a separate test profile, so your library and screen were never touched. The tests used a generated test tone, a made-up library and a few of your real songs (read only). Lyrics were checked with made-up lines and line counts only.

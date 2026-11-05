@@ -1,5 +1,5 @@
 'use strict';
-// Equalizer curve (Settings > Sound), like Spotify's: five points you drag up and down (-12 to +12 dB),
+// Equalizer curve (Settings > Sound): five points you drag up and down (-12 to +12 dB),
 // joined by a smooth curve with a soft white glow and a fading fill. Double-click a point: back to 0.
 // Changes glide (no jumps) and apply live through Sound.apply().
 // Uses app.js globals: S, Sound, reduceMotion.

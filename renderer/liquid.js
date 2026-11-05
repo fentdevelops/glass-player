@@ -12,7 +12,7 @@
   host.style.cssText = 'position:absolute;width:0;height:0;overflow:hidden';
   document.body.appendChild(host);
 
-  const TARGETS = ['#side', '#dock', '#art', '#lyrics', '#empty', '#spSetup'];
+  const TARGETS = ['#side', '#dock', '#art', '#lyrics', '#empty'];
   const BAND = 44;        // px of rim that refracts
   const BEND = 70;        // feDisplacementMap scale: up to ±35 px of bending at the very edge
   const FROST = 11;       // blur in the middle
@@ -129,7 +129,7 @@
   window.Liquid = {
     apply,
     watch,
-    // the artwork on screen changed (local or Spotify)
+    // the artwork on screen changed
     art(url) { artUrl = url || ''; setWall(wallFor()); },
   };
   apply();

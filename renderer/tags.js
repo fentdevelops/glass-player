@@ -143,7 +143,6 @@
   }
   // Library filtered to one tag
   function show(id) {
-    if (S.source !== 'local') return;
     S.filters.tags = [id];
     if (S.view !== 'library') setView('library');
     filtersChanged();

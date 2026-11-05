@@ -1,6 +1,6 @@
 {
   "name": "glass-player",
-  "version": "0.2.3",
+  "version": "0.2.4",
   "description": "Liquid glass music and video player",
   "main": "main.js",
   "scripts": {
@@ -13,11 +13,11 @@
   "license": "ISC",
   "type": "commonjs",
   "devDependencies": {
-    "electron": "github:castlabs/electron-releases#v44.10.1+wvcus",
+    "electron": "44.10.2",
     "electron-builder": "^26.18.0"
   },
   "allowScripts": {
-    "electron@44.10.1+wvcus": true,
+    "electron@44.10.2": true,
     "electron-winstaller@5.4.0": true
   },
   "dependencies": {
@@ -31,7 +31,6 @@
     "productName": "Glass Player",
     "files": [
       "main.js",
-      "spotify-main.js",
       "preload.js",
       "renderer/**/*"
     ],
@@ -76,9 +75,8 @@
         "role": "Viewer"
       }
     ],
-    "afterSign": "scripts/vmp-sign.js",
     "electronDist": "node_modules/electron/dist",
-    "electronVersion": "44.10.1",
+    "electronVersion": "44.10.2",
     "directories": {
       "buildResources": "build"
     },

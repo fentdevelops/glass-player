@@ -1,33 +1,10 @@
 'use strict';
 // Settings (gear, top left). Top to bottom: Glass (glow, darkness, tint colour, background), Sound (bass, treble,
-// a draggable EQ curve, reverb), Playback, Spotify, Updates, and What's new at the bottom.
+// a draggable EQ curve, reverb), Playback, Updates, and What's new at the bottom.
 // Speed lives in the dock now (next to Lyrics); the library reloads itself; updates install themselves.
 (() => {
   const sys = window.glass.system;
   const Settings = (window.Settings = {});
-
-  function spotifyHTML() {
-    const st = window.Spot ? Spot.status() : { connected: false };
-    if (st.connected) {
-      const plan = st.user && st.user.product ? (st.user.product === 'premium' ? 'Premium' : 'Free') : '';
-      return `
-        <div class="set-row"><div><b>Connected</b><span>${esc(st.user ? st.user.name : 'Spotify')}${plan ? ' · ' + plan : ''} · your library refreshes by itself</span></div>
-          <span class="set-pill on"><i></i>Linked</span></div>
-        <div class="set-row"><div><b>Play inside Glass</b><span data-spp>${esc(window.SpotPlayer ? SpotPlayer.message() || 'Off' : 'Off')}</span></div>
-          ${window.SpotPlayer && SpotPlayer.state() === 'reconnect' ? '<button type="button" class="btn primary" data-act-sp="reconnect">Reconnect</button>' : ''}</div>
-        ${window.SpotPlayer && ['unsigned', 'reconnect'].includes(SpotPlayer.state()) ? `<div class="set-row"><div><b>Turn on playing inside Glass</b><span>Three quick steps and Glass sets itself up: no Spotify app needed after that.</span></div>
-          <button type="button" class="btn primary" data-act-sp="setup">Set up</button></div>` : ''}
-        <div class="set-row"><div><b>Play on</b><span>Glass Player shows up here as a device. Pick where Spotify plays.</span></div></div>
-        <div class="dev-list" data-devices><span class="set-hint">Looking for devices…</span></div>
-        <div class="set-row"><span class="set-grow"></span><button type="button" class="btn ghost" data-act-sp="disconnect">Disconnect</button></div>`;
-    }
-    return `
-      <div class="set-row"><div><b>Not connected</b><span>Create a free app on the Spotify dashboard, add the Redirect URI, then paste its Client ID.</span></div>
-        <button type="button" class="btn" data-act-sp="dashboard">Open dashboard</button></div>
-      <div class="sp-uri"><code>${esc(document.querySelector('#spRedirect').textContent)}</code><button type="button" class="btn ghost" data-act-sp="copy">Copy</button></div>
-      <div class="set-row"><label class="field set-grow"><input type="text" name="sp_client" placeholder="Client ID (32 letters and digits)" spellcheck="false" autocomplete="off" value="${esc(document.querySelector('#spClient').value)}" /></label>
-        <button type="button" class="btn primary" data-act-sp="connect">Connect</button></div>`;
-  }
 
   // ---- building blocks ----
   const chips = (key, opts) => `<div class="set-chips" data-chips="${key}">${opts.map(([v, l]) => `<button type="button" class="schip" data-v="${v}">${l}</button>`).join('')}</div>`;
@@ -60,7 +37,7 @@
         <button type="button" class="btn" data-act="colors">Open Windows settings</button></div>`;
   }
 
-  // ---- Sound: bass, treble, a smooth EQ curve you drag (like Spotify's), reverb ----
+  // ---- Sound: bass, treble, a smooth EQ curve you drag, reverb ----
   function soundHTML() {
     return `
       ${slider('sound.bass', 'Bass boost', 'Adds weight to kicks and bass lines', 0, 12, 'dB')}
@@ -180,7 +157,7 @@
     const pickWall = async () => {
       const r = await api.pickWallpaper(S.ui.wallImg || null).catch((e) => { toast(cleanErr(e), true); return null; });
       if (r) { S.ui.wallImg = r.url; S.ui.wallImgSize = `${r.width}×${r.height}`; S.ui.wall = 'custom'; }
-      else if (!S.ui.wallImg) S.ui.wall = 'art';            // nothing picked and nothing from before
+      else if (!S.ui.wallImg) S.ui.wall = 'colors';         // nothing picked and nothing from before: back to the default
       applyUi(); save(); paintWall();
     };
     form.querySelector('[data-chips="ui.wall"]').addEventListener('click', () => {
@@ -198,7 +175,6 @@
       <div class="set-sec"><h4>Glass</h4>${glassHTML()}</div>
       <div class="set-sec"><h4>Sound</h4>${soundHTML()}</div>
       <div class="set-sec"><h4>Playback</h4>${playbackHTML()}</div>
-      <div class="set-sec"><h4>Spotify</h4><div data-sp-sec>${spotifyHTML()}</div></div>
       <div class="set-sec"><h4>Updates</h4>
         <div class="set-row"><div><b>Glass ${esc(window.Updates?.state().version || '')}</b><span data-upd>${esc(window.Updates ? Updates.label() : 'Glass updates itself')}</span></div></div></div>
       <div class="set-sec" data-news><h4>What's new</h4>${window.PatchNotes ? PatchNotes.html() : ''}</div>
@@ -214,42 +190,6 @@
         mountAudio(form);
         const updLine = form.querySelector('[data-upd]');
         if (window.Updates) Updates.onChange = (s) => { if (updLine.isConnected) updLine.textContent = Updates.label(s); };
-
-        // Spotify section
-        const sec = form.querySelector('[data-sp-sec]');
-        const paintDevices = async () => {
-          const box = sec.querySelector('[data-devices]');
-          if (!box || !window.Spot) return;
-          const ds = await Spot.devices();
-          box.innerHTML = ds.length
-            ? ds.map((d, i) => `<button type="button" class="btn${d.is_active ? ' on' : ''}" data-dev="${i}">${esc(d.name)}</button>`).join('')
-            : '<span class="set-hint">No devices yet. Open Spotify on your PC or phone, then reopen Settings.</span>';
-          box.onclick = async (e) => {
-            const b = e.target.closest('[data-dev]');
-            if (!b) return;
-            await Spot.transfer(ds[+b.dataset.dev]);
-            setTimeout(paintDevices, 900);
-          };
-        };
-        const repaint = () => { sec.innerHTML = spotifyHTML(); paintDevices(); };
-        paintDevices();
-        sec.addEventListener('click', async (e) => {
-          const b = e.target.closest('[data-act-sp]');
-          if (!b || !window.Spot) return;
-          const a = b.dataset.actSp;
-          if (a === 'dashboard') api.openExternal('https://developer.spotify.com/dashboard').catch(() => {});
-          else if (a === 'copy') { navigator.clipboard.writeText(document.querySelector('#spRedirect').textContent).then(() => toast('Redirect URI copied')).catch(() => {}); }
-          else if (a === 'setup') { window.SpSetup?.open(); }
-          else if (a === 'disconnect') { await Spot.disconnect(); repaint(); }
-          else if (a === 'reconnect') { b.disabled = true; b.textContent = 'Waiting for browser…'; await Spot.connect(Spot.status().clientId); repaint(); }
-          else if (a === 'connect') {
-            b.disabled = true;
-            b.textContent = 'Waiting for browser…';
-            const ok = await Spot.connect(form.elements.sp_client.value.trim());
-            repaint();
-            if (ok && S.source !== 'spotify') setSource('spotify');
-          }
-        });
       },
       onSubmit() { save(); },
     });

@@ -88,8 +88,8 @@
     if (e.target.closest('[data-wn-all]')) { closeCard(); window.Settings?.open({ to: 'news' }); }
     else if (e.target.closest('[data-wn-x]')) closeCard();
   });
-  // 0.2.0 kept no version note, so a library, a playlist or Spotify means Glass was in use before this update
-  const usedBefore = () => (typeof lib !== 'undefined' && lib.size > 0) || (S.playlists || []).length > 0 || S.source === 'spotify';
+  // 0.2.0 kept no version note, so a library or a playlist means Glass was in use before this update
+  const usedBefore = () => (typeof lib !== 'undefined' && lib.size > 0) || (S.playlists || []).length > 0;
   (async () => {
     const s = await up.state().catch(() => null);
     const version = s && s.version;

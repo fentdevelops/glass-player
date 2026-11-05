@@ -41,8 +41,9 @@ const S = {
   filters: { type: 'all', formats: [], fav: false, missing: false, nocover: false },   // Library filter menu
   lib: { group: 'album', sort: 'title', layout: 'list' },
   wide: false,
-  source: 'local',          // 'local' files | 'spotify' (Web API + Connect, spotify.js)
-  ui: { glow: 55, tint: 40, style: 'liquid', wall: 'art', quickEdit: true, zoom: 1, spVideo: false, wallBlur: 3, wallImg: '', wallImgSize: '' },  // Settings > Glass (style: liquid | frosted, wall: art | colors)
+  // Settings > Glass (style: liquid | frosted, wall: art | colors | custom). A new install starts clean: the colour
+  // background, no extra darkness, no background blur. Saved settings always win over these.
+  ui: { glow: 55, tint: 0, tintColor: '', style: 'liquid', wall: 'colors', quickEdit: true, zoom: 1, wallBlur: 0, wallImg: '', wallImgSize: '' },
   albumArt: {},             // album key -> { cover, thumb } made when songs are dragged together
   tags: [],                 // [{ id, name, emoji, color }] (tags.js)
   songTags: {},             // path -> [tag ids]
@@ -54,7 +55,7 @@ const S = {
   // Settings > Playback
   play: { click: 'restart', skip: 5, fade: true, speed: 1, keepPitch: true, autoplay: true, xfade: 0, crossfade: 0 },   // crossfade: 0 = gapless
   // Settings > Sound (sound.js builds the Web Audio chain from this)
-  sound: { bass: 0, treble: 0, eq: [0, 0, 0, 0, 0], preset: 'flat', reverb: 0, room: 'room', even: false, mono: false, wide: 0 },
+  sound: { bass: 0, treble: 0, eq: [0, 0, 0, 0, 0], preset: 'flat', reverb: 0, room: 'room', even: true, mono: false, wide: 0 },   // Even out volume: on from the start
 };
 // glow: how strongly the artwork colours wash the glass; tint: how dark the glass is (keeps white text readable)
 function applyUi() {
@@ -306,7 +307,6 @@ function tick(ts) {
   if (body.classList.contains('has-track') && !body.classList.contains('wide')) artEl.style.scale = (1 + level * 0.035).toFixed(4);
   if (ts - lastAmb > 42) { lastAmb = ts; drawAmbient(ts); }
   window.Extras?.drift?.(ts);
-  if (S.source === 'spotify') { window.Spot?.tick(ts); window.Lyrics?.tick(); return; }
   const d = deck.duration;
   if (!seeking && d && isFinite(d) && !deck.paused) {
     const c = deck.currentTime;
@@ -327,7 +327,6 @@ function loadCover(t) {
   api.cover(t.path).then((u) => { t.coverLoading = false; if (u) { t.cover = u; if (t === current()) showNow(false); } }).catch(() => { t.coverLoading = false; });
 }
 function showNow(animate) {
-  if (S.source === 'spotify') return;
   const t = current();
   body.classList.toggle('has-track', !!t);
   if (!t) {
@@ -374,38 +373,13 @@ function showNow(animate) {
   lastShown = t;
   window.Lyrics?.track(t);
 
+  // Windows' media pop-up (volume keys, lock screen) shows the song with its cover; refreshed once the cover loads
   if ('mediaSession' in navigator) {
-    navigator.mediaSession.metadata = new MediaMetadata({ title, artist: t.artist || '', album: t.album || '' });
+    const art = big || small;
+    navigator.mediaSession.metadata = new MediaMetadata({ title, artist: t.artist || '', album: t.album || '',
+      artwork: art ? [{ src: art, sizes: '720x720', type: /\.png(\?|$)/i.test(art) ? 'image/png' : 'image/jpeg' }] : [] });
   }
-}
-
-// the big frame: square cover, or 16:9 for a video picture (Spotify's Audio / Video switch).
-// Switching glides the frame between the two sizes; the picture re-crops as it goes, never stretches.
-function setArtMode(video, animate = true) {
-  const on = !!video, w = $('#artWrap'), sw = $('#avSwitch');
-  sw.style.setProperty('--k', on ? 1 : 0);
-  sw.querySelectorAll('[data-av]').forEach((b) => b.classList.toggle('active', (b.dataset.av === 'video') === on));
-  if (body.classList.contains('art-video') === on) return;
-  const a = w.getBoundingClientRect();
-  w.getAnimations().forEach((x) => x.cancel());
-  body.classList.toggle('art-video', on);
-  if (!animate || reduceMotion || !a.width) return;
-  const b = w.getBoundingClientRect();
-  anim(w, [{ width: a.width + 'px', height: a.height + 'px' }, { width: b.width + 'px', height: b.height + 'px' }], { duration: 820 });
-}
-
-// a Spotify song that comes with a video picture: the frame widens a little toward 16:9 and settles back,
-// so you can tell before picking Video
-function hintWide() {
-  const w = $('#artWrap');
-  if (reduceMotion || body.classList.contains('art-video') || w.getAnimations().length) return;
-  const b = w.getBoundingClientRect();
-  if (!b.width) return;
-  anim(w, [
-    { width: b.width + 'px', height: b.height + 'px' },
-    { width: b.width * 1.16 + 'px', height: b.height * 0.9 + 'px', offset: 0.45 },
-    { width: b.width + 'px', height: b.height + 'px' },
-  ], { duration: 1600, easing: 'cubic-bezier(.45,0,.25,1)' });
+  syncMedia();
 }
 
 // ---------- playback ----------
@@ -514,7 +488,6 @@ function planAfter(after) {
   return i < 0 ? null : S.queue[pickNext(false, i)] || null;
 }
 function prepareNext() {
-  if (S.source !== 'local') return;
   deck.invalidate();                      // asks planAfter() again; keeps the preload if the answer is the same
   const t = chooseNext();
   if (!t || t === current()) return;
@@ -527,7 +500,7 @@ function prepareNext() {
 const scheduleNext = () => { clearTimeout(prepTimer); prepTimer = setTimeout(prepareNext, 120); };
 const queueChanged = scheduleNext;   // queue, order, shuffle or repeat changed
 
-// Autoplay (like Spotify): when the queue is about to run out, add songs like the one playing.
+// Autoplay: when the queue is about to run out, add songs like the one playing.
 // Same artist counts most, then album, genre and folder; favorites get a nudge; recent plays are skipped.
 // opts.anyQueue: recommendations may include songs that are already queued (Autoplay itself never repeats them)
 function autoplayPicks(seed, count, opts = {}) {
@@ -790,7 +763,7 @@ function filterInventory() {
 }
 function chipList() {
   const f = S.filters, out = [];
-  if (S.view !== 'library' || S.source === 'spotify') return out;
+  if (S.view !== 'library') return out;
   if (f.type !== 'all') out.push({ k: 'type', label: TYPES[f.type] });
   for (const x of f.formats) out.push({ k: 'fmt:' + x, label: x.toUpperCase() });
   for (const k in TOGGLES) if (f[k]) out.push({ k, label: TOGGLES[k] });
@@ -967,11 +940,10 @@ const plArt = (p) => (p.virtual ? 'background-image:linear-gradient(140deg, #ff7
 
 function buildItems() {
   const items = buildItemsInner();
-  if (S.source === 'local' && S.view === 'library' && S.browse && !S.libOpen && !S.filter) items.unshift(backItem('Search', () => transitionView(-1, () => { S.browse = false; })));
+  if (S.view === 'library' && S.browse && !S.libOpen && !S.filter) items.unshift(backItem('Search', () => transitionView(-1, () => { S.browse = false; })));
   return items;
 }
 function buildItemsInner() {
-  if (S.source === 'spotify') return window.Spot ? Spot.items() : [];
   const items = [];
   if (S.view === 'queue') {
     if (!S.queue.length) items.push(emptyItem('Queue is empty', 'Play something from your Library, or drop files here', '<button class="btn" data-act="open-folder">Add a folder</button>'));
@@ -1094,11 +1066,6 @@ function indexAt(y) {
   return ans;
 }
 function applyState(node, it) {
-  if (it.kind === 'row' && it.track.sp) {
-    node.classList.toggle('current', !!window.Spot?.isCurrent(it.track));
-    node.querySelector('.heart')?.classList.toggle('on', !!window.Spot?.isLiked(it.track));
-    return;
-  }
   if (it.kind === 'row') {
     const t = it.track;
     node.classList.toggle('current', it.ctx === 'queue' ? it.i === S.cur : t === current());
@@ -1242,7 +1209,7 @@ const LETTERS = ['#', ...'ABCDEFGHIJKLMNOPQRSTUVWXYZ'];
 let azMap = new Map();
 function buildAZ() {
   // groups are ordered by size now, so the A–Z rail only makes sense for the flat, alphabetical list
-  const usable = S.source === 'local' && S.view === 'library' && !S.libOpen && !S.filter && S.lib.group === 'none' && ['title', 'artist', 'album'].includes(S.lib.sort) && items.length > 30;
+  const usable = S.view === 'library' && !S.libOpen && !S.filter && S.lib.group === 'none' && ['title', 'artist', 'album'].includes(S.lib.sort) && items.length > 30;
   side.classList.toggle('has-az', usable);
   if (!usable) return;
   azMap = new Map();
@@ -1275,14 +1242,6 @@ az.addEventListener('pointercancel', azEnd);
 // ---------- header + views ----------
 function paintHeader() {
   side.dataset.view = S.view;
-  side.dataset.source = S.source;
-  if (S.source === 'spotify' && window.Spot) {
-    const h = Spot.header();
-    $('#sideTitle').textContent = h.title;
-    $('#sideSub').textContent = h.sub;
-    paintChips();
-    return;
-  }
   let title = 'Queue', sub = plural(S.queue.length, 'song');
   if (S.view === 'library') {
     const g = S.libOpen ? GROUPS[S.libOpen.by] : null;
@@ -1315,13 +1274,13 @@ async function transitionView(dir, mutate) {
   save();
 }
 const VIEWS = ['queue', 'library', 'playlists'];
-// Each tab keeps its own search text (Search and Library, per source); the Queue has no search box.
+// Each tab keeps its own search text (Search and Library); the Queue has no search box.
 const searchBy = {};
 function swapSearch(to) {
   clearTimeout(searchTimer);
   const box = $('#search');
-  if (S.view !== 'queue') searchBy[S.source + ':' + S.view] = { raw: box.value, f: S.filter };
-  const s = to === 'queue' ? null : searchBy[S.source + ':' + to];
+  if (S.view !== 'queue') searchBy[S.view] = { raw: box.value, f: S.filter };
+  const s = to === 'queue' ? null : searchBy[to];
   S.filter = s ? s.f : '';
   box.value = s ? s.raw : '';
   if (to === 'queue') box.blur();
@@ -1477,7 +1436,7 @@ function dragScrollLoop() {
   requestAnimationFrame(dragScrollLoop);
 }
 vspace.addEventListener('pointerdown', (e) => {
-  if (e.button !== 0 || S.source !== 'local') return;
+  if (e.button !== 0) return;
   const node = e.target.closest('.vi.row');
   if (!node || e.target.closest('button')) return;
   const it = items[node._vi];
@@ -2270,17 +2229,21 @@ function toast(msg, error = false) {
 
 // ---------- deck events ----------
 deck.on('play', () => {
-  window.Spot?.pauseIfPlaying();   // one thing plays at a time
-  if (S.source === 'spotify') return;
   body.classList.add('playing');
   armIdle();
+  syncMedia();
 });
-deck.on('pause', () => { if (S.source !== 'spotify') body.classList.remove('playing', 'idle'); });
+deck.on('pause', () => { body.classList.remove('playing', 'idle'); syncMedia(); });
+// play state for Windows: the media pop-up and the taskbar preview's play/pause button
+function syncMedia() {
+  const playing = !!current() && !deck.paused;
+  if ('mediaSession' in navigator) navigator.mediaSession.playbackState = current() ? (playing ? 'playing' : 'paused') : 'none';
+  api.media?.state({ playing, has: !!current() });
+}
 deck.on('meta', ({ item: t, duration, isVideo }) => {
   if (!t || t !== current()) return;
   if (!t.duration && duration) { t.duration = duration; libChanged(); }
   if (t.error) { t.error = false; libChanged(); }
-  if (S.source === 'spotify') return;
   body.classList.toggle('is-video', isVideo);
   $('#tDur').textContent = fmt(duration);
   seek.value = duration ? (deck.currentTime / duration) * 1000 : 0;
@@ -2353,7 +2316,6 @@ function applyVolume() {
   const v = vol.value / 100;
   deck.setVolume(v);                      // the deck squares it, like the old v * v
   deck.setMuted(muted);
-  if (S.source === 'local') localVol = +vol.value;
   setFill(vol);
   body.classList.toggle('muted', muted || v === 0);
   save();
@@ -2413,51 +2375,6 @@ $$('[data-win]').forEach((b) => b.addEventListener('click', () => api.win(b.data
 $('.titlebar').addEventListener('dblclick', (e) => { if (!e.target.closest('.win-btns')) api.win('max'); });
 api.onMaximized((v) => body.classList.toggle('maximized', v));
 
-// ---------- Local / Spotify switch (titlebar) ----------
-let localVol = 80;            // the volume slider is shared; Spotify shows its device volume, local keeps its own
-function paintSource(animate = true) {
-  const k = S.source === 'spotify' ? 1 : 0;
-  $('#srcInd').style.setProperty('--k', k);
-  if (animate) anim($('#srcInd i'), [{ transform: 'scale(1)' }, { transform: 'scale(1.12, .88)' }, { transform: 'scale(1)' }], { duration: 700 });
-  $$('#src button').forEach((b) => b.classList.toggle('active', b.dataset.src === S.source));
-  body.classList.toggle('src-spotify', S.source === 'spotify');
-}
-function setSource(src) {
-  if (src === S.source) return;
-  if (S.source === 'local') localVol = +vol.value;
-  closeMenu();
-  S.source = src;
-  $('#search').value = '';
-  S.filter = '';
-  paintSource();
-  if (src === 'spotify') window.Spot?.activate();
-  else { window.Spot?.deactivate(); localResume(); }
-  window.Lyrics?.sourceChanged();
-  transitionView(src === 'spotify' ? 1 : -1, () => { S.plOpen = null; S.libOpen = null; });
-}
-// put the stage, dock and controls back on the local player
-function localResume() {
-  body.classList.remove('sp-unlinked', 'has-vart');
-  setArtMode(false, false);
-  vol.value = localVol;
-  applyVolume();
-  palKey = null;
-  lastShown = null;
-  showNow(false);
-  const t = current();
-  body.classList.toggle('playing', !!t && !deck.paused);
-  body.classList.toggle('is-video', !!t && deck.videoElement?.videoWidth > 0);
-  $('#tDur').textContent = fmt(t ? deck.duration : 0);
-  seek.value = deck.duration ? (deck.currentTime / deck.duration) * 1000 : 0;
-  setFill(seek);
-  $('#tCur').textContent = fmt(t ? deck.currentTime : 0);
-  paintShuffle();
-  paintRepeat();
-  stateChanged();
-  if (!t) palTarget = DEFAULT_PAL.map((c) => c.slice());
-}
-$$('#src button').forEach((b) => b.addEventListener('click', () => setSource(b.dataset.src)));
-
 // ---------- auto-hide controls over fullscreen video ----------
 let idleTimer = 0;
 function armIdle() {
@@ -2503,15 +2420,15 @@ window.addEventListener('keydown', (e) => {
 
 if ('mediaSession' in navigator) {
   const ms = navigator.mediaSession;
-  // media keys / Windows media controls act on whichever source is on screen: in Spotify mode they used to
-  // start the local player, which paused Spotify, and skip in both
-  const onSp = () => S.source === 'spotify' && !!window.Spot?.media;
-  ms.setActionHandler('play', () => (onSp() ? Spot.media('toggle') : togglePlay()));
-  ms.setActionHandler('pause', () => (onSp() ? Spot.media('pause') : deck.pause()));
-  ms.setActionHandler('previoustrack', () => (onSp() ? Spot.media('prev') : prev()));
-  ms.setActionHandler('nexttrack', () => (onSp() ? Spot.media('next') : next()));
-  ms.setActionHandler('seekto', (d) => (onSp() ? Spot.media('seek', d.seekTime) : deck.seek(d.seekTime)));
+  // media keys and Windows' media controls
+  ms.setActionHandler('play', () => togglePlay());
+  ms.setActionHandler('pause', () => deck.pause());
+  ms.setActionHandler('previoustrack', () => prev());
+  ms.setActionHandler('nexttrack', () => next());
+  ms.setActionHandler('seekto', (d) => deck.seek(d.seekTime));
 }
+// the taskbar preview's buttons
+api.media?.onAction((a) => { if (a === 'prev') prev(); else if (a === 'next') next(); else togglePlay(); });
 
 // ---------- drag & drop ----------
 let dragDepth = 0;
@@ -2540,7 +2457,7 @@ function snapshot() {
     cur: S.cur, at: deck.currentTime || 0,
     shuffle: S.shuffle, repeat: S.repeat,
     playlists: S.playlists, favs: [...S.favs],
-    view: S.view, lib: S.lib, filters: S.filters, wide: S.wide, source: S.source, localVol, ui: S.ui, lyrics: !!window.Lyrics?.open, albumArt: S.albumArt, play: S.play, sound: S.sound, tags: S.tags, songTags: S.songTags, plays: S.plays, sideW: S.sideW, recent: S.recent, browse: S.browse, from: S.from,
+    view: S.view, lib: S.lib, filters: S.filters, wide: S.wide, ui: S.ui, lyrics: !!window.Lyrics?.open, albumArt: S.albumArt, play: S.play, sound: S.sound, tags: S.tags, songTags: S.songTags, plays: S.plays, sideW: S.sideW, recent: S.recent, browse: S.browse, from: S.from,
     vol: +vol.value, muted,
   };
 }
@@ -2566,8 +2483,8 @@ async function restore() {
   if (s.lib) Object.assign(S.lib, s.lib);
   S.filters = readFilters(s.filters);
   S.queue = (s.queue || []).map((p) => lib.get(p)).filter(Boolean);
-  S.source = s.source === 'spotify' ? 'spotify' : 'local';
-  if (s.ui) S.ui = { ...S.ui, ...s.ui };
+  // only the settings Glass has (S.ui's keys) are taken from a saved state
+  if (s.ui && typeof s.ui === 'object') for (const k of Object.keys(S.ui)) if (k in s.ui) S.ui[k] = s.ui[k];
   if (s.albumArt) S.albumArt = s.albumArt;
   if (Array.isArray(s.tags)) S.tags = s.tags;
   if (s.songTags && typeof s.songTags === 'object') S.songTags = s.songTags;
@@ -2586,7 +2503,7 @@ async function restore() {
   deck.setRepeatOne(S.repeat === 'one');
   applyUi();
   window.Zoom?.restore(S.ui.zoom);
-  vol.value = localVol = s.localVol ?? s.vol ?? 80;
+  vol.value = s.localVol ?? s.vol ?? 80;   // localVol: where older saves kept the volume
   muted = !!s.muted;
   body.classList.toggle('wide', (S.wide = !!s.wide));
 
@@ -2603,8 +2520,6 @@ async function restore() {
   } else showNow(false);
   loaded = true;
   window.Undo?.init();
-  paintSource(false);
-  if (S.source === 'spotify') window.Spot?.activate();
   rebuild(true);
   paintHeader();
   for (const infos of pendingOpen.splice(0)) addTracks(infos, { playFirst: true });

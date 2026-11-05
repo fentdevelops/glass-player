@@ -1,7 +1,7 @@
 'use strict';
-// npm run release: build the installer + portable copy (signed for Spotify by scripts/vmp-sign.js), then publish
-// them as one GitHub release with build/release-notes.md as its notes. Installed copies of Glass read latest.yml
-// from the newest release and update themselves.
+// npm run release: build the installer + portable copy, then publish them as one GitHub release with
+// build/release-notes.md as its notes. Installed copies of Glass read latest.yml from the newest release
+// and update themselves.
 //
 // Why not electron-builder's own publishing: it uploads the two targets at the same time and both try to create
 // the release, so one fails ("Published releases must have a valid tag") and latest.yml can go missing, which
