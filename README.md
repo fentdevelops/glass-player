@@ -7,7 +7,7 @@
 <p align="center">A liquid-glass music and video player for the files on your computer.</p>
 
 <p align="center">
-  <a href="https://github.com/pxlarized2/glass-player/releases/latest"><b>Download</b></a> ·
+  <a href="https://github.com/fentdevelops/glass-player/releases/latest"><b>Download</b></a> ·
   <a href="#features">Features</a> ·
   <a href="#more-soon">More soon</a> ·
   <a href="#our-vision">Our vision</a> ·
@@ -15,7 +15,7 @@
 </p>
 
 <p align="center">
-  <a href="https://github.com/pxlarized2/glass-player/releases/latest"><img src="https://img.shields.io/github/v/release/pxlarized2/glass-player?label=version&color=7c3be0" alt="Latest version"></a>
+  <a href="https://github.com/fentdevelops/glass-player/releases/latest"><img src="https://img.shields.io/github/v/release/fentdevelops/glass-player?label=version&color=7c3be0" alt="Latest version"></a>
   <img src="https://img.shields.io/badge/runs%20on-Windows%20%7C%20Mac-3a2b9e" alt="Runs on Windows and Mac">
 </p>
 
@@ -80,7 +80,7 @@ On Windows, Glassy downloads new versions quietly and a small card asks you to r
 
 ## Download
 
-**[Get the latest version](https://github.com/pxlarized2/glass-player/releases/latest)** and pick the file for your computer:
+**[Get the latest version](https://github.com/fentdevelops/glass-player/releases/latest)** and pick the file for your computer:
 
 | Your computer | File | Updates |
 |---|---|---|
@@ -129,18 +129,6 @@ Made by fent.
 
 For inquiries, email [fentisback@gmail.com](mailto:fentisback@gmail.com) or message `@ldig` on Discord.
 
-## Building it yourself
+## License
 
-You need [Node.js](https://nodejs.org).
-
-```bash
-npm install
-```
-
-```bash
-npm start
-```
-
-To package it, run `npm run dist` on Windows or `npm run dist:mac` on a Mac.
-
-`npm run release` publishes the Windows files, then `.github/workflows/mac.yml` builds, tests and attaches the Mac files on GitHub's Mac machines.
+Glassy isn't open source. You're welcome to download and use it, but the code, design and name aren't free to copy. See [LICENSE](LICENSE).

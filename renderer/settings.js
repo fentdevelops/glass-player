@@ -179,7 +179,8 @@
       <div class="set-sec"><h4>Sound</h4>${soundHTML()}</div>
       <div class="set-sec"><h4>Playback</h4>${playbackHTML()}</div>
       <div class="set-sec"><h4>Updates</h4>
-        <div class="set-row"><div><b>Glassy ${esc(window.Updates?.state().version || '')}</b><span data-upd>${esc(window.Updates ? Updates.label() : 'Glass updates itself')}</span></div></div></div>
+        <div class="set-row"><div><b>Glassy ${esc(window.Updates?.state().version || '')}</b><span data-upd>${esc(window.Updates ? Updates.label() : 'Glass updates itself')}</span></div>
+          <button type="button" class="btn" data-upd-btn>Check</button></div></div>
       <div class="set-sec" data-news><h4>What's new</h4>${window.PatchNotes ? PatchNotes.html() : ''}</div>
       </div>
       <div class="modal-actions"><span class="grow"></span><button type="submit" class="btn primary">Done</button></div>`, {
@@ -191,8 +192,19 @@
         }, 380);
         mountGlass(form);
         mountAudio(form);
-        const updLine = form.querySelector('[data-upd]');
-        if (window.Updates) Updates.onChange = (s) => { if (updLine.isConnected) updLine.textContent = Updates.label(s); };
+        const updLine = form.querySelector('[data-upd]'), updBtn = form.querySelector('[data-upd-btn]');
+        if (window.Updates) {
+          const paintUpd = (s) => {
+            if (!updLine.isConnected) return;
+            updLine.textContent = Updates.label(s);
+            updBtn.textContent = Updates.button(s);
+            updBtn.disabled = Updates.busy(s);
+          };
+          Updates.onChange = paintUpd;
+          paintUpd(Updates.state());
+          updBtn.addEventListener('click', () => Updates.press());
+          if (Updates.stale()) Updates.check();
+        } else updBtn.hidden = true;
       },
       onSubmit() { save(); },
     });

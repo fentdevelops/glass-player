@@ -722,21 +722,25 @@ let updateState = { state: 'idle', version: app.getVersion() };
 const sendUpdate = (patch) => { updateState = { ...updateState, ...patch }; win?.webContents.send('update', updateState); };
 const newer = (a, b) => { const pa = String(a).replace(/^v/, '').split(/[.-]/).map(Number), pb = String(b).replace(/^v/, '').split(/[.-]/).map(Number);
   for (let i = 0; i < 3; i++) { if ((pa[i] || 0) !== (pb[i] || 0)) return (pa[i] || 0) > (pb[i] || 0); } return false; };
-let autoUpdater = null, lastCheck = 0;
+let autoUpdater = null, lastCheck = 0, checkGuard = 0;
+const upToDate = () => sendUpdate({ state: 'current', checkedAt: Date.now() });
 async function checkUpdates(manual = false) {
-  if (!ghPub || !app.isPackaged || process.env.GLASS_SHOT) { if (manual) sendUpdate({ state: 'off' }); return; }
-  // an update already on its way (or waiting for a restart) isn't looked for again
-  const busy = ['downloading', 'ready'].includes(updateState.state) || (updateState.state === 'checking' && Date.now() - lastCheck < 5 * 60e3);
-  if (!manual && busy) return;
+  if (!ghPub || !app.isPackaged || (process.env.GLASS_SHOT && !process.env.GLASS_TEST_UPDATES)) { if (manual) sendUpdate({ state: 'off' }); return; }
+  // an update already on its way (or waiting for a restart) isn't looked for again, even by the Check button
+  if (['downloading', 'ready'].includes(updateState.state)) return;
+  if (!manual && updateState.state === 'checking' && Date.now() - lastCheck < 5 * 60e3) return;
   lastCheck = Date.now();
+  // GitHub not answering shouldn't leave "Checking…" on screen forever
+  clearTimeout(checkGuard);
+  checkGuard = setTimeout(() => { if (updateState.state === 'checking') sendUpdate({ state: 'error', message: "GitHub didn't answer" }); }, 30000);
   try {
     if (manualUpdates) {
-      sendUpdate({ state: 'checking' });
+      if (updateState.state !== 'manual') sendUpdate({ state: 'checking' });   // the "is out" card stays put while it looks again
       const r = await fetch(`https://api.github.com/repos/${ghPub.owner}/${ghPub.repo}/releases/latest`, { headers: { 'User-Agent': 'GlassPlayer', Accept: 'application/vnd.github+json' }, signal: AbortSignal.timeout(10000) });
       if (!r.ok) throw new Error('HTTP ' + r.status);
       const j = await r.json();
       if (newer(j.tag_name, app.getVersion())) sendUpdate({ state: 'manual', next: String(j.tag_name).replace(/^v/, ''), url: j.html_url });
-      else sendUpdate({ state: 'current' });
+      else upToDate();
       return;
     }
     if (!autoUpdater) {
@@ -745,11 +749,11 @@ async function checkUpdates(manual = false) {
       autoUpdater.autoInstallOnAppQuit = true;
       autoUpdater.on('checking-for-update', () => sendUpdate({ state: 'checking' }));
       autoUpdater.on('update-available', (i) => sendUpdate({ state: 'downloading', next: i.version, percent: 0 }));
-      autoUpdater.on('update-not-available', () => sendUpdate({ state: 'current' }));
+      autoUpdater.on('update-not-available', upToDate);
       autoUpdater.on('download-progress', (p) => sendUpdate({ state: 'downloading', percent: Math.round(p.percent || 0) }));
       autoUpdater.on('update-downloaded', (i) => sendUpdate({ state: 'ready', next: i.version }));
       // no release on GitHub yet counts as up to date, not as a failed check
-      autoUpdater.on('error', (e) => { const m = String((e && e.message) || e); sendUpdate(/No published versions/i.test(m) ? { state: 'current' } : { state: 'error', message: m.split('\n')[0].slice(0, 160) }); });
+      autoUpdater.on('error', (e) => { const m = String((e && e.message) || e); sendUpdate(/No published versions/i.test(m) ? { state: 'current', checkedAt: Date.now() } : { state: 'error', message: m.split('\n')[0].slice(0, 160) }); });
     }
     await autoUpdater.checkForUpdates();
   } catch (e) { sendUpdate({ state: 'error', message: String((e && e.message) || e).split('\n')[0].slice(0, 160) }); }

@@ -1,6 +1,6 @@
 {
   "name": "glass-player",
-  "version": "0.2.15",
+  "version": "0.2.16",
   "description": "Liquid glass music and video player",
   "main": "main.js",
   "scripts": {
@@ -10,8 +10,9 @@
     "dist:portable": "electron-builder --win portable",
     "release": "node scripts/release.js"
   },
-  "author": "",
-  "license": "ISC",
+  "author": "fent",
+  "license": "UNLICENSED",
+  "private": true,
   "type": "commonjs",
   "devDependencies": {
     "electron": "44.10.2",
@@ -96,7 +97,7 @@
     "publish": [
       {
         "provider": "github",
-        "owner": "pxlarized2",
+        "owner": "fentdevelops",
         "repo": "glass-player",
         "releaseType": "release"
       }

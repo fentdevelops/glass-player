@@ -108,9 +108,16 @@
     _news: (before) => showCard(state.version || '?', PatchNotes.since(before)),   // dev/tests only
     check: () => up.check(),
     onChange: null,
+    // the button next to the version in Settings
+    button: (s = state) => (s.state === 'ready' ? 'Restart' : s.state === 'manual' ? 'Download' : 'Check'),
+    press(s = state) { if (s.state === 'ready') up.install(); else if (s.state === 'manual') up.open(); else up.check(); },
+    busy: (s = state) => s.state === 'checking' || s.state === 'downloading',
+    // Settings looks again when it opens, so "up to date" is never an old answer
+    stale: (s = state) => !['checking', 'downloading', 'ready'].includes(s.state) && Date.now() - (s.checkedAt || 0) > 60e3,
     label(s = state) {
+      const ago = (ts) => { const m = Math.floor((Date.now() - ts) / 60e3); return m < 1 ? 'just now' : m < 60 ? `${m} min ago` : `${Math.floor(m / 60)} hr ago`; };
       return {
-        off: 'Updates turn on once Glassy is published on GitHub', idle: 'Not checked yet', checking: 'Checking…', current: "You're up to date",
+        off: 'Updates are off in this copy', idle: 'Not checked yet', checking: 'Checking…', current: `You're up to date${s.checkedAt ? `, checked ${ago(s.checkedAt)}` : ''}`,
         downloading: `Downloading ${s.next || ''}… ${s.percent || 0}%`, ready: `Version ${s.next || ''} is ready. Restart to update.`,
         manual: `Version ${s.next || ''} is out`, error: `Couldn't check: ${s.message || 'unknown error'}`,
       }[s.state] || '';

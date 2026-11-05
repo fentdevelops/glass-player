@@ -8,6 +8,8 @@
     <rect width="96" height="64" rx="12" fill="url(#pn${id})"/><rect width="96" height="64" rx="12" fill="url(#pg${id})"/>
     <g fill="none" stroke="#fff" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round">${body}</g></svg>`;
   const NOTES = [
+    { v: '0.2.16', title: 'Check for updates yourself', text: 'Settings has a Check button next to the version. It also looks again whenever you open Settings and says when it last checked.',
+      art: wash(37, '<circle cx="48" cy="32" r="16"/><path d="m40 32 6 6 11-12"/>') },
     { v: '0.2.15', title: 'Change a cover everywhere', text: 'Editing a cover now shows every other song with that exact picture, and one switch changes them all at once.',
       art: wash(35, '<rect x="18" y="20" width="26" height="26" rx="5"/><rect x="35" y="15" width="26" height="26" rx="5" fill="rgba(255,255,255,.18)"/><rect x="52" y="20" width="26" height="26" rx="5"/>') },
     { v: '0.2.15', title: 'Glassy on Mac', text: 'Glassy now runs on Mac too, with the system\u2019s own window buttons and blur, and the \u2318 key for shortcuts.',

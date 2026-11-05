@@ -3,7 +3,7 @@
 A liquid-glass music and video player for Windows and Mac (Electron). This file lists everything built so far,
 how to use it, where it lives in the code, and what's still waiting on you.
 
-**Current version:** 0.2.15 · **Code:** https://github.com/pxlarized2/glass-player (public) · **Releases:** the repo's Releases page. Installed copies update themselves from there.
+**Current version:** 0.2.16 · **Code:** https://github.com/fentdevelops/glass-player (public) · **Releases:** the repo's Releases page. Installed copies update themselves from there.
 
 ---
 
@@ -12,6 +12,17 @@ how to use it, where it lives in the code, and what's still waiting on you.
 | What | Why | How |
 |---|---|---|
 | Check the window corners | The rounded-corner fix was checked off-screen only | Look at the four corners of the installed Glass on your screen |
+
+---
+
+## 0.2.16: a Check button for updates
+
+- **Settings → Updates** has a **Check** button next to the version. It turns into **Restart** when an update is ready and **Download** when the app can't update itself.
+- **"Up to date" is never an old answer.** It was showing the result of the last automatic check, up to 30 minutes old. Settings now looks again when it opens and says when it last checked.
+- **A check GitHub never answers** stops saying "Checking…" after 30 seconds.
+- **Moved:** the GitHub account is now `fentdevelops`. New copies look for updates there.
+- **License:** all rights reserved (see `LICENSE`). It used to say ISC, which would have let anyone copy it.
+- **Removed:** `start.bat`, a leftover shortcut for running from source. The app is the `.exe` on the releases page.
 
 ---
 
@@ -226,7 +237,7 @@ how to use it, where it lives in the code, and what's still waiting on you.
 - **Scrollbars are a white floating pill** (Settings, Edit info and every other sheet): no track, no arrows, clear of the edges.
 
 ### Public repo and updates (0.2.1)
-- **The code is public** at https://github.com/pxlarized2/glass-player, checked for passwords, keys, tokens and personal paths first (none, in any commit).
+- **The code is public** at https://github.com/fentdevelops/glass-player, checked for passwords, keys, tokens and personal paths first (none, in any commit).
 - **Glass updates itself.** It checks GitHub 8 s after it opens and every 3 hours, downloads a new version in the background, and installs it when you restart (the popup bottom right has **Restart to update**) or the next time you close Glass. The portable exe can't replace itself, so it offers the download page instead.
 - **Fixed: updates never switched on.** The packaged app has no `build` section in its package.json, so Glass couldn't see where to look. It now reads the repo from `resources/app-update.yml`, which every build carries. 0.2.0 had this bug, so 0.2.0 → 0.2.1 was installed by hand; later versions arrive by themselves.
 - **"Glass updated" card:** the first time a new version opens, a glass card bottom right shows what's new (up to three changes with their pictures). **All changes** opens Settings at What's new. It leaves by itself after 20 s unless you're hovering it, and shows once per version. A fresh install doesn't show it.
