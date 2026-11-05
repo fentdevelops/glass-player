@@ -30,7 +30,7 @@
       ${chips('ui.wall', [['art', 'Artwork'], ['colors', 'Colours'], ['custom', 'Your image']])}
       <div class="set-row set-wall" data-wall-row><div><b>Your image</b><span data-wall-hint></span></div>
         <button type="button" class="btn" data-act="wallpaper">Choose image…</button></div>
-      <div class="set-row"><div><b>Background blur <em class="set-val" data-wallblur></em></b><span>How soft the picture behind the glass looks</span></div>
+      <div class="set-row set-blur" data-blur-row><div><b>Background blur <em class="set-val" data-wallblur></em></b><span>How soft the picture behind the glass looks</span></div>
         <input type="range" class="range" min="0" max="40" step="1" data-ui="wallBlur" /></div>
       ${toggle('ui.quickEdit', 'Quick edits', 'Right-click the cover to change it. Double-click the title, artist or album to rename it.')}
       <div class="set-row"><div><b>See-through window</b><span data-transp>Checking Windows…</span></div>
@@ -152,7 +152,14 @@
         wallHint.textContent = `${w} × ${h}` + (wide && sharp ? ' · sharp and 16:9, looks great'
           : !sharp ? ' · a 16:9 picture of 1920 × 1080 or more looks sharper' : ' · not 16:9, so the edges get cropped');
       }
-      blurVal.textContent = `${S.ui.wallBlur} px`;
+      // the slider belongs to the background that's on: the artwork has its own blur (max to start), your image its own;
+      // the colours background has nothing to blur, so there's no slider for it
+      const key = S.ui.wall === 'custom' ? 'wallBlur' : 'wallBlurArt';
+      form.querySelector('[data-blur-row]').classList.toggle('off', S.ui.wall === 'colors');
+      blurRange.dataset.ui = key;
+      blurRange.value = S.ui[key];
+      setFill(blurRange);
+      blurVal.textContent = `${S.ui[key]} px`;
     };
     const pickWall = async () => {
       const r = await api.pickWallpaper(S.ui.wallImg || null).catch((e) => { toast(cleanErr(e), true); return null; });
@@ -160,11 +167,12 @@
       else if (!S.ui.wallImg) S.ui.wall = 'colors';         // nothing picked and nothing from before: back to the default
       applyUi(); save(); paintWall();
     };
-    form.querySelector('[data-chips="ui.wall"]').addEventListener('click', () => {
+    // after the chip's own handler has stored the choice (it's added later, so it runs after this one)
+    form.querySelector('[data-chips="ui.wall"]').addEventListener('click', () => setTimeout(() => {
       if (S.ui.wall === 'custom' && !S.ui.wallImg) pickWall(); else paintWall();
-    });
+    }));
     form.querySelector('[data-act="wallpaper"]').addEventListener('click', pickWall);
-    blurRange.addEventListener('input', () => { blurVal.textContent = `${S.ui.wallBlur} px`; });
+    blurRange.addEventListener('input', () => { blurVal.textContent = `${S.ui[blurRange.dataset.ui]} px`; });
     paintWall();
   }
 

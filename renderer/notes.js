@@ -8,6 +8,12 @@
     <rect width="96" height="64" rx="12" fill="url(#pn${id})"/><rect width="96" height="64" rx="12" fill="url(#pg${id})"/>
     <g fill="none" stroke="#fff" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round">${body}</g></svg>`;
   const NOTES = [
+    { v: '0.2.5', title: 'Calm, smooth glass', text: 'The background holds still once a song’s colours settle, so the glass edges stop flickering and everything runs smoother.',
+      art: wash(18, '<path d="M14 40c10-8 20-8 34 0s24 8 34 0" opacity=".45"/><path d="M14 30h68"/>') },
+    { v: '0.2.5', title: 'Bright covers stay readable', text: 'A white or bright cover dims the background just enough to keep the text clear. Dark covers are untouched.',
+      art: wash(19, '<circle cx="40" cy="32" r="12" fill="#fff" stroke="none"/><path d="M60 26h18M60 34h12"/>') },
+    { v: '0.2.5', title: 'Soft artwork background', text: 'The artwork background starts fully blurred, like coloured light. Your own image keeps its own blur.',
+      art: wash(20, '<circle cx="36" cy="32" r="14" fill="rgba(255,255,255,.25)" stroke="none"/><circle cx="60" cy="30" r="16" fill="rgba(255,255,255,.18)" stroke="none"/>') },
     { v: '0.2.4', title: 'Fullscreen fits your screen', text: 'Cover on the left, lyrics on the right, centred and sized for big screens.',
       art: wash(14, '<rect x="14" y="16" width="26" height="26" rx="5"/><path d="M50 20h32M50 29h26M50 38h30"/><path d="M8 52h80" opacity=".5"/>') },
     { v: '0.2.4', title: 'The glass takes the cover in', text: 'When the lyrics need room, the cover sinks into their glass and surfaces small in the corner, sharp all the way.',

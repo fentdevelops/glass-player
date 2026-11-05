@@ -3,7 +3,7 @@
 A liquid-glass music and video player for Windows (Electron). This file lists everything built so far,
 how to use it, where it lives in the code, and what's still waiting on you.
 
-**Current version:** 0.2.4 · **Code:** https://github.com/pxlarized2/glass-player (public) · **Releases:** the repo's Releases page. Installed copies update themselves from there.
+**Current version:** 0.2.5 · **Code:** https://github.com/pxlarized2/glass-player (public) · **Releases:** the repo's Releases page. Installed copies update themselves from there.
 
 ---
 
@@ -220,6 +220,12 @@ how to use it, where it lives in the code, and what's still waiting on you.
 ### Smooth resizing (0.2.2)
 - **Cards:** card grids (Library playlists, artists, albums) used to stretch wider while their rows kept the old height, so cards overlapped, then snapped into a new grid 140 ms after you stopped. Now every frame of a drag gives the rows the cards’ real height, and when a column comes or goes the cards glide from where they were to their new spots. A width sweep from 380 to 960 px and back (117 frames) found no overlap at any frame.
 - **Lyrics:** the space above and below the lines came from the panel’s width, so the whole text slid up and down as you dragged. It now comes from the stage’s height, and on every size change the sung line is put back exactly where it was (plain lyrics keep their place in the text). Measured: the sung line stays within 6 px across every width, including the switch to and from the corner layout.
+
+### Calm glass, bright covers, soft artwork (0.2.5)
+- **Glass edges no longer flicker.** The colour wash behind everything was repainted 24 times a second, drifting and pulsing with the beat. Each repaint made every glass panel redo its blur and bent rim, and the rims bend whatever is behind them, so dark parts of the cover (a figure in the artwork) flickered along the bottom edges. It also cost a lot of frame rate on big screens. The wash now only moves while it glides to a new song’s colours (about 3 s) or follows a video; once settled it holds still (measured: 0 repaints in 4 s of playback, was about 100).
+- **Bright covers stay readable.** Glass measures each cover’s brightness and, only for bright ones, darkens the background behind the glass and stops the glass brightening what’s behind it, easing in with the song’s colours. A white cover becomes a soft grey glow with clear white text; normal and dark covers are left exactly as they were. Not applied with your own image as the background.
+- **Soft artwork background.** The artwork background has its own blur, at the maximum to start, so it reads as coloured light. Your own image keeps its own blur (low to start), and the Colours background has no blur slider at all. Upgrading keeps any blur you chose; an untouched old default moves to the new maximum.
+- Fixed: picking a background in Settings now updates the blur slider (and opens the image picker for Your image) on the first click.
 
 ### Fullscreen, the glass taking the cover in, Windows controls (0.2.4)
 - **Fullscreen fits the screen.** Hiding the title bar left the content in its 0 px row, so everything hung from the top edge. The content now spans the whole screen; on big stages (1500 px wide and 1000 px tall and up) the cover sits on the left and the lyrics on the right, centred, larger, and clear of the floating player bar. The black background is only behind videos now; music keeps the glass background.

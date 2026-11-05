@@ -43,7 +43,8 @@ const S = {
   wide: false,
   // Settings > Glass (style: liquid | frosted, wall: art | colors | custom). A new install starts clean: the colour
   // background, no extra darkness, no background blur. Saved settings always win over these.
-  ui: { glow: 55, tint: 0, tintColor: '', style: 'liquid', wall: 'colors', quickEdit: true, zoom: 1, wallBlur: 0, wallImg: '', wallImgSize: '' },
+  // wallBlurArt: blur behind the artwork background (max, so it reads as coloured light); wallBlur: behind your own image
+  ui: { glow: 55, tint: 0, tintColor: '', style: 'liquid', wall: 'colors', quickEdit: true, zoom: 1, wallBlurArt: 40, wallBlur: 0, wallImg: '', wallImgSize: '' },
   albumArt: {},             // album key -> { cover, thumb } made when songs are dragged together
   tags: [],                 // [{ id, name, emoji, color }] (tags.js)
   songTags: {},             // path -> [tag ids]
@@ -63,7 +64,8 @@ function applyUi() {
   r.setProperty('--glow', g.toFixed(2));
   r.setProperty('--tint-a', (0.08 + t * 0.5).toFixed(3));
   r.setProperty('--tint-b', (0.18 + t * 0.5).toFixed(3));
-  r.setProperty('--wall-blur', Math.max(0, Math.min(40, +S.ui.wallBlur || 0)) + 'px');   // Settings > Glass > Background blur
+  const blur = S.ui.wall === 'custom' ? S.ui.wallBlur : S.ui.wallBlurArt;
+  r.setProperty('--wall-blur', Math.max(0, Math.min(40, +blur || 0)) + 'px');   // Settings > Glass > Background blur (per background)
   // Settings > Glass > Glass colour: a light tint on every panel, and the dark layer behind leans the same way
   const m = /^#([0-9a-f]{6})$/i.exec(S.ui.tintColor || '');
   if (m) {
@@ -214,6 +216,7 @@ function hsl(h, s, l) {
   return [f(0), f(8), f(4)].map((v) => Math.round(v * 255));
 }
 function paletteFromSeed(seed) {
+  dimTarget = 0;
   const h = hueFrom(seed);
   palTarget = [hsl(h, 45, 55), hsl((h + 40) % 360, 40, 45), hsl((h + 320) % 360, 45, 50), hsl((h + 180) % 360, 30, 45), hsl(h, 20, 18)];
 }
@@ -241,6 +244,7 @@ function paletteFromImage(src, seed) {
     }
     const picked = buckets.filter((b) => b.n > 2).sort((a, b) => b.w - a.w).slice(0, 4).map((b) => [b.r / b.n, b.g / b.n, b.b / b.n]);
     const avg = [ar / n, ag / n, ab / n];
+    dimTarget = dimFor(avg);
     while (picked.length < 4) picked.push(avg);
     picked.push(avg.map((v) => v * 0.3));
     palTarget = picked.map((c) => c.map((v) => Math.round(v)));
@@ -249,9 +253,30 @@ function paletteFromImage(src, seed) {
   img.src = src;
 }
 let level = 0;
+// The colour wash behind the glass. Every change to it makes every glass panel redo its blur and bent rim, so it
+// only moves while it has somewhere to go: gliding to a new song's colours (or following a video). Once the colours
+// have settled it holds still. It used to drift and pulse with the beat 24 times a second, which made the glass rims
+// flicker (they bend whatever is behind them) and cost a lot of frame rate on big screens.
+let ambClock = 0, ambLast = 0;
+// Bright covers (a white one, say) would turn the background, and the see-through glass on it, nearly white, and the
+// white text with it. So the background behind the glass is dimmed just enough to keep text readable, only for
+// bright covers; normal and dark ones are left exactly as they are. It eases with the colours on each new song.
+// Not with your own image as background: the cover says nothing about how bright that picture is.
+let dim = 0, dimTarget = 0;
+function dimFor([r, g, b]) {
+  const y = (0.2126 * r + 0.7152 * g + 0.0722 * b) / 255;
+  return Math.max(0, Math.min(1, (y - 0.45) / 0.35)) * 0.62;
+}
+const dimNow = () => (S.ui.wall === 'custom' ? 0 : dimTarget);
+const ambSettled = () => Math.abs(dimNow() - dim) < 0.004 && pal.every((c, i) => c.every((v, k) => Math.abs(palTarget[i][k] - v) < 0.6));
 function drawAmbient(ts) {
-  const w = amb.width, h = amb.height, t = ts / 1000;
-  for (let i = 0; i < pal.length; i++) for (let k = 0; k < 3; k++) pal[i][k] += (palTarget[i][k] - pal[i][k]) * 0.04;
+  const w = amb.width, h = amb.height;
+  ambClock += Math.min(0.05, Math.max(0, (ts - (ambLast || ts)) / 1000));   // the wash's own clock: stands still while it rests
+  ambLast = ts;
+  const t = ambClock;
+  for (let i = 0; i < pal.length; i++) for (let k = 0; k < 3; k++) pal[i][k] += (palTarget[i][k] - pal[i][k]) * 0.07;   // ~3 s to a new song's colours
+  dim += (dimNow() - dim) * 0.07;
+  document.documentElement.style.setProperty('--dim', dim.toFixed(3));
   const base = pal[4];
   actx.globalCompositeOperation = 'source-over';
   actx.fillStyle = `rgb(${base[0]} ${base[1]} ${base[2]})`;
@@ -261,7 +286,7 @@ function drawAmbient(ts) {
   for (const b of blobs) {
     const x = w * (0.5 + 0.45 * Math.sin(t * b.sx + b.ph));
     const y = h * (0.5 + 0.42 * Math.cos(t * b.sy * 1.3 + b.ph * 2));
-    const r = b.r * w * (1 + level * 0.25);
+    const r = b.r * w;
     const c = pal[b.c];
     const g = actx.createRadialGradient(x, y, 0, x, y, r);
     g.addColorStop(0, `rgb(${c[0]} ${c[1]} ${c[2]} / .7)`);
@@ -305,7 +330,9 @@ function tick(ts) {
   const target = readLevel();
   level += (target - level) * (target > level ? 0.3 : 0.07);
   if (body.classList.contains('has-track') && !body.classList.contains('wide')) artEl.style.scale = (1 + level * 0.035).toFixed(4);
-  if (ts - lastAmb > 42) { lastAmb = ts; drawAmbient(ts); }
+  const ambLive = body.classList.contains('is-video') || !ambSettled() || !lastAmb;   // !lastAmb: the very first paint
+  if (ambLive && ts - lastAmb > 42) { lastAmb = ts; drawAmbient(ts); }
+  else if (!ambLive) ambLast = 0;
   window.Extras?.drift?.(ts);
   const d = deck.duration;
   if (!seeking && d && isFinite(d) && !deck.paused) {
@@ -2485,6 +2512,9 @@ async function restore() {
   S.queue = (s.queue || []).map((p) => lib.get(p)).filter(Boolean);
   // only the settings Glass has (S.ui's keys) are taken from a saved state
   if (s.ui && typeof s.ui === 'object') for (const k of Object.keys(S.ui)) if (k in s.ui) S.ui[k] = s.ui[k];
+  // from before blur was set per background: an untouched old default (3) moves to the new max, a blur someone
+  // picked on purpose is kept for the artwork
+  if (s.ui && 'wallBlur' in s.ui && !('wallBlurArt' in s.ui)) S.ui.wallBlurArt = +s.ui.wallBlur === 3 ? 40 : +s.ui.wallBlur;
   if (s.albumArt) S.albumArt = s.albumArt;
   if (Array.isArray(s.tags)) S.tags = s.tags;
   if (s.songTags && typeof s.songTags === 'object') S.songTags = s.songTags;

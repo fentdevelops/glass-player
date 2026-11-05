@@ -1,13 +1,11 @@
-## Glass 0.2.4
+## Glass 0.2.5
 
-**Fullscreen fits your screen.** The cover sits on the left and the lyrics on the right, centred and sized for big screens, instead of hanging from the top edge. Music keeps the glass background in fullscreen.
+**Calm, smooth glass.** The colour wash behind the glass used to move and pulse with the beat many times a second, which made the glass edges flicker and cost frame rate on big screens. It now glides to each new song's colours and then holds still.
 
-**The glass takes the cover in.** When the lyrics need the room, the cover sinks into their glass and surfaces small in the corner with a ripple, sharp the whole way. Widening lets it rise back out.
+**Bright covers stay readable.** A white or bright cover dims the background just enough to keep white text clear. Normal and dark covers are left exactly as they were.
 
-**Windows media controls.** The volume and lock-screen pop-up shows the cover, and hovering Glass on the taskbar gives you previous, play/pause and next buttons.
+**Soft artwork background.** The artwork background starts fully blurred, like coloured light behind the glass. Your own image keeps its own blur, and if you'd picked a blur yourself, it's kept.
 
-**Updates install quietly.** Restart to update now installs in the background and Glass opens again by itself.
+**Also:** choosing a background in Settings updates the blur slider right away.
 
-**Also:** new installs start clean (colour background, no extra darkness or blur, Even out volume on), and the quality line under the song title shows right away after a restart.
-
-Installed copies update themselves. New install: download `Glass-Player-Setup-0.2.4.exe` below.
+Installed copies update themselves. New install: download `Glass-Player-Setup-0.2.5.exe` below.
