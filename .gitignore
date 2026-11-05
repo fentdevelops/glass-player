@@ -7,3 +7,5 @@ dist-*/
 # private research (legal and backend notes): kept on this PC, never in the public repo
 research_notes/
 reports/
+# the iPhone handoff describes the user and local paths: kept on this PC, not in the public repo
+docs/ios/

@@ -1,9 +1,9 @@
 # Glassy: what's been built
 
-A liquid-glass music and video player for Windows (Electron). This file lists everything built so far,
+A liquid-glass music and video player for Windows and Mac (Electron). This file lists everything built so far,
 how to use it, where it lives in the code, and what's still waiting on you.
 
-**Current version:** 0.2.14 · **Code:** https://github.com/pxlarized2/glass-player (public) · **Releases:** the repo's Releases page. Installed copies update themselves from there.
+**Current version:** 0.2.15 · **Code:** https://github.com/pxlarized2/glass-player (public) · **Releases:** the repo's Releases page. Installed copies update themselves from there.
 
 ---
 
@@ -12,6 +12,31 @@ how to use it, where it lives in the code, and what's still waiting on you.
 | What | Why | How |
 |---|---|---|
 | Check the window corners | The rounded-corner fix was checked off-screen only | Look at the four corners of the installed Glass on your screen |
+
+---
+
+## 0.2.15: Glassy on Mac, and one cover for every song that shares it
+
+### Change a cover everywhere
+
+- **Where:** on top of Edit info, Edit album, and Adjust cover when you right-click the big cover.
+- **What it shows:** how many other songs have that exact picture (same thumbnail file contents), with their names. Click it to see the whole list.
+- **The switch:** "Change all N at once" puts the new cover on all of them when you save. One Ctrl+Z puts them all back. Off by default.
+- It stays hidden when no other song has that picture. Covers are saved in Glassy for the other songs; only the song you are editing can write into its MP3 file.
+
+### Covers in the media pop-up
+
+- The system refuses pictures given as a file on disk, so the pop-up never got the cover. It now receives the picture itself.
+
+### Mac
+
+- **Window:** the system's own traffic-light buttons and blur behind the window, always in dark mode so white text stays readable. The gear sits top right.
+- **Keys:** ⌘ instead of Ctrl for every shortcut, and the hints on screen say so.
+- **Menu bar:** Quit, copy and paste in text boxes, window controls.
+- **Files:** songs opened from Finder ("Open With", double-click, dropped on the Dock icon) start playing. Library and settings live in `~/Library/Application Support/Glassy`.
+- **Updates:** a card says when a new version is out and opens the download page. Mac apps can only replace themselves once they're signed by an Apple developer account.
+- **Build:** `.github/workflows/mac.yml` builds Apple silicon and Intel copies on GitHub's Mac machines whenever a release is published, tests the built app with `scripts/smoke.js`, then attaches the `.dmg` and `.zip` files to the release.
+- **README:** download table and first-open steps for Mac.
 
 ---
 

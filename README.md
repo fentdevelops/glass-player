@@ -54,6 +54,7 @@ There's no account and no subscription. Glassy doesn't come with any music, it p
 - Edit titles, artists and albums, saved back into your MP3s. Find online fills in the details for you.
 - Real artist suggestions with photos as you type, and collabs split into the people on them.
 - A cover tool: move, zoom, fit, or borrow the art from another song.
+- See every song that shares a cover, and change them all at once.
 - Drag one song onto another to make an album.
 
 ### Lyrics
@@ -70,7 +71,7 @@ There's no account and no subscription. Glassy doesn't come with any music, it p
 - Even out volume, on by default, so quiet songs come up and loud ones settle down.
 - Each song can fade in and out. Speed goes from 0.75× to 2× and keeps the pitch.
 - When the queue runs low, Autoplay adds similar songs from your library.
-- Sleep timer, media keys, and video with fullscreen.
+- Media keys, and video with fullscreen.
 - Music: mp3, m4a, flac, wav, ogg, opus. Video: mp4, m4v, webm, mkv, mov.
 
 ### Updates

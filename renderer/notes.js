@@ -8,6 +8,12 @@
     <rect width="96" height="64" rx="12" fill="url(#pn${id})"/><rect width="96" height="64" rx="12" fill="url(#pg${id})"/>
     <g fill="none" stroke="#fff" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round">${body}</g></svg>`;
   const NOTES = [
+    { v: '0.2.15', title: 'Change a cover everywhere', text: 'Editing a cover now shows every other song with that exact picture, and one switch changes them all at once.',
+      art: wash(35, '<rect x="18" y="20" width="26" height="26" rx="5"/><rect x="35" y="15" width="26" height="26" rx="5" fill="rgba(255,255,255,.18)"/><rect x="52" y="20" width="26" height="26" rx="5"/>') },
+    { v: '0.2.15', title: 'Glassy on Mac', text: 'Glassy now runs on Mac too, with the system\u2019s own window buttons and blur, and the \u2318 key for shortcuts.',
+      art: wash(34, '<rect x="20" y="14" width="56" height="38" rx="7"/><circle cx="29" cy="23" r="2.2" fill="#fff" stroke="none"/><circle cx="37" cy="23" r="2.2" fill="#fff" stroke="none"/><circle cx="45" cy="23" r="2.2" fill="#fff" stroke="none"/>') },
+    { v: '0.2.15', title: 'Covers in the media pop-up', text: 'The volume and lock-screen pop-up now gets the song\u2019s cover. It wasn\u2019t reaching it before.',
+      art: wash(36, '<rect x="26" y="16" width="44" height="32" rx="6"/><rect x="32" y="22" width="14" height="14" rx="3" fill="#fff" stroke="none"/><path d="M51 26h13M51 32h9" opacity=".7"/>') },
     { v: '0.2.14', title: 'Glass Player is now Glassy', text: 'Same app, same library, same everything, with a better name.',
       art: wash(33, '<text x="48" y="41" text-anchor="middle" font-family="Segoe UI" font-weight="700" font-size="24" fill="#fff" stroke="none">G</text>') },
     { v: '0.2.13', title: 'Bright spots stay readable', text: 'A soft shadow now sits over only the bright parts of the background, so a white patch can\u2019t wash out the player while everything else keeps its colour.',
