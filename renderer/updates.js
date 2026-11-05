@@ -24,13 +24,13 @@
     if (small) {
       pop.innerHTML = `<button type="button" class="up-pill" data-big>${ICON}<span>${s.state === 'ready' ? 'Update ready' : 'Update available'}</span></button>`;
     } else if (s.state === 'downloading') {
-      pop.innerHTML = `<div class="up-row">${ICON}<div class="up-text"><b>Downloading Glass ${esc(s.next || '')}</b><span>It installs when you restart</span></div></div>
+      pop.innerHTML = `<div class="up-row">${ICON}<div class="up-text"><b>Downloading Glassy ${esc(s.next || '')}</b><span>It installs when you restart</span></div></div>
         <div class="up-bar"><i style="width:${s.percent || 0}%"></i></div>`;
     } else if (s.state === 'ready') {
-      pop.innerHTML = `<div class="up-row">${ICON}<div class="up-text"><b>Glass ${esc(s.next || '')} is ready</b><span>Restart to finish updating</span></div></div>
+      pop.innerHTML = `<div class="up-row">${ICON}<div class="up-text"><b>Glassy ${esc(s.next || '')} is ready</b><span>Restart to finish updating</span></div></div>
         <div class="up-actions"><button type="button" class="btn ghost" data-later>Later</button><button type="button" class="btn primary" data-install>Restart to update</button></div>`;
     } else {
-      pop.innerHTML = `<div class="up-row">${ICON}<div class="up-text"><b>Glass ${esc(s.next || '')} is out</b><span>You're on ${esc(s.version || '')}</span></div></div>
+      pop.innerHTML = `<div class="up-row">${ICON}<div class="up-text"><b>Glassy ${esc(s.next || '')} is out</b><span>You're on ${esc(s.version || '')}</span></div></div>
         <div class="up-actions"><button type="button" class="btn ghost" data-later>Later</button><button type="button" class="btn primary" data-open>Download</button></div>`;
     }
     pop.hidden = false;
@@ -73,7 +73,7 @@
   function showCard(version, notes) {
     if (!notes.length || !pop.hidden) return;
     const shown = notes.slice(0, 3);
-    card.innerHTML = `<div class="wn-head"><div class="up-text"><b>Glass updated to ${esc(version)}</b><span>Here's what's new</span></div>
+    card.innerHTML = `<div class="wn-head"><div class="up-text"><b>Glassy updated to ${esc(version)}</b><span>Here's what's new</span></div>
         <button type="button" class="wn-x" data-wn-x aria-label="Close">${X}</button></div>
       <div class="wn-list">${shown.map((n) => `<div class="wn-item"><div class="wn-art">${n.art}</div><div class="pn-text"><b>${esc(n.title)}</b><span>${esc(n.text)}</span></div></div>`).join('')}</div>
       <div class="up-actions"><button type="button" class="btn ghost" data-wn-x>Close</button><button type="button" class="btn primary" data-wn-all>${notes.length > 3 ? `All ${notes.length} changes` : 'All changes'}</button></div>`;
@@ -110,7 +110,7 @@
     onChange: null,
     label(s = state) {
       return {
-        off: 'Updates turn on once Glass is published on GitHub', idle: 'Not checked yet', checking: 'Checking…', current: "You're up to date",
+        off: 'Updates turn on once Glassy is published on GitHub', idle: 'Not checked yet', checking: 'Checking…', current: "You're up to date",
         downloading: `Downloading ${s.next || ''}… ${s.percent || 0}%`, ready: `Version ${s.next || ''} is ready. Restart to update.`,
         manual: `Version ${s.next || ''} is out`, error: `Couldn't check: ${s.message || 'unknown error'}`,
       }[s.state] || '';

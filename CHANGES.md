@@ -1,9 +1,9 @@
-# Glass Player: what's been built
+# Glassy: what's been built
 
 A liquid-glass music and video player for Windows (Electron). This file lists everything built so far,
 how to use it, where it lives in the code, and what's still waiting on you.
 
-**Current version:** 0.2.13 · **Code:** https://github.com/pxlarized2/glass-player (public) · **Releases:** the repo's Releases page. Installed copies update themselves from there.
+**Current version:** 0.2.14 · **Code:** https://github.com/pxlarized2/glass-player (public) · **Releases:** the repo's Releases page. Installed copies update themselves from there.
 
 ---
 
@@ -161,7 +161,7 @@ how to use it, where it lives in the code, and what's still waiting on you.
 
 ### App icon, installer and Start menu
 - **New app icon:** a liquid-glass tile in the app's colours, with a frosted glass lens and a white play mark. It stays readable down to 16 px. Source: `build/icon.svg`, rendered to `build/icon.png`.
-- **Installer:** `dist-deck/Glass Player Setup 0.2.0.exe` installs for your account (no admin) into `%LOCALAPPDATA%\Programs\Glass Player`. It adds Start menu and desktop shortcuts, so typing "Glass" in Windows search finds it, and an entry in Settings → Apps so it can be uninstalled.
+- **Installer:** `dist-deck/Glassy Setup x.y.z.exe` installs for your account (no admin) into `%LOCALAPPDATA%\Programs\Glass Player`. It adds Start menu and desktop shortcuts, so typing "Glass" in Windows search finds it, and an entry in Settings → Apps so it can be uninstalled.
 
 ### Albums, finding the playing song, video button
 - **Albums start closed** in grouped lists. Click one to open it; it stays open until you close Glass.
@@ -217,6 +217,11 @@ how to use it, where it lives in the code, and what's still waiting on you.
 ### Smooth resizing (0.2.2)
 - **Cards:** card grids (Library playlists, artists, albums) used to stretch wider while their rows kept the old height, so cards overlapped, then snapped into a new grid 140 ms after you stopped. Now every frame of a drag gives the rows the cards’ real height, and when a column comes or goes the cards glide from where they were to their new spots. A width sweep from 380 to 960 px and back (117 frames) found no overlap at any frame.
 - **Lyrics:** the space above and below the lines came from the panel’s width, so the whole text slid up and down as you dragged. It now comes from the stage’s height, and on every size change the sung line is put back exactly where it was (plain lyrics keep their place in the text). Measured: the sung line stays within 6 px across every width, including the switch to and from the corner layout.
+
+### Glassy (0.2.14)
+- Glass Player is now **Glassy**: the window title, Start menu and desktop shortcuts, the installer, the program file and the app’s own messages. Older notes below still say "Glass".
+- The update carries over by itself. It installs into your existing folder (`Programs\Glass Player`, which keeps that name), renames your shortcuts, and your library and settings stay in `%APPDATA%\Glass Player`. New installs go to `Programs\Glassy`, and also keep their data in `%APPDATA%\Glass Player`.
+- The GitHub repo stays `glass-player`, because installed copies use it to find updates.
 
 ### Bright spots stay readable (0.2.13)
 - The artwork and Your image backgrounds get a soft shadow over only their bright parts. Glass makes a tiny brightness map of the picture, once per picture: no shadow up to mid brightness, most of the way for white, spread slightly past the bright area so the soft edge falls outside it. A mostly dark cover with a white patch used to wash out the player bar because its average wasn’t bright; now only the patch is shaded and the rest keeps its full colour. A fully white cover becomes a soft grey as before. Your own image gets this too, which the old dimming had to skip.

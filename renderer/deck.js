@@ -1,5 +1,5 @@
 'use strict';
-// GlassDeck: two-deck playback engine for Glass Player (browser global window.GlassDeck, no deps).
+// GlassDeck: two-deck playback engine for Glassy (browser global window.GlassDeck, no deps).
 //
 // Two <video> elements (they play audio files too) feed one AudioWorklet ("glass-seam", deck-worklet.js)
 // that runs each deck through a few-millisecond delay line. That buffer is what makes album transitions

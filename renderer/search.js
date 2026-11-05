@@ -1,4 +1,4 @@
-/* Glass Player search: typo-tolerant, phonetic-ish matching over title / artist / album / file name.
+/* Glassy search: typo-tolerant, phonetic-ish matching over title / artist / album / file name.
    Browser: window.GlassSearch. Node: module.exports. No dependencies. */
 (function (root, factory) {
   const api = factory();

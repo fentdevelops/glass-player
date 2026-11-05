@@ -178,7 +178,7 @@
       <div class="set-sec"><h4>Sound</h4>${soundHTML()}</div>
       <div class="set-sec"><h4>Playback</h4>${playbackHTML()}</div>
       <div class="set-sec"><h4>Updates</h4>
-        <div class="set-row"><div><b>Glass ${esc(window.Updates?.state().version || '')}</b><span data-upd>${esc(window.Updates ? Updates.label() : 'Glass updates itself')}</span></div></div></div>
+        <div class="set-row"><div><b>Glassy ${esc(window.Updates?.state().version || '')}</b><span data-upd>${esc(window.Updates ? Updates.label() : 'Glass updates itself')}</span></div></div></div>
       <div class="set-sec" data-news><h4>What's new</h4>${window.PatchNotes ? PatchNotes.html() : ''}</div>
       </div>
       <div class="modal-actions"><span class="grow"></span><button type="submit" class="btn primary">Done</button></div>`, {

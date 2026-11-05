@@ -430,7 +430,7 @@ function showNow(animate) {
     $('#nowTitle').title = $('#dockTitle').title = '';
     $('#dockThumb').style.backgroundImage = '';
     $('#dockThumb').classList.add('placeholder');
-    document.title = 'Glass Player';
+    document.title = 'Glassy';
     window.Liquid?.art('');
     lastShown = null;
     window.Lyrics?.track(null);
@@ -444,7 +444,7 @@ function showNow(animate) {
   $('#nowTitle').title = $('#dockTitle').title = `Playing from ${fromLabel()}`;
   $('#nowQ').textContent = typeof qualityText === 'function' ? qualityText(t) : '';
   $('#dockTitle').textContent = title;
-  document.title = `${title} — Glass Player`;
+  document.title = `${title} — Glassy`;
   paintHeart($('#btnFav'), S.favs.has(t.path), false);
   loadCover(t);
 
@@ -2020,7 +2020,7 @@ function editModal(t, { lookup = false } = {}) {
     ${Tags.fieldHTML()}
     ${isMp3
       ? '<label class="check"><input type="checkbox" name="t_tags" checked /><span class="box"></span>Also save into the MP3 file\'s tags</label>'
-      : '<p class="note">Changes are saved in Glass. Writing tags into the file works for MP3 only for now.</p>'}
+      : '<p class="note">Changes are saved in Glassy. Writing tags into the file works for MP3 only for now.</p>'}
     <div class="modal-actions">
       <button type="button" class="btn ghost" data-reset>Remove cover</button>
       <span class="grow"></span>

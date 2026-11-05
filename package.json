@@ -1,6 +1,6 @@
 {
   "name": "glass-player",
-  "version": "0.2.13",
+  "version": "0.2.14",
   "description": "Liquid glass music and video player",
   "main": "main.js",
   "scripts": {
@@ -25,10 +25,10 @@
     "music-metadata": "^12.3.4",
     "node-id3": "^0.2.9"
   },
-  "productName": "Glass Player",
+  "productName": "Glassy",
   "build": {
     "appId": "com.glass.player",
-    "productName": "Glass Player",
+    "productName": "Glassy",
     "files": [
       "main.js",
       "preload.js",
@@ -47,8 +47,8 @@
       "allowToChangeInstallationDirectory": true,
       "createDesktopShortcut": true,
       "createStartMenuShortcut": true,
-      "shortcutName": "Glass Player",
-      "artifactName": "Glass Player Setup ${version}.${ext}"
+      "shortcutName": "Glassy",
+      "artifactName": "Glassy Setup ${version}.${ext}"
     },
     "fileAssociations": [
       {

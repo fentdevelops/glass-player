@@ -1,11 +1,11 @@
 'use strict';
 // npm run release: build the installer + portable copy, then publish them as one GitHub release with
-// build/release-notes.md as its notes. Installed copies of Glass read latest.yml from the newest release
+// build/release-notes.md as its notes. Installed copies read latest.yml from the newest release
 // and update themselves.
 //
 // Why not electron-builder's own publishing: it uploads the two targets at the same time and both try to create
 // the release, so one fails ("Published releases must have a valid tag") and latest.yml can go missing, which
-// leaves every installed Glass blind to the update. Here the release is created once, with every file in it.
+// leaves every installed copy blind to the update. Here the release is created once, with every file in it.
 //
 // Needs the GitHub CLI signed in (gh auth login). Push the commit first: the release is tagged on it.
 const { execFileSync } = require('child_process');
@@ -37,9 +37,9 @@ run(eb, ['--win', 'nsis', 'portable', '--publish', 'never', '-c.directories.outp
 
 // GitHub names assets without spaces; latest.yml already points at the dashed names
 const files = [
-  [`Glass Player Setup ${version}.exe`, `Glass-Player-Setup-${version}.exe`],
-  [`Glass Player Setup ${version}.exe.blockmap`, `Glass-Player-Setup-${version}.exe.blockmap`],
-  [`Glass Player ${version}.exe`, `Glass-Player-${version}.exe`],
+  [`Glassy Setup ${version}.exe`, `Glassy-Setup-${version}.exe`],
+  [`Glassy Setup ${version}.exe.blockmap`, `Glassy-Setup-${version}.exe.blockmap`],
+  [`Glassy ${version}.exe`, `Glassy-${version}.exe`],
   ['latest.yml', 'latest.yml'],
 ];
 const yml = fs.readFileSync(path.join(out, 'latest.yml'), 'utf8');
@@ -48,5 +48,5 @@ const stage = path.join(out, 'upload-' + version);
 fs.mkdirSync(stage, { recursive: true });
 const up = files.map(([from, to]) => { const dest = path.join(stage, to); fs.copyFileSync(path.join(out, from), dest); return dest; });
 
-run(gh, ['release', 'create', tag, ...up, '--title', `Glass ${version}`, '--notes-file', notes, '--target', head, '--latest']);
-console.log(`Published ${tag}: installed copies of Glass will pick it up within half an hour.`);
+run(gh, ['release', 'create', tag, ...up, '--title', `Glassy ${version}`, '--notes-file', notes, '--target', head, '--latest']);
+console.log(`Published ${tag}: installed copies of Glassy will pick it up within half an hour.`);

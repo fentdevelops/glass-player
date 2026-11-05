@@ -1,5 +1,5 @@
 <svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" viewBox="0 0 1024 1024" width="1024" height="1024">
-  <!-- Glass Player app icon: a liquid-glass tile (colour wash like the app's artwork wallpaper)
+  <!-- Glassy app icon: a liquid-glass tile (colour wash like the app's artwork wallpaper)
        with a frosted glass lens in the middle and a white play mark. -->
   <defs>
     <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">

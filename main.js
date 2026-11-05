@@ -10,8 +10,10 @@ const MEDIA_EXT = new Set([...AUDIO_EXT, ...VIDEO_EXT].map((e) => '.' + e));
 
 let win = null;
 
+// Glassy used to be called Glass Player: its library and settings stay in the folder they've always been in.
+// (Windows names that folder after the app, so without this the rename would look like an empty library.)
 // Dev: GLASS_USERDATA isolates test runs from the real library
-if (process.env.GLASS_USERDATA) app.setPath('userData', process.env.GLASS_USERDATA);
+app.setPath('userData', process.env.GLASS_USERDATA || path.join(app.getPath('appData'), 'Glass Player'));
 // Dev: GLASS_SHOT runs render off-screen (no window ever appears, nothing steals focus) and are muted.
 // GLASS_SCREEN needs a real on-screen window, so only that mode shows one; ask the user before using it.
 const OFFSCREEN_TEST = !!process.env.GLASS_SHOT && !process.env.GLASS_SCREEN;
@@ -66,7 +68,7 @@ function createWindow() {
     // effects off, acrylic is just solid grey and can cost the rounded corners, so a solid dark window is used.
     ...(transparencyOn() ? { backgroundColor: '#00000000', backgroundMaterial: 'acrylic' } : { backgroundColor: '#15151b' }),
     show: false,
-    title: 'Glass Player',
+    title: 'Glassy',
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
       contextIsolation: true,
