@@ -3,7 +3,7 @@
 A liquid-glass music and video player for Windows (Electron). This file lists everything built so far,
 how to use it, where it lives in the code, and what's still waiting on you.
 
-**Current version:** 0.2.8 · **Code:** https://github.com/pxlarized2/glass-player (public) · **Releases:** the repo's Releases page. Installed copies update themselves from there.
+**Current version:** 0.2.9 · **Code:** https://github.com/pxlarized2/glass-player (public) · **Releases:** the repo's Releases page. Installed copies update themselves from there.
 
 ---
 
@@ -217,6 +217,11 @@ how to use it, where it lives in the code, and what's still waiting on you.
 ### Smooth resizing (0.2.2)
 - **Cards:** card grids (Library playlists, artists, albums) used to stretch wider while their rows kept the old height, so cards overlapped, then snapped into a new grid 140 ms after you stopped. Now every frame of a drag gives the rows the cards’ real height, and when a column comes or goes the cards glide from where they were to their new spots. A width sweep from 380 to 960 px and back (117 frames) found no overlap at any frame.
 - **Lyrics:** the space above and below the lines came from the panel’s width, so the whole text slid up and down as you dragged. It now comes from the stage’s height, and on every size change the sung line is put back exactly where it was (plain lyrics keep their place in the text). Measured: the sung line stays within 6 px across every width, including the switch to and from the corner layout.
+
+### Bars that follow the music, lyrics as one motion (0.2.9)
+- **The bars on the playing song react to the sound.** They were a looping animation. Now the first bar follows the low end (808s, kicks), the second the middle (vocals, snares), the third the top (hi-hats, ticks). Each band is measured against its own recent loudest and quietest, so quiet hats still move their bar fully and a long 808 doesn’t pin it at the top. Checked with a test track of 2 kicks and 8 hi-hats a second: the low bar moved 2 times a second and the top bar 8. When paused they settle low.
+- **Lyrics open and close as one motion.** The cover, title and glass panel share one curve and timing, a gentle start and a soft landing (the old curve was most of the way there in a quarter of its time, which looked like snapping). The panel only moves and fades: the extra blur on top of its glass is gone. The cover’s glass frame is fitted before the first frame, so it no longer swaps partway through, which was the click.
+- **Closing from the corner layout:** the cover rises over the fading panel instead of under it, the title fades in with it instead of appearing at once, and the lyrics header no longer jumps. **Opening into the corner layout** stays sharp the same way, with the title fading out.
 
 ### Simpler playback (0.2.8)
 - Settings → Playback is down to **Fade in and out**. The rest is simply how Glass behaves now: clicking the song that’s playing restarts it, Autoplay is always on, songs run straight into each other with no crossfade, and play and pause have no audible fade (a 0.04 s ramp only stops the click). Old choices for these are cleared when Glass starts.

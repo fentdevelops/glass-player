@@ -307,11 +307,13 @@ deck.ready.then(() => {
     const out = Sound.build(deck.ctx, bus);
     out.connect(analyser);
     out.connect(master);
+    startBars(out);
   } catch (err) {
     console.error('sound chain', err);
     try { bus.disconnect(); } catch {}
     bus.connect(analyser);
     bus.connect(master);
+    startBars(bus);
   }
 });
 function readLevel() {
@@ -320,6 +322,51 @@ function readLevel() {
   let s = 0;
   for (let i = 1; i < 9; i++) s += freq[i];
   return Math.max(0, (s / 8 / 255 - 0.35) / 0.65);
+}
+
+// ---------- the bars on the playing song's cover ----------
+// They follow the music itself: the first bar is the low end (808s, kicks), the second the middle (vocals, snares), the
+// third the top (hi-hats, ticks). Each band is measured against its own recent loudest and quietest, so a quiet hat
+// pattern still moves its bar all the way and a long 808 doesn't just pin it at the top.
+let barsAn = null, barsBuf = null, barEls = [], barFind = 0, barLast = 0;
+const barBands = [[35, 140], [300, 2500], [5000, 14000]].map((hz) => ({ hz, lv: 0, peak: 0, floor: 1, shown: -1, from: 1, to: 1 }));
+function startBars(source) {
+  barsAn = deck.ctx.createAnalyser();
+  barsAn.fftSize = 2048;                 // fine enough to tell an 808 from the notes above it
+  barsAn.smoothingTimeConstant = 0;      // raw: paintBars does its own smoothing
+  barsAn.minDecibels = -80;
+  barsAn.maxDecibels = -12;
+  source.connect(barsAn);
+  barsBuf = new Uint8Array(barsAn.frequencyBinCount);
+  const perBin = deck.ctx.sampleRate / barsAn.fftSize;
+  for (const b of barBands) {
+    b.from = Math.max(1, Math.round(b.hz[0] / perBin));
+    b.to = Math.min(barsBuf.length - 1, Math.max(b.from, Math.round(b.hz[1] / perBin)));
+  }
+}
+function paintBars(ts) {
+  if (ts - barFind > 150) { barFind = ts; barEls = [...document.querySelectorAll('.row.current .eq')].map((e) => e.children); }
+  const dt = Math.min(0.1, (ts - barLast) / 1000);
+  barLast = ts;
+  if (!barEls.length || !barsAn || reduceMotion) return;
+  const live = !deck.paused;
+  if (live) barsAn.getByteFrequencyData(barsBuf);
+  barBands.forEach((b, i) => {
+    let target = 0;
+    if (live) {
+      let sum = 0, top = 0;
+      for (let k = b.from; k <= b.to; k++) { const v = barsBuf[k] / 255; sum += v; if (v > top) top = v; }
+      const v = (sum / (b.to - b.from + 1) + top) / 2;     // between the band's average and its loudest note
+      b.peak = Math.max(v, b.peak - dt * 0.08);            // the loudest lately sinks slowly...
+      b.floor = Math.min(v, b.floor + dt * 0.12);          // ...the quietest lately rises slowly
+      target = v < 0.02 ? 0 : Math.min(1, (v - b.floor) / Math.max(0.14, b.peak - b.floor));
+    }
+    b.lv += (target - b.lv) * (1 - Math.exp(-(target > b.lv ? 40 : 7) * dt));   // up with the hit, back down more slowly
+    const y = +(0.14 + 0.86 * b.lv).toFixed(3);
+    if (y === b.shown) return;
+    b.shown = y;
+    for (const bars of barEls) if (bars[i]) bars[i].style.transform = `scaleY(${y})`;
+  });
 }
 
 // ---------- frame loop (touches only the few elements that move) ----------
@@ -333,6 +380,7 @@ function tick(ts) {
   const ambLive = body.classList.contains('is-video') || !ambSettled() || !lastAmb;   // !lastAmb: the very first paint
   if (ambLive && ts - lastAmb > 42) { lastAmb = ts; drawAmbient(ts); }
   else if (!ambLive) ambLast = 0;
+  paintBars(ts);
   window.Extras?.drift?.(ts);
   const d = deck.duration;
   if (!seeking && d && isFinite(d) && !deck.paused) {

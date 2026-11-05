@@ -8,6 +8,10 @@
     <rect width="96" height="64" rx="12" fill="url(#pn${id})"/><rect width="96" height="64" rx="12" fill="url(#pg${id})"/>
     <g fill="none" stroke="#fff" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round">${body}</g></svg>`;
   const NOTES = [
+    { v: '0.2.9', title: 'Bars that follow the music', text: 'The bars on the playing song react to the sound: one to the 808s and kicks, one to the vocals and snares, one to the hi-hats.',
+      art: wash(26, '<path d="M36 46V26M48 46V36M60 46V18"/>') },
+    { v: '0.2.9', title: 'Lyrics open and close as one motion', text: 'The cover and the glass panel now move together, with a gentle start and a soft landing, and nothing clicks into place.',
+      art: wash(27, '<rect x="14" y="20" width="24" height="24" rx="5"/><rect x="46" y="14" width="36" height="36" rx="7" opacity=".55"/><path d="M38 32h8" opacity=".8"/>') },
     { v: '0.2.8', title: 'Simpler playback', text: 'Clicking the playing song restarts it, Autoplay is always on, songs run straight into each other, and pause stops right away. Fade in and out is the one setting left.',
       art: wash(25, '<path d="M38 22v20l16-10z"/><path d="M62 22v20"/>') },
     { v: '0.2.7', title: 'The cover comes back cleanly', text: 'Making the queue panel smaller again fades the cover in at its spot, small to big. No more slow trip across the screen.',

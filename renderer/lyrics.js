@@ -237,9 +237,15 @@
   // slides out while the cover glides back to the middle.
   let moving = false;
   const flipEls = () => [$('#artWrap'), $('#nowMeta')];
-  const PANE_OUT = [   // the panel's way out; coming in plays it backwards
-    { opacity: 1, transform: 'none', filter: 'none' },
-    { opacity: 0, transform: 'translateX(70px) scale(.95)', filter: 'blur(10px)' },
+  // Cover, title and glass panel all move on this one curve and timing, so they read as one motion: a gentle start
+  // and a long soft landing. (A curve that shoots off at the start was most of the way there in a quarter of its time,
+  // which looked like snapping.)
+  const MOVE = { duration: 760, easing: 'cubic-bezier(.42, .02, .2, 1)' };
+  // the panel's way out; coming in plays it backwards. It only moves and fades: an extra blur on top of the glass
+  // made the two come apart
+  const PANE_OUT = [
+    { opacity: 1, transform: 'none' },
+    { opacity: 0, transform: 'translateX(90px) scale(.96)' },
   ];
   function flip(els, before) {
     els.forEach((el, i) => {
@@ -247,7 +253,7 @@
       if (!a.width || !b.width) return;
       const s = a.width / b.width;
       el.style.transformOrigin = '0 0';
-      done(anim(el, [{ transform: `translate(${a.left - b.left}px, ${a.top - b.top}px) scale(${s})` }, { transform: 'none' }], { duration: 820, easing: GLIDE }))
+      done(anim(el, [{ transform: `translate(${a.left - b.left}px, ${a.top - b.top}px) scale(${s})` }, { transform: 'none' }], MOVE))
         .then(() => { el.style.transformOrigin = ''; });
     });
   }
@@ -268,9 +274,16 @@
       const els = flipEls();
       if (on) {
         const before = els.map((el) => el.getBoundingClientRect());
+        const img = $('#artImg'), i0 = img.getBoundingClientRect();
+        const title = compact ? copyOf($('#nowMeta')) : null;      // no room for the title: a copy of it fades out
         body.classList.add('lyrics-on');
-        flip(els, before);
-        anim(pane, PANE_OUT.slice().reverse(), { duration: 820, easing: GLIDE });
+        window.Liquid?.snap($('#art'));       // the glass fits its new size before the first frame: no swap mid-motion
+        window.Liquid?.snap(pane);
+        if (compact) {
+          intoCorner(i0, img.getBoundingClientRect());
+          if (title) { document.body.appendChild(title); done(anim(title, [{ opacity: 1 }, { opacity: 0, transform: 'translateY(8px)' }], { duration: 380, easing: 'ease-out', fill: 'forwards' })).then(() => title.remove()); }
+        } else flip(els, before);
+        anim(pane, PANE_OUT.slice().reverse(), MOVE);
         const t = nowSong();
         if (!t || t !== shownFor) load(t); else tick(true);
       } else {
@@ -280,14 +293,20 @@
         pane.getAnimations().forEach((a) => a.cancel());
         Object.assign(pane.style, { width: r0.width + 'px', height: r0.height + 'px', left: '0px', top: '0px' });
         pane.classList.add('ly-leaving');
+        pane.classList.toggle('was-compact', compact);   // its header keeps the room it had next to the small cover
+        $('#artWrap').style.zIndex = '4';                // the cover rises over the fading panel, not under it
         body.classList.remove('lyrics-on');
         const r1 = pane.getBoundingClientRect();
         pane.style.left = r0.left - r1.left + 'px';
         pane.style.top = r0.top - r1.top + 'px';
+        window.Liquid?.snap($('#art'));       // the glass fits its new size before the first frame: no swap mid-motion
         flip(els, before);
-        await done(anim(pane, PANE_OUT, { duration: 820, easing: GLIDE, fill: 'forwards' }));
+        // the title was hidden in the corner layout, so it has nowhere to glide from: it rises in with the cover
+        if (!before[1].width) anim($('#nowMeta'), [{ opacity: 0, transform: 'translateY(12px)' }, { opacity: 1, transform: 'none' }], { ...MOVE, delay: 120, fill: 'backwards' });
+        await done(anim(pane, PANE_OUT, { ...MOVE, fill: 'forwards' }));
+        $('#artWrap').style.zIndex = '';
         if (!open) {
-          pane.classList.remove('ly-leaving');
+          pane.classList.remove('ly-leaving', 'was-compact');
           Object.assign(pane.style, { width: '', height: '', left: '', top: '' });
           pane.getAnimations().forEach((a) => a.cancel());
         }
@@ -337,7 +356,16 @@
       anim(meta, [{ opacity: 0, transform: 'translateY(10px)' }, { opacity: 1, transform: 'none' }], { duration: 520, delay: 120, easing: GLIDE, fill: 'backwards' });
       return;
     }
-    // into the corner: shrinks toward it, then softens and fades into the glass as the small cover fades in
+    intoCorner(i0, i1);
+    // the lyrics pour out from where they were to fill the stage
+    const ins = [p0.top - p1.top, p1.right - p0.right, p1.bottom - p0.bottom, p0.left - p1.left].map((v) => Math.max(0, Math.round(v)) + 'px');
+    anim(pane, [{ clipPath: `inset(${ins.join(' ')} round 26px)` }, { clipPath: 'inset(-30px round 56px)' }], { duration: 700, easing: GLIDE });
+  }
+  // into the corner: a full-size stand-in shrinks toward it, then softens and fades into the glass as the small cover
+  // fades in. i0, i1: where the cover's picture was, and where it is now
+  function intoCorner(i0, i1) {
+    const wrapEl = $('#artWrap'), img = $('#artImg');
+    ghost?.remove();
     const s = i1.width / i0.width, dx = i1.left - i0.left, dy = i1.top - i0.top;
     const at = (k, sc) => `translate(${dx * k}px, ${dy * k}px) scale(${sc})`;
     const cs = getComputedStyle(img);
@@ -354,9 +382,22 @@
       { transform: at(1, s), borderRadius: `${12 / s}px`, opacity: 0, filter: `blur(${3 / s}px)` },
     ], { duration: T, easing: 'cubic-bezier(.45, 0, .2, 1)', fill: 'forwards' })).then(() => { if (ghost === g) ghost = null; g.remove(); });
     anim(wrapEl, [{ opacity: 0, transform: 'scale(.85)' }, { opacity: 1, transform: 'none' }], { duration: 420, delay: T * 0.55, easing: GLIDE, fill: 'backwards' });
-    // the lyrics pour out from where they were to fill the stage
-    const ins = [p0.top - p1.top, p1.right - p0.right, p1.bottom - p0.bottom, p0.left - p1.left].map((v) => Math.max(0, Math.round(v)) + 'px');
-    anim(pane, [{ clipPath: `inset(${ins.join(' ')} round 26px)` }, { clipPath: 'inset(-30px round 56px)' }], { duration: 700, easing: GLIDE });
+  }
+  // a look-alike of an element, pinned where it is now, that can fade out after the real one has gone
+  function copyOf(el) {
+    const r = el.getBoundingClientRect();
+    if (!r.width) return null;
+    const c = el.cloneNode(true);
+    const same = (from, to) => {
+      const cs = getComputedStyle(from);
+      to.removeAttribute('id');
+      to.className = '';
+      for (const k of ['font', 'color', 'textShadow', 'textAlign', 'letterSpacing', 'margin']) to.style[k] = cs[k];
+      [...from.children].forEach((ch, i) => same(ch, to.children[i]));
+    };
+    same(el, c);
+    Object.assign(c.style, { position: 'fixed', left: r.left + 'px', top: r.top + 'px', width: r.width + 'px', margin: '0', zIndex: 40, pointerEvents: 'none' });
+    return c;
   }
   new ResizeObserver(() => fitRoom(true)).observe(stage);
   fitRoom(false);

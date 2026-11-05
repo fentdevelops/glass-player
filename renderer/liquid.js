@@ -131,6 +131,8 @@
     watch,
     // the artwork on screen changed
     art(url) { artUrl = url || ''; setWall(wallFor()); },
+    // a panel is about to animate at a new size: fit its glass now, so it doesn't swap partway through the motion
+    snap(el) { if (!el || !on) return; clearTimeout(settle.get(el)); settle.delete(el); build(el); el.classList.remove('lg-busy'); },
   };
   apply();
 })();
