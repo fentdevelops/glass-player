@@ -556,7 +556,6 @@ async function lrclibJSON(url) {
 }
 // ---- more synced lyrics: Kugou and NetEase Cloud Music answer plain requests with timed lyrics (LRC) ----
 // (QQ Music only answers requests that claim to come from its own website, so it isn't used.)
-// Genius has words only, never timings, so it stays a "search in your browser" link.
 async function getJSON(url, ms = 8000) {
   const r = await fetch(url, { headers: lrcHeaders, signal: AbortSignal.timeout(ms) });
   if (!r.ok) throw new Error('HTTP ' + r.status);

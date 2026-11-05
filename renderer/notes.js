@@ -8,6 +8,8 @@
     <rect width="96" height="64" rx="12" fill="url(#pn${id})"/><rect width="96" height="64" rx="12" fill="url(#pg${id})"/>
     <g fill="none" stroke="#fff" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round">${body}</g></svg>`;
   const NOTES = [
+    { v: '0.2.3', title: 'Lyrics search stays in Glass', text: 'Search lists only lyrics that play along inside Glass, from LRCLIB, Kugou and NetEase. The Genius link is gone.',
+      art: wash(13, '<circle cx="42" cy="30" r="11"/><path d="M50 38l9 9"/><path d="M64 22h14M64 30h10" opacity=".7"/>') },
     { v: '0.2.2', title: 'Lyrics make room', text: 'With a wide queue panel, the lyrics fill the space and the cover drops into their corner like a water drop.',
       art: wash(9, '<path d="M48 14c8 10 13 17 13 23a13 13 0 0 1-26 0c0-6 5-13 13-23z" fill="rgba(255,255,255,.18)"/><path d="M24 50h48" opacity=".6"/>') },
     { v: '0.2.2', title: 'Smooth resizing', text: 'Cards and lyrics follow the panel while you drag it, with no overlapping or jumping.',

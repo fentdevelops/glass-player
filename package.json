@@ -1,13 +1,13 @@
 {
   "name": "glass-player",
-  "version": "0.2.2",
+  "version": "0.2.3",
   "description": "Liquid glass music and video player",
   "main": "main.js",
   "scripts": {
     "start": "electron .",
     "dist": "electron-builder --win",
     "dist:portable": "electron-builder --win portable",
-    "release": "electron-builder --win nsis portable --publish always -c.directories.output=dist-deck"
+    "release": "node scripts/release.js"
   },
   "author": "",
   "license": "ISC",

@@ -559,7 +559,7 @@ function register() {
   ipcMain.on('sp:log', (_e, line) => spLog(line));
   ipcMain.handle('open-external', (_e, url) => {
     const u = new URL(String(url));
-    if (u.protocol !== 'https:' || !['open.spotify.com', 'developer.spotify.com', 'genius.com', 'en.wikipedia.org'].includes(u.hostname)) throw new Error('Blocked link');
+    if (u.protocol !== 'https:' || !['open.spotify.com', 'developer.spotify.com', 'en.wikipedia.org'].includes(u.hostname)) throw new Error('Blocked link');
     return shell.openExternal(u.toString());
   });
 }

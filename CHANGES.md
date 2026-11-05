@@ -3,7 +3,7 @@
 A liquid-glass music and video player for Windows (Electron). This file lists everything built so far,
 how to use it, where it lives in the code, and what's still waiting on you.
 
-**Current version:** 0.2.2 · **Code:** https://github.com/pxlarized2/glass-player (public) · **Releases:** the repo's Releases page. Installed copies update themselves from there.
+**Current version:** 0.2.3 · **Code:** https://github.com/pxlarized2/glass-player (public) · **Releases:** the repo's Releases page. Installed copies update themselves from there.
 
 ---
 
@@ -284,6 +284,10 @@ how to use it, where it lives in the code, and what's still waiting on you.
 - **Cards:** card grids (Library playlists, artists, albums) used to stretch wider while their rows kept the old height, so cards overlapped, then snapped into a new grid 140 ms after you stopped. Now every frame of a drag gives the rows the cards’ real height, and when a column comes or goes the cards glide from where they were to their new spots. A width sweep from 380 to 960 px and back (117 frames) found no overlap at any frame.
 - **Lyrics:** the space above and below the lines came from the panel’s width, so the whole text slid up and down as you dragged. It now comes from the stage’s height, and on every size change the sung line is put back exactly where it was (plain lyrics keep their place in the text). Measured: the sung line stays within 6 px across every width, including the switch to and from the corner layout.
 
+### Lyrics search without Genius (0.2.3)
+- The lyrics search lists only LRCLIB, Kugou and NetEase results, which play along inside Glass. The "Search on Genius" link (words only, no timing, opened in the browser) is gone, and Glass no longer opens genius.com links at all.
+- Releases now go out in one step (`npm run release` → `scripts/release.js`), so `latest.yml` can't go missing again.
+
 ### Updates find you (0.2.2)
 - Glass looks for a new version 8 s after it opens, every 30 minutes, and when you come back to its window after 10 minutes away. A new version downloads quietly with a small progress card, then a card says it’s ready with **Restart to update** (Later shrinks it to a pill).
 - Each finished batch of work now ships as a GitHub release with these notes, so your installed Glass picks it up by itself.
@@ -298,11 +302,11 @@ how to use it, where it lives in the code, and what's still waiting on you.
   npx electron-builder --win nsis portable -c.directories.output=dist-deck
   ```
   `build.electronDist` points at the local castlabs Electron. `scripts/vmp-sign.js` signs each build with your castlabs account (it warns and continues if the account is missing).
-- **Publish a new version:** raise `version` in package.json, add its notes to `renderer/notes.js` (`v: 'x.y.z'`), commit and push, then:
+- **Publish a new version:** raise `version` in package.json, add its notes to `renderer/notes.js` (`v: 'x.y.z'`) and `build/release-notes.md`, commit and push, then:
   ```bash
-  GH_TOKEN="$(gh auth token)" npm run release
+  npm run release
   ```
-  That builds, signs and uploads the installer, the portable exe and `latest.yml` to a new GitHub release `vX.Y.Z`. Installed copies pick it up within 3 hours, or at their next start.
+  `scripts/release.js` checks the commit is pushed and the notes mention the version, builds and signs, then creates the GitHub release `vX.Y.Z` once with the installer, blockmap, portable exe, `latest.yml` and the notes (needs `gh auth login`). electron-builder's own publishing is no longer used: it uploaded the two targets at once, both tried to create the release, and in 0.2.2 `latest.yml` went missing until it was added by hand. Installed copies pick a release up within half an hour (0.2.2 and later), or at their next start.
 - **New dependencies:** `electron-updater`. The castlabs signing tool `castlabs-evs` is installed for Python (`py`).
 - **Your data** (library, edits, tags, plays, settings) is stored in the app's user folder, not in your music files. The only things that write to song files are Edit info's "Also save into the MP3 file's tags" box and "Save as .lrc".
 

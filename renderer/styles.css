@@ -1137,14 +1137,10 @@ body.dragging-song, body.dragging-song * { user-select: none; cursor: grabbing !
 .tg-tog.add { opacity: .7; }
 .tg-tog.add svg { width: 13px; height: 13px; fill: none; stroke: currentColor; stroke-width: 2.2; stroke-linecap: round; }
 .field:has(> .tg-field) { margin-top: 14px; }
-/* lyrics search: LRCLIB + Genius sections */
+/* lyrics search results */
 .ly-sec { display: flex; align-items: baseline; gap: 8px; margin: 10px 6px 4px; font-size: 11px; font-weight: 700; letter-spacing: .4px; text-transform: uppercase; color: var(--ink-2); }
 .ly-sec:first-child { margin-top: 2px; }
 .ly-sec span { font-weight: 500; letter-spacing: 0; text-transform: none; color: var(--ink-3); }
-.ly-genius { grid-template-columns: 36px minmax(0, 1fr) auto; }
-.ly-genius .lk-art { width: 36px; height: 36px; border-radius: 8px; }
-.lk-src.genius { background: #ffff64; color: #111; }
-.ly-genius .lk-art { display: grid; place-items: center; background: #ffff64; color: #111; font-weight: 800; font-size: 16px; }
 
 /* ---------- quality badges (extras.js) ---------- */
 .q {

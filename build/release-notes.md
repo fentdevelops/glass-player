@@ -1,11 +1,9 @@
-## Glass 0.2.2
+## Glass 0.2.3
 
-**Lyrics make room.** With the lyrics open and a wide queue panel (or a small window), the lyrics now fill the whole space and the cover drops into their top-left corner like a water drop. Widen it again and the drop rises back into the full cover. Before, the cover vanished and the lyrics stayed squeezed into one side with an empty gap.
+**Lyrics search stays in Glass.** The lyrics search now lists only LRCLIB, Kugou and NetEase results, which play along with the song inside Glass. The "Search on Genius" link is gone (Genius has the words only, with no timing, and could only open in your browser).
 
-**Smooth resizing.** Dragging the queue panel or resizing the window no longer makes cards overlap and then snap into place: rows grow with the cards on every frame, and cards glide to their new spots when a column comes or goes. Lyrics stay put too, with the sung line held where it was instead of the text jumping and sliding back.
+**Releases arrive reliably.** Each new version is now published in one step with everything installed copies need to find it, so the update card shows up within half an hour.
 
-**Updates find you.** Glass checks for a new version every 30 minutes and when you come back to it, downloads it quietly, and shows a small card when it's ready to restart.
+Also in 0.2.2: lyrics make room with a water-drop cover when the queue panel is wide, cards and lyrics follow the panel smoothly while you resize, Glass checks for updates every 30 minutes, and Spotify inside Glass reconnects by itself without leaving extra "Glass Player" devices behind.
 
-**Steadier Spotify inside Glass.** The in-app Spotify player reconnects by itself when Spotify drops it, carrying on with the same song at the same spot. Glass now signs its player off when it closes, so Spotify no longer collects extra "Glass Player" devices that play nothing, and any old one is hidden and has its music moved back.
-
-Installed copies update themselves. New install: download `Glass Player Setup 0.2.2.exe` below.
+Installed copies update themselves. New install: download `Glass-Player-Setup-0.2.3.exe` below.

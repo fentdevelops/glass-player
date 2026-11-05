@@ -1,8 +1,7 @@
 'use strict';
 // Lyrics panel, for local songs and Spotify alike.
 // Lookup order lives in main (lyrics-get): local songs → sidecar .lrc/.txt → tags → saved pick → LRCLIB;
-// Spotify songs → saved pick → LRCLIB. The search also lists Genius matches, which open on genius.com
-// (Genius has no lyrics API and doesn't allow automated access, so it opens Genius's own search page in the browser).
+// Spotify songs → saved pick → LRCLIB. The search lists matches from LRCLIB, Kugou and NetEase, inside Glass.
 // Synced lyrics follow playback (current line glides to centre, click a line to jump); plain lyrics just scroll.
 // Uses app.js globals: api, S, $, body, deck, current, esc, anim, toast, cleanErr, guessQuery, openMenu, ICON, fmt, save.
 (() => {
@@ -155,7 +154,7 @@
     tick(true);
   });
 
-  // ---------- search: LRCLIB (shown here) + Genius (opens in the browser) ----------
+  // ---------- search: LRCLIB, Kugou and NetEase, all shown here (synced first) ----------
   function openSearch() {
     const t = shownFor;
     if (!t) return;
@@ -185,12 +184,7 @@
             <span class="lk-src${r.synced ? ' on' : ''}">${r.instrumental ? 'Instrumental' : r.synced ? 'Synced' : 'Plain'}</span></button>`;
         }).join('')
         : '<div class="lk-empty">No matches. Try just the song name.</div>';
-    const gnHTML = `<div class="ly-sec">Genius <span>opens in your browser</span></div>
-      <button type="button" class="lk-item ly-item ly-genius" data-genius style="--d:${results.length * 40}ms">
-        <span class="lk-art">G</span>
-        <span class="lk-text"><b>Search on Genius</b><small>“${esc(text)}”</small></span>
-        <span class="lk-src genius">Genius ↗</span></button>`;
-    out.innerHTML = `<div class="ly-sec">Lyrics <span>LRCLIB, Kugou and NetEase · synced first</span></div>` + lrHTML + gnHTML;
+    out.innerHTML = `<div class="ly-sec">Lyrics <span>LRCLIB, Kugou and NetEase · synced first</span></div>` + lrHTML;
   }
   findBtn.addEventListener('click', () => (wrap.classList.contains('open') ? closeSearch() : openSearch()));
   $('#lyGo').addEventListener('click', runSearch);
@@ -202,10 +196,6 @@
     if (e.key === 'Escape') { e.stopPropagation(); closeSearch(); q.blur(); }
   });
   out.addEventListener('click', async (e) => {
-    if (e.target.closest('[data-genius]')) {
-      api.openExternal('https://genius.com/search?q=' + encodeURIComponent(q.value.trim())).catch((err) => toast(cleanErr(err), true));
-      return;
-    }
     const b = e.target.closest('[data-r]');
     const t = shownFor;
     if (!b || !t) return;
