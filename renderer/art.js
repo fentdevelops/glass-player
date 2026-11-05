@@ -33,13 +33,14 @@
   // ---------- Adjust ----------
   const V = 300, OUT = 720;
   const SHARP = 600;      // fewer of the picture's own pixels than this across the square starts to look soft
-  function adjust(img) {
+  function adjust(img, { same } = {}) {
     return new Promise((resolve) => {
       const W = img.width, H = img.height;
       const zCover = V / Math.min(W, H), zFit = V / Math.max(W, H);
       let z = zCover, x = (V - W * z) / 2, y = (V - H * z) / 2, result = null;
       const L = layer(`
         <h3 class="modal-title">Adjust cover</h3>
+        ${same ? '<div class="same-cover" data-same></div>' : ''}
         <div class="adj-view" data-view>
           <div class="adj-fill" style="background-image:url('${img.dataUrl}')"></div>
           <img class="adj-img" src="${img.dataUrl}" draggable="false" alt="" />
@@ -55,6 +56,7 @@
         <div class="adj-warn" data-warn role="status"><p></p></div>
         <div class="modal-actions"><span class="grow"></span><button type="button" class="btn" data-x>Cancel</button><button type="button" class="btn primary" data-ok>Use cover</button></div>`, 'adj-panel');
       L.onClose = () => resolve(result);
+      const strip = same ? sameStrip($('[data-same]', L.panel), same) : null;
       const view = $('[data-view]', L.panel), im = $('.adj-img', L.panel), range = $('[data-zoom]', L.panel);
       const warn = $('[data-warn]', L.panel);
       const zMin = Math.min(zFit, zCover), zMax = zCover * 4;
@@ -116,25 +118,72 @@
           g.imageSmoothingQuality = 'high';
           g.drawImage(pic, x * f, y * f, w, h);
           result = await api.saveArtData(c.toDataURL('image/jpeg', 0.9));
+          if (strip?.all()) result.alsoTo = strip.others();
           L.close();
         } catch (err) { toast(cleanErr(err), true); e.currentTarget.disabled = false; }
       });
     });
   }
-  async function pickAndAdjust() {
-    try { const img = await api.pickImageData(); return img ? adjust(img) : null; }
+  async function pickAndAdjust(opts) {
+    try { const img = await api.pickImageData(); return img ? adjust(img, opts) : null; }
     catch (err) { toast(cleanErr(err), true); return null; }
   }
-  async function adjustUrl(url) {
-    try { return adjust(await api.imageData(url)); }
+  async function adjustUrl(url, opts) {
+    try { return adjust(await api.imageData(url), opts); }
     catch (err) { toast(cleanErr(err), true); return null; }
   }
 
   // ---------- artwork from other songs ----------
-  async function artGroups() {
-    const songs = [...lib.values()].filter((t) => t.thumb);
+  async function hashesOf(songs) {
     const hashes = [];
     for (let i = 0; i < songs.length; i += 500) hashes.push(...(await api.artHashes(songs.slice(i, i + 500).map((t) => t.thumb))));
+    return hashes;
+  }
+
+  // ---------- the other songs with exactly this picture, shown on top of the cover editors ----------
+  // Same picture = the same thumbnail file contents. `not` leaves out the song being edited. The strip stays hidden
+  // until something matches. all(): the "change them all" switch is on. others(): the songs it would change.
+  function sameStrip(host, { thumb, not = [], allLabel }) {
+    let others = [];
+    const box = { all: () => !!host?.querySelector('input')?.checked, others: () => others };
+    if (!host || !thumb) return box;
+    (async () => {
+      const songs = [...lib.values()].filter((t) => t.thumb);
+      const [hashes, [mine]] = await Promise.all([hashesOf(songs), api.artHashes([thumb])]);
+      const key = mine || thumb, skip = new Set(not);
+      others = songs.filter((t, i) => (hashes[i] || t.thumb) === key && !skip.has(t));
+      if (!others.length || !host.isConnected) return;
+      const n = others.length, names = others.slice(0, 2).map(titleOf).join(', ');
+      host.innerHTML = `<div class="sc-in">
+          <button type="button" class="sc-head" data-sc-open aria-expanded="false">
+            <span class="sc-thumb"></span>
+            <span class="sc-text"><b>Also on ${plural(n, not.length ? 'other song' : 'song')}</b><small>${esc(names)}${n > 2 ? ` + ${n - 2} more` : ''}</small></span>
+            <svg class="sc-chev" viewBox="0 0 24 24"><path d="m6 9 6 6 6-6"/></svg>
+          </button>
+          <div class="sc-list"><div class="sc-rows">${others.slice(0, 200).map((t) => `<div class="sc-song"><b>${esc(titleOf(t))}</b><small>${esc(artistOf(t))}</small></div>`).join('')}
+            ${n > 200 ? `<div class="sc-song"><small>and ${n - 200} more</small></div>` : ''}</div></div>
+          <label class="sc-all"><span>${esc(allLabel(n))}</span><span class="switch"><input type="checkbox" /><i></i></span></label>
+        </div>`;
+      $('.sc-thumb', host).style.backgroundImage = cssUrl(thumb);
+      $('[data-sc-open]', host).addEventListener('click', (e) => e.currentTarget.setAttribute('aria-expanded', String(host.classList.toggle('open'))));
+      requestAnimationFrame(() => host.classList.add('on'));
+    })().catch(() => { others = []; });
+    return box;
+  }
+  // puts a cover on several songs at once; part of the same undo step as the save that called it
+  function giveCover(tracks, art) {
+    let playing = false;
+    for (const t of tracks) {
+      Object.assign(t, (edits[t.path] = { ...(edits[t.path] || {}), cover: art.cover, thumb: art.thumb }));
+      if (t === current()) playing = true;
+    }
+    if (tracks.length) { libChanged(); save(); if (playing) showNow(false); }
+    return tracks.length;
+  }
+
+  async function artGroups() {
+    const songs = [...lib.values()].filter((t) => t.thumb);
+    const hashes = await hashesOf(songs);
     const m = new Map();
     songs.forEach((t, i) => {
       const k = hashes[i] || t.thumb;
@@ -271,13 +320,13 @@
   }
 
   // the menu behind every "change cover" button
-  function coverMenu(rect, { current: cur, forTrack, onPick, fromSongs: allowSongs = true }) {
+  function coverMenu(rect, { current: cur, forTrack, onPick, fromSongs: allowSongs = true, same }) {
     openMenu(rect, () => [
-      { label: 'Choose an image…', icon: ICON.folder, act: async () => { const r = await pickAndAdjust(); if (r) onPick(r); } },
+      { label: 'Choose an image…', icon: ICON.folder, act: async () => { const r = await pickAndAdjust({ same }); if (r) onPick(r); } },
       ...(allowSongs ? [{ label: 'Use art from another song…', icon: ICON.note, act: async () => { const r = await fromSongs(forTrack); if (r) onPick(r); } }] : []),
-      ...(cur ? [{ label: 'Adjust this cover…', icon: ICON.edit, act: async () => { const r = await adjustUrl(cur); if (r) onPick(r); } }] : []),
+      ...(cur ? [{ label: 'Adjust this cover…', icon: ICON.edit, act: async () => { const r = await adjustUrl(cur, { same }); if (r) onPick(r); } }] : []),
     ]);
   }
 
-  window.Art = { adjust, pickAndAdjust, adjustUrl, fromSongs, coverMenu, layer };
+  window.Art = { adjust, pickAndAdjust, adjustUrl, fromSongs, coverMenu, layer, sameStrip, giveCover };
 })();

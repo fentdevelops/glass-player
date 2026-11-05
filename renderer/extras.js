@@ -257,12 +257,14 @@ $('#art').addEventListener('contextmenu', (e) => {
   const t = current();
   Art.coverMenu({ left: e.clientX, right: e.clientX, top: e.clientY, bottom: e.clientY }, {
     current: t.cover || t.thumb, forTrack: t,
+    same: { thumb: t.thumb, not: [t], allLabel: (n) => (n === 1 ? 'Change both at once' : `Change all ${n + 1} at once`) },
     onPick: (r) => {
       const ed = (edits[t.path] = { ...(edits[t.path] || {}), cover: r.cover, thumb: r.thumb });
       Object.assign(t, ed);
+      const also = r.alsoTo ? Art.giveCover(r.alsoTo, r) : 0;
       afterEdit(t);
       anim($('#artWrap'), [{ transform: 'scale(.94)', opacity: 0.6 }, { transform: 'none', opacity: 1 }], { duration: 700 });
-      toast('Cover changed');
+      toast(also ? `Cover changed on ${plural(also + 1, 'song')}` : 'Cover changed');
     },
   });
 });

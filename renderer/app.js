@@ -479,14 +479,18 @@ function showNow(animate) {
   // Windows' media pop-up (volume keys, lock screen) shows the song with its cover; refreshed once the cover loads
   if ('mediaSession' in navigator) {
     const art = big || small;
-    navigator.mediaSession.metadata = new MediaMetadata({ title, artist: t.artist || '', album: t.album || '',
-      artwork: art ? [{ src: art, sizes: '720x720', type: /\.png(\?|$)/i.test(art) ? 'image/png' : 'image/jpeg' }] : [] });
+    const tell = (img) => { navigator.mediaSession.metadata = new MediaMetadata({ title, artist: t.artist || '', album: t.album || '', artwork: img ? [{ src: img.dataUrl, sizes: `${img.width}x${img.height}`, type: 'image/jpeg' }] : [] }); };
+    if (art !== mediaArt.url) { mediaArt.url = art; mediaArt.img = null; }
+    tell(mediaArt.img);
+    // the system only takes pictures it's handed directly, never a file on disk
+    if (art && !mediaArt.img) api.imageData(art).then((img) => { if (mediaArt.url === art) { mediaArt.img = img; tell(img); } }).catch(() => {});
   }
   syncMedia();
 }
 
 // ---------- playback ----------
 let restoreAt = 0;
+const mediaArt = { url: '', img: null };
 function play(i, autoplay = true) {
   const t = S.queue[i];
   if (!t) return;
@@ -1593,10 +1597,11 @@ function setAlbum(tracks, name, msg) {
 }
 // edit an album: its name (written to every song in it, Glass-side) and its cover
 function albumEditModal(g) {
-  let art = S.albumArt[g.key] || null, changedArt = false;
+  let art = S.albumArt[g.key] || null, changedArt = false, same = null;
   const thumbNow = () => art?.thumb || g.thumb;
   openModal(`
     <h3 class="modal-title">Edit album</h3>
+    <div class="same-cover" data-same></div>
     <div class="pl-edit">
       <button type="button" class="pl-pick album-new" data-art-pick title="Change cover"><div class="pl-pick-img" data-art></div><span class="cover-hint">Change cover</span></button>
       <div class="fields">
@@ -1608,6 +1613,7 @@ function albumEditModal(g) {
       <button type="button" class="btn" data-cancel>Cancel</button><button type="submit" class="btn primary">Save</button></div>`, {
     onMount(form) {
       const img = $('[data-art]', form);
+      same = Art.sameStrip($('[data-same]', form), { thumb: thumbNow(), allLabel: (n) => (n === 1 ? 'Change that song too' : `Change all ${n} songs too`) });
       const paint = (pop) => {
         const u = art?.cover || thumbNow();
         img.style.backgroundImage = u ? cssUrl(u) : gradFor(g.name);
@@ -1624,6 +1630,7 @@ function albumEditModal(g) {
       const name = form.elements.a_name.value.trim().replace(/\s+/g, ' ') || g.name;
       const newKey = name.toLowerCase();
       if (changedArt) { if (art) S.albumArt[g.key] = art; else delete S.albumArt[g.key]; }
+      if (changedArt && art && same?.all()) Art.giveCover(same.others(), art);
       if (newKey !== g.key || g.merged) {
         if (S.albumArt[g.key]) { S.albumArt[newKey] = S.albumArt[g.key]; if (newKey !== g.key) delete S.albumArt[g.key]; }
         if (S.expanded.delete('album:' + g.key)) S.expanded.add('album:' + newKey);
@@ -1999,7 +2006,7 @@ function renameTrack(t, nt) {
 function editModal(t, { lookup = false } = {}) {
   const ext = t.path.slice(t.path.lastIndexOf('.'));
   const isMp3 = ext.toLowerCase() === '.mp3';
-  let cover = t.cover || t.thumb || null, thumb = t.thumb || null, coverChanged = false, applyTags = null;
+  let cover = t.cover || t.thumb || null, thumb = t.thumb || null, coverChanged = false, applyTags = null, same = null;
   if (!t.cover) loadCover(t);
   openModal(`
     <div class="modal-head">
@@ -2016,6 +2023,7 @@ function editModal(t, { lookup = false } = {}) {
         <p class="lookup-note">Results from Apple Music and Deezer. Pick one to fill everything in, then edit anything before saving.</p>
       </div>
     </div>
+    <div class="same-cover" data-same></div>
     <div class="edit-grid">
       <button type="button" class="cover-pick" data-pick title="Change cover"><div class="cover-img"></div><span class="cover-hint">Change cover</span></button>
       <div class="fields">
@@ -2037,6 +2045,7 @@ function editModal(t, { lookup = false } = {}) {
     </div>`, {
     onMount(form) {
       const img = $('.cover-img', form), reset = $('[data-reset]', form);
+      same = Art.sameStrip($('[data-same]', form), { thumb: t.thumb, not: [t], allLabel: (n) => (n === 1 ? 'Change both at once' : `Change all ${n + 1} at once`) });
       const paint = (bounce) => {
         img.style.backgroundImage = cover ? cssUrl(cover) : '';
         img.classList.toggle('placeholder', !cover);
@@ -2120,6 +2129,7 @@ function editModal(t, { lookup = false } = {}) {
       const e = (edits[t.path] = { ...(edits[t.path] || {}), ...fields });
       if (coverChanged) { e.cover = cover; e.thumb = thumb; }
       Object.assign(t, e);
+      const alsoChanged = coverChanged && same?.all() ? Art.giveCover(same.others(), { cover, thumb }) : 0;
       applyTags?.();
       const writeTags = isMp3 && f.t_tags?.checked;
       const base = f.t_file.value.trim();
@@ -2132,7 +2142,7 @@ function editModal(t, { lookup = false } = {}) {
         }
       } catch (err) { toast(cleanErr(err), true); afterEdit(t); return false; }
       afterEdit(t);
-      toast('Saved');
+      toast(alsoChanged ? `Saved. Cover changed on ${plural(alsoChanged + 1, 'song')}` : 'Saved');
     },
   });
 }

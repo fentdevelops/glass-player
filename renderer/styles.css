@@ -795,6 +795,28 @@ body.lyrics-on.ly-compact .ly-head, .lyrics.ly-leaving.was-compact .ly-head { mi
   will-change: transform, opacity, filter;
 }
 /* Adjust cover: a small heads-up that glides open when the picture would look soft */
+/* the other songs with exactly this picture, on top of the cover editors (art.js) */
+.same-cover { display: grid; grid-template-rows: 0fr; opacity: 0; transition: grid-template-rows .55s var(--glide), opacity .45s var(--glide), margin .55s var(--glide); }
+.same-cover.on { grid-template-rows: 1fr; opacity: 1; margin-bottom: 14px; }
+.art-panel .same-cover { width: 300px; }
+.sc-in { overflow: hidden; min-height: 0; border-radius: 14px; background-color: var(--fill-1); box-shadow: inset 0 0 0 1px rgba(255, 255, 255, .08); }
+.sc-head { display: grid; grid-template-columns: 34px minmax(0, 1fr) 16px; gap: 10px; align-items: center; width: 100%; padding: 8px 12px 8px 8px; text-align: left; border-radius: 14px; transition: background-color var(--t-hover) var(--glide); }
+.sc-head:hover { background-color: var(--fill-1); }
+.sc-thumb { width: 34px; height: 34px; border-radius: 8px; background: center / cover var(--fill-2); box-shadow: inset 0 0 0 1px rgba(255, 255, 255, .12); }
+.sc-text, .sc-song { min-width: 0; }
+.sc-text b, .sc-text small, .sc-song b, .sc-song small { display: block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.sc-text b { font-size: 13px; font-weight: 600; }
+.sc-text small, .sc-song small { font-size: 11.5px; color: var(--ink-2); }
+.sc-chev { width: 16px; height: 16px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; opacity: .7; transition: transform .5s var(--glide); }
+.same-cover.open .sc-chev { transform: rotate(180deg); }
+.sc-list { display: grid; grid-template-rows: 0fr; transition: grid-template-rows .5s var(--glide); }
+.same-cover.open .sc-list { grid-template-rows: 1fr; }
+.sc-rows { min-height: 0; overflow: hidden; }
+.same-cover.open .sc-rows { overflow-y: auto; max-height: 124px; }
+.sc-song { padding: 4px 12px 4px 52px; }
+.sc-song b { font-size: 12.5px; font-weight: 500; }
+.sc-all { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 8px 12px; font-size: 13px; cursor: pointer; border-top: 1px solid rgba(255, 255, 255, .07); }
+.sc-all:active .switch i::after { width: 22px; }
 .adj-warn { display: grid; width: 300px; grid-template-rows: 0fr; opacity: 0; transition: grid-template-rows .5s var(--glide), opacity .4s var(--glide), margin .5s var(--glide); }
 .adj-warn.on { grid-template-rows: 1fr; opacity: 1; margin-top: 8px; }
 .adj-warn p { overflow: hidden; min-height: 0; margin: 0; font-size: 12px; line-height: 1.35; text-align: center; color: rgba(255, 224, 170, .95); }
