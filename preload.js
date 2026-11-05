@@ -20,6 +20,11 @@ contextBridge.exposeInMainWorld('glass', {
   saveArtData: (dataUrl) => ipcRenderer.invoke('save-art-data', dataUrl),
   artHashes: (urls) => ipcRenderer.invoke('art-hashes', urls),
   artistInfo: (name) => ipcRenderer.invoke('artist-info', name),
+  acts: {
+    known: () => ipcRenderer.invoke('acts-known'),
+    check: (items) => ipcRenderer.invoke('acts-check', items),
+    search: (q) => ipcRenderer.invoke('acts-search', q),
+  },
   lyrics: {
     get: (p, hints, mode) => ipcRenderer.invoke('lyrics-get', p, hints, mode),
     search: (q) => ipcRenderer.invoke('lyrics-search', q),

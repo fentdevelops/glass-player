@@ -96,17 +96,36 @@ const subOf = (t) => (t.album ? `${artistOf(t)} — ${t.album}` : artistOf(t));
 // every artist on a song: "A x B", "A, B", "A & B", "A feat. B", "A (feat. B)". The joins are kept for display.
 const ARTIST_SPLIT = /(\s+x\s+|\s*[,;&]\s*|(?:\s+|\s*[(\[])(?:feat\.?|ft\.?|featuring)\s+)/i;
 const partsCache = new Map();
-function artistParts(s) {
-  s = String(s || '');
-  let out = partsCache.get(s);
-  if (out) return out;
-  const bits = s.split(ARTIST_SPLIT);
-  out = [];
+function rawArtistParts(s) {
+  const bits = s.split(ARTIST_SPLIT), out = [];
   for (let k = 0; k < bits.length; k += 2) {
     const m = /^([\s([]*)(.*?)([\s)\]]*)$/.exec(bits[k]);
     if (m[2]) out.push({ name: m[2], before: m[1].trim(), after: m[3].trim(), sep: bits[k + 1] || '' });
     else if (out.length) out[out.length - 1].sep += bits[k] + (bits[k + 1] || '');
   }
+  return out;
+}
+// Real acts with a comma or "&" in their name ("Tyler, the Creator", "Earth, Wind & Fire") aren't collabs: they stay
+// in one piece. Which ones those are comes from Deezer, checked in the background (checkActs, further down).
+const wholeActs = new Set();
+const actKey = (s) => String(s || '').normalize('NFKD').replace(/[\u0300-\u036f]/g, '').toLowerCase().replace(/&/g, ' and ').replace(/[^\p{L}\p{N}$]+/gu, ' ').trim();
+const joinParts = (ps, i, j) => { let s = ''; for (let k = i; k <= j; k++) s += ps[k].name + (k < j ? ps[k].sep : ''); return s; };
+function keepActsWhole(ps) {
+  if (!wholeActs.size || ps.length < 2) return ps;
+  const out = [];
+  for (let i = 0; i < ps.length; i++) {
+    let j = ps.length - 1;
+    while (j > i && !wholeActs.has(actKey(joinParts(ps, i, j)))) j--;
+    out.push(j === i ? ps[i] : { name: joinParts(ps, i, j), before: ps[i].before, after: ps[j].after, sep: ps[j].sep });
+    i = j;
+  }
+  return out;
+}
+function artistParts(s) {
+  s = String(s || '');
+  let out = partsCache.get(s);
+  if (out) return out;
+  out = keepActsWhole(rawArtistParts(s));
   if (partsCache.size > 20000) partsCache.clear();
   partsCache.set(s, out);
   return out;
@@ -194,6 +213,7 @@ async function pumpMeta() {
     if (batch.includes(current())) showNow(false);
   }
   metaRunning = false;
+  queueActs();
 }
 let rebuildTimer = 0;
 function libChanged() {
@@ -2108,19 +2128,63 @@ function editModal(t, { lookup = false } = {}) {
     },
   });
 }
+// ---------- real artists: which names with a comma or "&" are one act (Deezer, in the background) ----------
+// Only names joined by a comma or "&" can be one act; "x" and "feat." always mean a collab. Whatever has been checked is
+// remembered, so this only looks up names it hasn't seen.
+const actsAsked = new Set();
+let actsBusy = false, actsTimer = 0;
+const queueActs = () => { clearTimeout(actsTimer); actsTimer = setTimeout(checkActs, 4000); };
+async function checkActs() {
+  if (actsBusy || !api.acts) return;
+  actsBusy = true;
+  try {
+    const todo = new Map();
+    for (const t of lib.values()) {
+      if (!t.artist) continue;
+      const ps = rawArtistParts(t.artist);
+      for (let i = 0; i < ps.length - 1 && ps.length <= 6; i++) {
+        for (let j = i + 1; j < ps.length; j++) {
+          if (!/^\s*[,&]\s*$/.test(ps[j - 1].sep)) break;
+          const name = joinParts(ps, i, j), k = actKey(name);
+          if (!actsAsked.has(k)) todo.set(k, { name, parts: ps.slice(i, j + 1).map((p) => p.name) });
+        }
+      }
+    }
+    const list = [...todo.entries()];
+    for (let i = 0; i < list.length; i += 20) {
+      const batch = list.slice(i, i + 20);
+      const r = await api.acts.check(batch.map(([, v]) => v)).catch(() => null);
+      if (!r) break;
+      const failed = new Set((r.failed || []).map(actKey));
+      batch.forEach(([k]) => { if (!failed.has(k)) actsAsked.add(k); });
+      if (failed.size) break;                       // offline or refused: tried again later
+      const fresh = (r.whole || []).map(actKey).filter((k) => !wholeActs.has(k));
+      if (fresh.length) { fresh.forEach((k) => wholeActs.add(k)); partsCache.clear(); libChanged(); }
+    }
+  } finally { actsBusy = false; }
+}
+api.acts?.known().then((c) => {
+  c.checked.forEach((k) => actsAsked.add(k));
+  if (c.whole.length) { c.whole.forEach((k) => wholeActs.add(k)); partsCache.clear(); libChanged(); }
+  queueActs();
+}).catch(() => {});
+
 // ---------- artist / album picker for Edit info ----------
 function libraryChoices(kind, except) {
   const m = new Map();
   for (const x of lib.values()) {
     if (x === except) continue;
-    const name = kind === 'artist' ? x.artist : x.album;
-    if (!name || /^unknown/i.test(name)) continue;
-    const k = name.toLowerCase();
-    let e = m.get(k);
-    if (!e) m.set(k, (e = { name, count: 0, thumb: null, artists: new Set() }));
-    e.count++;
-    if (!e.thumb && x.thumb) e.thumb = x.thumb;
-    if (x.artist) e.artists.add(x.artist);
+    // artists one by one: "A & B" counts for A and for B, and isn't an artist itself
+    const names = kind === 'artist' ? artistNames(x) : [x.album];
+    for (const name of names) {
+      if (!name || /^unknown/i.test(name)) continue;
+      const k = name.toLowerCase();
+      let e = m.get(k);
+      if (!e) m.set(k, (e = { name, count: 0, thumb: null, artists: new Set() }));
+      e.count++;
+      if (!e.thumb && x.thumb) e.thumb = x.thumb;
+      if (x.artist) e.artists.add(x.artist);
+    }
   }
   return [...m.values()].map((e) => ({ ...e, artist: e.artists.size === 1 ? [...e.artists][0] : '' }))
     .sort((a, b) => b.count - a.count || coll.compare(a.name, b.name));
@@ -2131,7 +2195,7 @@ function attachSuggest(input, kind, t, onPick) {
   pop.className = 'sugg glass';
   pop.hidden = true;
   modalRoot.appendChild(pop);
-  let shown = [], hi = -1;
+  let shown = [], hi = -1, online = [], onlineFor = '', onlineT = 0;
   const place = () => {
     const r = input.closest('.combo').getBoundingClientRect();
     const below = innerHeight - r.bottom > 240 || r.top < 260;
@@ -2144,12 +2208,17 @@ function attachSuggest(input, kind, t, onPick) {
   const show = (everything = false) => {
     const q = everything ? '' : input.value.trim().toLowerCase();
     shown = (q ? all.filter((s) => s.name.toLowerCase().includes(q) && s.name.toLowerCase() !== q)
-      .sort((a, b) => b.name.toLowerCase().startsWith(q) - a.name.toLowerCase().startsWith(q)) : all).slice(0, 7);
+      .sort((a, b) => b.name.toLowerCase().startsWith(q) - a.name.toLowerCase().startsWith(q)) : all).slice(0, q ? 7 : 60);
+    // real artists from Deezer that aren't in the library yet, under the ones that are
+    if (q && kind === 'artist' && onlineFor === q) {
+      const have = new Set([...all.map((s) => s.name.toLowerCase()), q]);
+      shown = shown.concat(online.filter((s) => !have.has(s.name.toLowerCase())).slice(0, 5));
+    }
     if (!shown.length) { hide(); return; }
     hi = -1;
     pop.innerHTML = shown.map((s, i) => `<button type="button" class="sg-item" data-i="${i}" style="--d:${i * 30}ms">
-      <span class="sg-art" style="${artStyle(s.thumb, s.name)}">${s.thumb ? '' : kind === 'artist' ? ICON.person : ICON.note}</span>
-      <span class="sg-text"><b>${esc(s.name)}</b><small>${esc([kind === 'album' ? s.artist : '', plural(s.count, 'song')].filter(Boolean).join(' · '))}</small></span></button>`).join('');
+      <span class="sg-art${s.photo ? ' round' : ''}" style="${artStyle(s.photo || s.thumb, s.name)}">${s.photo || s.thumb ? '' : kind === 'artist' ? ICON.person : ICON.note}</span>
+      <span class="sg-text"><b>${esc(s.name)}</b><small>${esc(s.photo !== undefined ? 'Not in your library yet' : [kind === 'album' ? s.artist : '', plural(s.count, 'song')].filter(Boolean).join(' · '))}</small></span></button>`).join('');
     const wasHidden = pop.hidden;
     pop.hidden = false;
     place();
@@ -2163,8 +2232,23 @@ function attachSuggest(input, kind, t, onPick) {
     const box = input.closest('.combo');
     box.classList.remove('flash'); void box.offsetWidth; box.classList.add('flash');
   };
-  input.addEventListener('input', () => show());
-  input.addEventListener('focus', () => show(!input.value.trim()));
+  input.addEventListener('input', () => {
+    show();
+    if (kind !== 'artist' || !api.acts) return;
+    clearTimeout(onlineT);
+    const q = input.value.trim().toLowerCase();
+    if (q.length < 2) return;
+    onlineT = setTimeout(async () => {
+      const r = await api.acts.search(q).catch(() => []);
+      if (input.value.trim().toLowerCase() !== q || document.activeElement !== input) return;
+      online = r;
+      onlineFor = q;
+      show();
+    }, 320);
+  });
+  // clicking anywhere on the field opens the whole list (typing then narrows it down)
+  input.addEventListener('focus', () => show(true));
+  input.addEventListener('pointerdown', () => { if (document.activeElement === input && pop.hidden) show(true); });
   input.addEventListener('blur', () => setTimeout(hide, 120));
   input.closest('.combo').querySelector('.combo-btn').addEventListener('pointerdown', (e) => {
     e.preventDefault();

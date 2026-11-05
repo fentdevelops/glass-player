@@ -8,6 +8,10 @@
     <rect width="96" height="64" rx="12" fill="url(#pn${id})"/><rect width="96" height="64" rx="12" fill="url(#pg${id})"/>
     <g fill="none" stroke="#fff" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round">${body}</g></svg>`;
   const NOTES = [
+    { v: '0.2.11', title: 'Real artists', text: 'Edit info lists real artists instead of collab strings, and typing a name suggests real artists with their photos. Names like Earth, Wind & Fire stay in one piece.',
+      art: wash(29, '<circle cx="48" cy="25" r="9"/><path d="M31 49c2-9 9-13 17-13s15 4 17 13"/>') },
+    { v: '0.2.11', title: 'Album list opens on click', text: 'Clicking anywhere on the Artist or Album field opens its list. No more aiming for the little arrow.',
+      art: wash(30, '<rect x="18" y="16" width="60" height="13" rx="5"/><path d="M26 38h44M26 47h30" opacity=".7"/>') },
     { v: '0.2.10', title: 'A heads-up for small pictures', text: 'When a cover you pick is low quality, Adjust cover says so, so it won\u2019t surprise you as a blurry cover or background.',
       art: wash(28, '<rect x="30" y="14" width="36" height="36" rx="7"/><path d="M48 24v12"/><circle cx="48" cy="42" r="1.4" fill="#fff"/>') },
     { v: '0.2.9', title: 'Bars that follow the music', text: 'The bars on the playing song react to the sound: one to the 808s and kicks, one to the vocals and snares, one to the hi-hats.',

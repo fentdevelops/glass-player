@@ -1,5 +1,7 @@
-## Glass 0.2.10
+## Glass 0.2.11
 
-**A heads-up for small pictures.** When a cover you pick is low quality, including when you zoom far into a picture, Adjust cover shows a small note that it may look blurry as the cover and in the background. It's only a note: any picture can still be used.
+**Real artists.** Edit info now lists real artists instead of collab strings like "Playboi Carti & Lil Uzi Vert", and typing a name suggests real artists with their photos. Names like Earth, Wind & Fire or Tyler, the Creator stay in one piece everywhere in Glass, checked against Deezer's public artist search (only the artist names are sent).
 
-Installed copies update themselves. New install: download `Glass-Player-Setup-0.2.10.exe` below.
+**The Album list opens on click.** Clicking anywhere on the Artist or Album field opens its list, even when it's already filled in.
+
+Installed copies update themselves. New install: download `Glass-Player-Setup-0.2.11.exe` below.

@@ -3,7 +3,7 @@
 A liquid-glass music and video player for Windows (Electron). This file lists everything built so far,
 how to use it, where it lives in the code, and what's still waiting on you.
 
-**Current version:** 0.2.10 · **Code:** https://github.com/pxlarized2/glass-player (public) · **Releases:** the repo's Releases page. Installed copies update themselves from there.
+**Current version:** 0.2.11 · **Code:** https://github.com/pxlarized2/glass-player (public) · **Releases:** the repo's Releases page. Installed copies update themselves from there.
 
 ---
 
@@ -217,6 +217,12 @@ how to use it, where it lives in the code, and what's still waiting on you.
 ### Smooth resizing (0.2.2)
 - **Cards:** card grids (Library playlists, artists, albums) used to stretch wider while their rows kept the old height, so cards overlapped, then snapped into a new grid 140 ms after you stopped. Now every frame of a drag gives the rows the cards’ real height, and when a column comes or goes the cards glide from where they were to their new spots. A width sweep from 380 to 960 px and back (117 frames) found no overlap at any frame.
 - **Lyrics:** the space above and below the lines came from the panel’s width, so the whole text slid up and down as you dragged. It now comes from the stage’s height, and on every size change the sung line is put back exactly where it was (plain lyrics keep their place in the text). Measured: the sung line stays within 6 px across every width, including the switch to and from the corner layout.
+
+### Real artists (0.2.11)
+- **Edit info’s artist list shows real artists.** It used to list every song’s raw tag, so "Playboi Carti & Lil Uzi Vert" counted as an artist. Collabs now count for each artist on them, and the list shows one name per artist.
+- **Real names stay in one piece.** Glass checks names joined by a comma or "&" against Deezer’s public artist search, in the background and only once per name. A name stays whole only if Deezer has that exact name and it’s more popular than the names it would split into: "Tyler, the Creator", "Earth, Wind & Fire" and "Simon & Garfunkel" stay whole, while "Tyler, the Creator & Frank Ocean" and "Drake & Future" split. This also fixes artist pages and grouping for those acts. Only the names are sent; answers are kept in `artist-names.json` in Glass’s data folder. Offline it splits as before and checks again later.
+- **Typing an artist** suggests real artists from Deezer, with photos, under the ones already in your library.
+- **Clicking anywhere on the Artist or Album field opens its list,** even when the field is already filled in; typing then narrows it down.
 
 ### A heads-up for small pictures (0.2.10)
 - **Adjust cover** (songs, albums, playlists) shows a small note when fewer than 600 of the picture’s own pixels would fill the square, including when you zoom far into a big picture: it may look blurry as the cover and in the background, and 1000 × 1000 or bigger stays sharp. It’s only a note; any picture can still be used.

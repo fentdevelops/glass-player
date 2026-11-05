@@ -810,6 +810,63 @@ ipcMain.on('zoom-set', (_e, f) => {
   if (win && v >= ZOOMS[0] && v <= ZOOMS[ZOOMS.length - 1]) win.webContents.setZoomFactor(v);
 });
 
+// ---- real artists, from Deezer's public artist search (no key, nothing about you is sent) ----
+// Is "Earth, Wind & Fire" one act, or "Playboi Carti & Lil Uzi Vert" a collab to split? A name counts as one act only if
+// Deezer has that exact name and it's more popular than any of the names it would split into (Deezer also has a few
+// small pages for collabs). Answers are kept in userData/artist-names.json; a failed lookup isn't remembered.
+const actKey = (s) => String(s || '').normalize('NFKD').replace(/[\u0300-\u036f]/g, '').toLowerCase().replace(/&/g, ' and ').replace(/[^\p{L}\p{N}$]+/gu, ' ').trim();
+let acts = null, actsSave = 0;
+function actsLoad() {
+  if (acts) return acts;
+  try { acts = JSON.parse(fs.readFileSync(ud('artist-names.json'), 'utf8')); } catch { acts = {}; }
+  acts.exact ??= {};
+  acts.whole ??= {};
+  return acts;
+}
+function actsPersist() {
+  clearTimeout(actsSave);
+  actsSave = setTimeout(() => { try { fs.writeFileSync(ud('artist-names.json'), JSON.stringify(acts)); } catch { /* best effort */ } }, 800);
+}
+const actPause = (ms) => new Promise((r) => setTimeout(r, ms));
+async function deezerArtists(q, limit) {
+  const j = await getJSON(`https://api.deezer.com/search/artist?q=${encodeURIComponent(q)}&limit=${limit}`);
+  return (j && j.data) || [];
+}
+async function exactAct(name) {
+  const c = actsLoad(), k = actKey(name);
+  if (k in c.exact) return c.exact[k];
+  const hit = (await deezerArtists(name, 8)).find((a) => actKey(a.name) === k);
+  c.exact[k] = hit ? { name: hit.name, fans: hit.nb_fan || 0 } : null;
+  actsPersist();
+  await actPause(130);        // stays well inside Deezer's limit of 50 requests in 5 seconds
+  return c.exact[k];
+}
+// items: [{ name, parts: [...] }]. Returns the names that are one act; ones that couldn't be checked come back in `failed`
+ipcMain.handle('acts-check', async (_e, items) => {
+  const c = actsLoad(), whole = [], failed = [];
+  for (const { name, parts } of items || []) {
+    const k = actKey(name);
+    if (!(k in c.whole)) {
+      try {
+        const w = await exactAct(name);
+        let one = !!(w && w.fans);
+        for (const p of one ? parts : []) { const a = await exactAct(p); if (a && a.fans > w.fans) { one = false; break; } }
+        c.whole[k] = one;
+        actsPersist();
+      } catch { failed.push(name); continue; }
+    }
+    if (c.whole[k]) whole.push(name);
+  }
+  return { whole, failed };
+});
+ipcMain.handle('acts-known', () => { const c = actsLoad(); return { whole: Object.keys(c.whole).filter((k) => c.whole[k]), checked: Object.keys(c.whole) }; });
+// typing an artist's name: real artists to choose from, with their photos
+ipcMain.handle('acts-search', async (_e, q) => {
+  try {
+    return (await deezerArtists(String(q || '').slice(0, 80), 6)).map((a) => ({ name: a.name, photo: a.picture_medium || '', fans: a.nb_fan || 0 }));
+  } catch { return []; }
+});
+
 // ---- taskbar preview buttons: previous · play/pause · next (hover Glass on the taskbar) ----
 // The icons are drawn here, white with soft edges, so no image files are needed.
 const glyphs = {};
