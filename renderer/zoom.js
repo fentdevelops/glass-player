@@ -9,9 +9,9 @@
   pop.className = 'zoom-pop glass';
   pop.hidden = true;
   pop.innerHTML = `
-    <button type="button" class="zp-btn" data-z="-1" title="Zoom out (Ctrl −)"><svg viewBox="0 0 24 24"><path d="M6.5 12h11"/></svg></button>
-    <button type="button" class="zp-val" data-z="0" title="Back to 100% (Ctrl 0)"><span>100%</span></button>
-    <button type="button" class="zp-btn" data-z="1" title="Zoom in (Ctrl +)"><svg viewBox="0 0 24 24"><path d="M6.5 12h11M12 6.5v11"/></svg></button>`;
+    <button type="button" class="zp-btn" data-z="-1" title="Zoom out (${modName} −)"><svg viewBox="0 0 24 24"><path d="M6.5 12h11"/></svg></button>
+    <button type="button" class="zp-val" data-z="0" title="Back to 100% (${modName} 0)"><span>100%</span></button>
+    <button type="button" class="zp-btn" data-z="1" title="Zoom in (${modName} +)"><svg viewBox="0 0 24 24"><path d="M6.5 12h11M12 6.5v11"/></svg></button>`;
   document.body.appendChild(pop);
   window.Liquid?.watch?.(pop);
   const val = pop.querySelector('.zp-val span');

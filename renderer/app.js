@@ -1,6 +1,14 @@
 'use strict';
 
 const api = window.glass;
+// macOS: ⌘ instead of Ctrl, and the system's own window buttons (styles.css: body.mac)
+const isMac = /Mac/i.test(navigator.platform);
+const modName = isMac ? '⌘' : 'Ctrl';
+const modKey = (e) => (isMac ? e.metaKey : e.ctrlKey);
+if (isMac) {
+  document.body.classList.add('mac');
+  document.querySelectorAll('[title*="Ctrl"]').forEach((el) => { el.title = el.title.replace(/Ctrl\s*\+?\s*/g, '⌘'); });
+}
 const $ = (s, r = document) => r.querySelector(s);
 const $$ = (s, r = document) => [...r.querySelectorAll(s)];
 const body = document.body;
@@ -2547,10 +2555,10 @@ window.addEventListener('keydown', (e) => {
   if (modalClose) return;
   if (e.target.matches('input[type=text]')) { if (e.key === 'Escape') e.target.blur(); return; }
   const k = e.key.toLowerCase();
-  if (e.ctrlKey && k === 'o') { act('open-files'); e.preventDefault(); return; }
-  if (e.ctrlKey && k === 'f') { if (S.view === 'queue') { setView('library'); setTimeout(() => $('#search').focus(), 260); } else $('#search').focus(); e.preventDefault(); return; }
-  if (e.ctrlKey && k === 'e') { setWide(!S.wide); e.preventDefault(); return; }
-  if (e.ctrlKey && /^[123]$/.test(k)) { setView(VIEWS[+k - 1]); e.preventDefault(); return; }
+  if (modKey(e) && k === 'o') { act('open-files'); e.preventDefault(); return; }
+  if (modKey(e) && k === 'f') { if (S.view === 'queue') { setView('library'); setTimeout(() => $('#search').focus(), 260); } else $('#search').focus(); e.preventDefault(); return; }
+  if (modKey(e) && k === 'e') { setWide(!S.wide); e.preventDefault(); return; }
+  if (modKey(e) && /^[123]$/.test(k)) { setView(VIEWS[+k - 1]); e.preventDefault(); return; }
   switch (k) {
     case ' ': togglePlay(); break;
     case 'arrowright': deck.seek(Math.min(deck.duration || 0, deck.currentTime + (e.shiftKey ? 30 : S.play.skip || 5))); break;

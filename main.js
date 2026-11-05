@@ -10,10 +10,11 @@ const MEDIA_EXT = new Set([...AUDIO_EXT, ...VIDEO_EXT].map((e) => '.' + e));
 
 let win = null;
 
-// Glassy used to be called Glass Player: its library and settings stay in the folder they've always been in.
+const isMac = process.platform === 'darwin';
+// Glassy used to be called Glass Player: on Windows its library and settings stay in the folder they've always been in.
 // (Windows names that folder after the app, so without this the rename would look like an empty library.)
 // Dev: GLASS_USERDATA isolates test runs from the real library
-app.setPath('userData', process.env.GLASS_USERDATA || path.join(app.getPath('appData'), 'Glass Player'));
+app.setPath('userData', process.env.GLASS_USERDATA || path.join(app.getPath('appData'), isMac ? 'Glassy' : 'Glass Player'));
 // Dev: GLASS_SHOT runs render off-screen (no window ever appears, nothing steals focus) and are muted.
 // GLASS_SCREEN needs a real on-screen window, so only that mode shows one; ask the user before using it.
 const OFFSCREEN_TEST = !!process.env.GLASS_SHOT && !process.env.GLASS_SCREEN;
@@ -61,12 +62,14 @@ function createWindow() {
     height: testH || 800,
     minWidth: 900,
     minHeight: 600,
-    frame: false,
+    frame: isMac,           // macOS keeps its real window buttons (see titleBarStyle below); Windows draws its own
     // Windows 11 rounds a frameless window's corners; asked for explicitly
     roundedCorners: true,
     // Windows 11 acrylic: the desktop behind the player shows through, heavily blurred. With Transparency
     // effects off, acrylic is just solid grey and can cost the rounded corners, so a solid dark window is used.
-    ...(transparencyOn() ? { backgroundColor: '#00000000', backgroundMaterial: 'acrylic' } : { backgroundColor: '#15151b' }),
+    // macOS: the system's own blur behind the window, and the traffic-light buttons over our title bar
+    ...(isMac ? { titleBarStyle: 'hiddenInset', trafficLightPosition: { x: 14, y: 15 }, vibrancy: 'under-window', visualEffectState: 'active', backgroundColor: '#00000000' }
+      : transparencyOn() ? { backgroundColor: '#00000000', backgroundMaterial: 'acrylic' } : { backgroundColor: '#15151b' }),
     show: false,
     title: 'Glassy',
     webPreferences: {
@@ -108,7 +111,8 @@ function createWindow() {
   win.on('leave-full-screen', () => win.webContents.send('maximized', win.isMaximized()));
 
   win.webContents.once('did-finish-load', () => {
-    const tracks = resolvePaths(argPaths(process.argv));
+    const tracks = resolvePaths([...argPaths(process.argv), ...finderFiles.splice(0)]);
+    pageReady = true;
     if (tracks.length) win.webContents.send('open-paths', tracks);
 
     // Dev helpers: GLASS_SHOT=out.png captures and quits. GLASS_PRE runs JS at 1.5s,
@@ -711,7 +715,9 @@ function readPub() {
   return [].concat((pkgInfo.build && pkgInfo.build.publish) || []).find((p) => p && p.provider === 'github' && p.owner && p.repo) || null;
 }
 const ghPub = readPub();
-const isPortable = !!process.env.PORTABLE_EXECUTABLE_DIR;
+// the portable copy can't replace itself; macOS only lets an app update itself once it's signed by an Apple developer
+// account. Both get the "new version is out" card, which opens the download page.
+const manualUpdates = !!process.env.PORTABLE_EXECUTABLE_DIR || isMac;
 let updateState = { state: 'idle', version: app.getVersion() };
 const sendUpdate = (patch) => { updateState = { ...updateState, ...patch }; win?.webContents.send('update', updateState); };
 const newer = (a, b) => { const pa = String(a).replace(/^v/, '').split(/[.-]/).map(Number), pb = String(b).replace(/^v/, '').split(/[.-]/).map(Number);
@@ -724,7 +730,7 @@ async function checkUpdates(manual = false) {
   if (!manual && busy) return;
   lastCheck = Date.now();
   try {
-    if (isPortable) {
+    if (manualUpdates) {
       sendUpdate({ state: 'checking' });
       const r = await fetch(`https://api.github.com/repos/${ghPub.owner}/${ghPub.repo}/releases/latest`, { headers: { 'User-Agent': 'GlassPlayer', Accept: 'application/vnd.github+json' }, signal: AbortSignal.timeout(10000) });
       if (!r.ok) throw new Error('HTTP ' + r.status);
@@ -763,6 +769,7 @@ app.whenReady().then(() => {
 
 // ---- Windows glass: is "Transparency effects" on? (read only; the user flips it in Windows Settings) ----
 function transparencyOn() {
+  if (process.platform !== 'win32') return true;
   try {
     const out = require('child_process').execFileSync('reg', ['query', 'HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Themes\\Personalize', '/v', 'EnableTransparency'], { windowsHide: true, encoding: 'utf8', timeout: 3000 });
     const m = /EnableTransparency\s+REG_DWORD\s+0x([0-9a-f]+)/i.exec(out);
@@ -770,13 +777,14 @@ function transparencyOn() {
   } catch { return true; }
 }
 ipcMain.handle('sys:transparency', () => new Promise((resolve) => {
+  if (process.platform !== 'win32') { resolve(true); return; }
   require('child_process').execFile('reg', ['query', 'HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Themes\\Personalize', '/v', 'EnableTransparency'],
     { windowsHide: true }, (err, out) => {
       const m = !err && /EnableTransparency\s+REG_DWORD\s+0x([0-9a-f]+)/i.exec(out);
       resolve(m ? parseInt(m[1], 16) !== 0 : null);
     });
 }));
-ipcMain.handle('sys:open-colors', () => shell.openExternal('ms-settings:colors'));
+ipcMain.handle('sys:open-colors', () => (process.platform === 'win32' ? shell.openExternal('ms-settings:colors') : null));
 
 // ---- links that open in the browser: only https, only these hosts (artist pages: "Read more on Wikipedia") ----
 const LINK_HOSTS = ['en.wikipedia.org'];
@@ -924,6 +932,25 @@ function removeOldFiles() {
   for (const f of OLD_FILES) {
     try { fs.rmSync(ud(f), { force: true }); } catch { /* in use or not allowed */ }
   }
+}
+
+// ---- macOS: a real menu bar (Quit, copy and paste in text boxes, window controls) and files opened from Finder ----
+let pageReady = false;
+const finderFiles = [];
+if (isMac) {
+  app.on('open-file', (e, p) => {
+    e.preventDefault();
+    if (pageReady && win) {
+      const tracks = resolvePaths([p]);
+      if (tracks.length) win.webContents.send('open-paths', tracks);
+    } else finderFiles.push(p);
+  });
+  app.whenReady().then(() => {
+    const { Menu, nativeTheme } = require('electron');
+    // the blur behind the window follows this; on a Mac set to light mode it would turn white behind white text
+    nativeTheme.themeSource = 'dark';
+    Menu.setApplicationMenu(Menu.buildFromTemplate([{ role: 'appMenu' }, { role: 'editMenu' }, { role: 'windowMenu' }]));
+  });
 }
 
 // ---- single instance: "Open with" on a running player adds to its queue ----

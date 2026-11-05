@@ -1,0 +1,76 @@
+# Builds Glassy for macOS on a real Mac, tests it, and attaches it to the GitHub release.
+# Runs by itself whenever a release is published (npm run release on Windows), or by hand from the Actions tab.
+name: Mac build
+
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Release to attach the Mac files to (for example v0.2.15). Empty builds and tests only.
+        required: false
+        default: ''
+
+permissions:
+  contents: write
+
+jobs:
+  mac:
+    runs-on: macos-latest
+    timeout-minutes: 40
+    env:
+      TAG: ${{ github.event.release.tag_name || inputs.tag }}
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.release.tag_name || inputs.tag || github.ref }}
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Install
+        run: |
+          npm ci
+          node node_modules/electron/install.js
+
+      - name: Test from source
+        run: node scripts/smoke.js smoke/source
+
+      - name: Build
+        # no Apple developer account yet: the app is signed ad hoc, so macOS asks people to allow it on first open
+        run: npx electron-builder --mac --publish never -c.directories.output=dist-mac
+
+      - name: Test the built app
+        run: node scripts/smoke.js smoke/built "dist-mac/mac-arm64/Glassy.app/Contents/MacOS/Glassy"
+
+      - name: Test the Intel build (runs through Rosetta, when this machine has it)
+        continue-on-error: true
+        run: |
+          file "dist-mac/mac/Glassy.app/Contents/MacOS/Glassy"
+          node scripts/smoke.js smoke/built-intel "dist-mac/mac/Glassy.app/Contents/MacOS/Glassy"
+
+      - name: Picture of the real window, with the system's buttons and blur
+        continue-on-error: true
+        run: |
+          mkdir -p smoke/screen
+          GLASS_USERDATA="$RUNNER_TEMP/glassy-screen" "dist-mac/mac-arm64/Glassy.app/Contents/MacOS/Glassy" &
+          APP=$!
+          sleep 12
+          screencapture -x smoke/screen/screen.png
+          kill $APP
+
+      - name: Save the test results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: mac-smoke
+          path: smoke/
+
+      - name: Attach to the release
+        if: env.TAG != ''
+        run: |
+          ls -la dist-mac/*.dmg dist-mac/*.zip
+          gh release upload "$TAG" dist-mac/*.dmg dist-mac/*.zip --clobber

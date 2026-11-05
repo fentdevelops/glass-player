@@ -109,7 +109,7 @@
     if (!e) { pill('Nothing to undo'); return; }
     await apply(e.before, e.files, e.removed, true);
     redoStack.push(e);
-    pill(`Undone: ${e.label}`, 'Ctrl+Shift+Z to redo');
+    pill(`Undone: ${e.label}`, `${modName}+Shift+Z to redo`);
   }
   async function redo() {
     const e = redoStack.pop();
@@ -145,7 +145,7 @@
 
   // ---------- keys: Ctrl+Z, Ctrl+Shift+Z / Ctrl+Y (text boxes keep their own undo) ----------
   window.addEventListener('keydown', (e) => {
-    if (!e.ctrlKey || e.altKey) return;
+    if (!modKey(e) || e.altKey) return;
     const k = e.key.toLowerCase();
     if (k !== 'z' && k !== 'y') return;
     if (e.target && e.target.matches && e.target.matches('input, textarea, [contenteditable]')) return;

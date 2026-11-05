@@ -33,8 +33,8 @@
       <div class="set-row set-blur" data-blur-row><div><b>Background blur <em class="set-val" data-wallblur></em></b><span>How soft the picture behind the glass looks</span></div>
         <input type="range" class="range" min="0" max="40" step="1" data-ui="wallBlur" /></div>
       ${toggle('ui.quickEdit', 'Quick edits', 'Right-click the cover to change it. Double-click the title, artist or album to rename it.')}
-      <div class="set-row"><div><b>See-through window</b><span data-transp>Checking Windows…</span></div>
-        <button type="button" class="btn" data-act="colors">Open Windows settings</button></div>`;
+      ${isMac ? '' : `<div class="set-row"><div><b>See-through window</b><span data-transp>Checking Windows…</span></div>
+        <button type="button" class="btn" data-act="colors">Open Windows settings</button></div>`}`;
   }
 
   // ---- Sound: bass, treble, a smooth EQ curve you drag, reverb ----
@@ -120,6 +120,7 @@
     // Windows "Transparency effects": the see-through blur needs it on
     const transp = form.querySelector('[data-transp]');
     const paintTransp = async () => {
+      if (!transp) return;     // a Windows setting: not shown on macOS
       const on = await sys.transparency().catch(() => null);
       transp.textContent = on === true ? 'On: the desktop shows through, blurred'
         : on === false ? 'Off: Windows draws the glass solid grey. Turn on Transparency effects.'
@@ -131,7 +132,7 @@
     window.addEventListener('focus', onFocus);
     new MutationObserver((_, obs) => { if (!form.isConnected) { window.removeEventListener('focus', onFocus); obs.disconnect(); } })
       .observe(document.querySelector('#modalRoot'), { childList: true });
-    form.querySelector('[data-act="colors"]').addEventListener('click', () => sys.openColors().catch(() => {}));
+    form.querySelector('[data-act="colors"]')?.addEventListener('click', () => sys.openColors().catch(() => {}));
 
     // background: your own picture + how blurred it is
     const wallRow = form.querySelector('[data-wall-row]'), wallHint = form.querySelector('[data-wall-hint]');
@@ -197,5 +198,5 @@
     });
   };
   document.querySelector('#btnSettings').addEventListener('click', () => Settings.open());
-  window.addEventListener('keydown', (e) => { if (e.ctrlKey && e.key === ',') { e.preventDefault(); Settings.open(); } });
+  window.addEventListener('keydown', (e) => { if (modKey(e) && e.key === ',') { e.preventDefault(); Settings.open(); } });
 })();

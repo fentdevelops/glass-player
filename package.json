@@ -6,6 +6,7 @@
   "scripts": {
     "start": "electron .",
     "dist": "electron-builder --win",
+    "dist:mac": "electron-builder --mac --publish never",
     "dist:portable": "electron-builder --win portable",
     "release": "node scripts/release.js"
   },
@@ -41,6 +42,20 @@
       ],
       "icon": "build/icon.png"
     },
+    "mac": {
+      "target": [
+        { "target": "dmg", "arch": ["arm64", "x64"] },
+        { "target": "zip", "arch": ["arm64", "x64"] }
+      ],
+      "icon": "build/icon.png",
+      "category": "public.app-category.music",
+      "identity": "-",
+      "hardenedRuntime": false,
+      "gatekeeperAssess": false,
+      "darkModeSupport": true,
+      "artifactName": "Glassy-${version}-mac-${arch}.${ext}"
+    },
+    "dmg": { "artifactName": "Glassy-${version}-mac-${arch}.${ext}" },
     "nsis": {
       "oneClick": false,
       "perMachine": false,
@@ -75,8 +90,6 @@
         "role": "Viewer"
       }
     ],
-    "electronDist": "node_modules/electron/dist",
-    "electronVersion": "44.10.2",
     "directories": {
       "buildResources": "build"
     },

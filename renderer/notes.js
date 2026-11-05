@@ -58,7 +58,7 @@
       art: wash(11, '<path d="M38 42V30a10 10 0 0 1 20 0v12l4 4H34z"/><path d="M44 50a4 4 0 0 0 8 0"/>') },
     { v: '0.2.1', title: 'Glassy updates itself', text: 'New versions download quietly in the background and install when you restart.',
       art: wash(8, '<circle cx="48" cy="32" r="19" opacity=".45"/><path d="M48 20v20M40 33l8 8 8-8"/><path d="M38 47h20"/>') },
-    { title: 'Undo anything', text: 'Ctrl+Z puts back what you just did. Ctrl+Shift+Z does it again.',
+    { title: 'Undo anything', text: `${modName}+Z puts back what you just did. ${modName}+Shift+Z does it again.`,
       art: wash(2, '<path d="M36 26h18a10 10 0 0 1 0 20H42"/><path d="M42 19l-7 7 7 7"/>') },
     { title: 'Equalizer curve', text: 'Drag the points on a smooth, glowing curve. Double-click one to reset it.',
       art: wash(3, '<path d="M14 40 C26 40 28 22 40 24 S54 44 64 34 S78 22 84 26"/><circle cx="40" cy="24" r="3" fill="#fff"/><circle cx="64" cy="34" r="3" fill="#fff"/>') },

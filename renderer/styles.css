@@ -185,7 +185,7 @@ video.under { opacity: 1; transition: none; }
 }
 body.has-track .empty { display: none; }
 .empty-icon { width: 44px; height: 44px; margin-bottom: 14px; fill: none; stroke: #fff; stroke-width: 1.4; stroke-linecap: round; stroke-linejoin: round; animation: float 2.8s ease-in-out infinite alternate; }
-.empty h1 { margin: 0; font: 600 22px/1.2 "Segoe UI Variable Display", "Segoe UI", sans-serif; }
+.empty h1 { margin: 0; font: 600 22px/1.2 "Segoe UI Variable Display", "Segoe UI", system-ui, sans-serif; }
 .empty p { margin: 8px 0 22px; color: var(--ink-2); font-size: 13px; }
 .empty-actions { display: flex; gap: 10px; }
 
@@ -333,7 +333,7 @@ body.playing .ibtn.play .i-pause { opacity: 1; transform: none; }
 
 .side-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 0 8px 10px 10px; min-height: 44px; }
 .side-title { min-width: 0; }
-.side-title h2 { margin: 0; font: 600 17px/1.2 "Segoe UI Variable Display", "Segoe UI", sans-serif; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.side-title h2 { margin: 0; font: 600 17px/1.2 "Segoe UI Variable Display", "Segoe UI", system-ui, sans-serif; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .side-title span { display: block; font-size: 12px; color: var(--ink-2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .tools { display: flex; gap: 2px; flex: none; }
 .tool { animation: pop-in .5s var(--soft) both; }
@@ -531,7 +531,7 @@ body.playing .ibtn.play .i-pause { opacity: 1; transform: none; }
 .az span.hot { color: #fff; transform: scale(1.5); }
 .az-bubble {
   position: absolute; right: 30px; top: 0; z-index: 5; width: 46px; height: 46px; border-radius: 14px;
-  display: grid; place-items: center; font: 600 22px/1 "Segoe UI Variable Display", "Segoe UI", sans-serif;
+  display: grid; place-items: center; font: 600 22px/1 "Segoe UI Variable Display", "Segoe UI", system-ui, sans-serif;
   background: rgba(70, 70, 80, .8); box-shadow: inset 0 1px 0 rgba(255, 255, 255, .3), 0 10px 24px -8px rgba(0, 0, 0, .5);
   opacity: 0; transform: scale(.6); pointer-events: none;
   transition: opacity .3s var(--glide), transform .45s var(--glide), top .12s linear;
@@ -567,7 +567,7 @@ body.playing .ibtn.play .i-pause { opacity: 1; transform: none; }
 .hero-art.editable:hover { transform: scale(1.04); }
 .hero-art svg { width: 32%; height: 32%; fill: none; stroke: #fff; stroke-width: 1.5; stroke-linecap: round; opacity: .9; }
 .hero-art.fav svg { fill: #fff; stroke: none; }
-.hero h3 { margin: 0; font: 600 20px/1.2 "Segoe UI Variable Display", "Segoe UI", sans-serif; word-break: break-word; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+.hero h3 { margin: 0; font: 600 20px/1.2 "Segoe UI Variable Display", "Segoe UI", system-ui, sans-serif; word-break: break-word; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
 .hero p { margin: 3px 0 10px; font-size: 12px; color: var(--ink-2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .hero-actions { display: flex; gap: 4px; align-items: center; }
 .btn-play { height: 32px; padding: 0 14px 0 10px; border-radius: 999px; display: inline-flex; align-items: center; gap: 6px; font-weight: 600; font-size: 12.5px; background-color: rgba(255, 255, 255, .92); color: #16161b; box-shadow: inset 0 1px 0 #fff, 0 6px 14px -6px rgba(0, 0, 0, .4); }
@@ -613,7 +613,7 @@ body.playing .ibtn.play .i-pause { opacity: 1; transform: none; }
   backdrop-filter: blur(36px) saturate(160%);
 }
 .modal-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 14px; }
-.modal-title { margin: 0 0 16px; font: 600 19px/1.2 "Segoe UI Variable Display", "Segoe UI", sans-serif; }
+.modal-title { margin: 0 0 16px; font: 600 19px/1.2 "Segoe UI Variable Display", "Segoe UI", system-ui, sans-serif; }
 .modal-head .modal-title { margin: 0; }
 .edit-grid { display: grid; grid-template-columns: 132px minmax(0, 1fr); gap: 16px; margin-bottom: 12px; }
 .cover-pick, .pl-pick { position: relative; display: block; width: 100%; border-radius: 16px; }
@@ -1149,7 +1149,7 @@ body.wide .side-grip, body.fs .side-grip { display: none; }
 .ahero-art svg { width: 34%; height: 34%; fill: none; stroke: #fff; stroke-width: 1.5; opacity: .9; }
 .ahero-info { min-width: 0; }
 .ahero-kind { display: block; font-size: 11px; font-weight: 600; color: var(--ink-2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; text-transform: capitalize; }
-.ahero h3 { margin: 2px 0 2px; font: 650 22px/1.15 "Segoe UI Variable Display", "Segoe UI", sans-serif; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.ahero h3 { margin: 2px 0 2px; font: 650 22px/1.15 "Segoe UI Variable Display", "Segoe UI", system-ui, sans-serif; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .ahero-facts { margin: 0 0 6px; font-size: 12px; color: var(--ink-2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .ahero-genres { display: flex; gap: 4px; margin-bottom: 8px; overflow: hidden; }
 .ahero-genres span { flex: none; font-size: 10.5px; font-weight: 600; padding: 2px 8px; border-radius: 999px; background: var(--fill-2); text-transform: capitalize; }
@@ -1374,6 +1374,11 @@ body.fs.idle .vfs-btn { opacity: 0; pointer-events: none; }
 html, body { border-radius: 8px; }
 body { clip-path: inset(0 round 8px); }
 body.maximized, body.fs { clip-path: none; border-radius: 0; }
+/* macOS: the system rounds the window and draws its own buttons top left, so the gear sits top right */
+body.mac { clip-path: none; }
+body.mac .win-rim { border-radius: 10px; }
+body.mac .win-btns { display: none; }
+body.mac .titlebar { justify-content: flex-end; }
 
 /* ---------- glass colour (Settings > Glass): a light tint under every panel's sheen ---------- */
 .glass, body.liquid .glass { background-color: var(--glass-tint, transparent); }
@@ -1393,7 +1398,7 @@ body.maximized, body.fs { clip-path: none; border-radius: 0; }
 .set-bigrow { display: flex; align-items: flex-end; justify-content: space-between; gap: 12px; margin-top: 4px; }
 .set-bigrow b { display: block; font-size: 14px; }
 .set-bigrow span { display: block; font-size: 12px; color: var(--ink-2); }
-.set-num { font-style: normal; font: 700 18px/1 "Segoe UI Variable Display", "Segoe UI", sans-serif; font-variant-numeric: tabular-nums; }
+.set-num { font-style: normal; font: 700 18px/1 "Segoe UI Variable Display", "Segoe UI", system-ui, sans-serif; font-variant-numeric: tabular-nums; }
 .range.big { width: 100%; height: 26px; --th: 7px; }
 .range.big:hover, .range.big:active { --th: 10px; }
 
@@ -1414,14 +1419,14 @@ body.maximized, body.fs { clip-path: none; border-radius: 0; }
 .eq-svg { display: block; width: 100%; height: auto; touch-action: none; user-select: none; }
 .eq-grid { stroke: rgba(255, 255, 255, .08); stroke-width: 1; stroke-dasharray: 3 5; }
 .eq-grid.zero { stroke: rgba(255, 255, 255, .2); stroke-dasharray: none; }
-.eq-db { fill: rgba(255, 255, 255, .45); font: 600 9px "Segoe UI", sans-serif; text-anchor: end; }
+.eq-db { fill: rgba(255, 255, 255, .45); font: 600 9px "Segoe UI", system-ui, sans-serif; text-anchor: end; }
 .eq-line { fill: none; stroke: #fff; stroke-width: 2.4; stroke-linecap: round; }
 .eq-glow { fill: none; stroke: rgba(255, 255, 255, .55); stroke-width: 7; }
 .eq-hit { fill: transparent; cursor: ns-resize; }
 .eq-dot { fill: #fff; stroke: rgba(30, 30, 38, .9); stroke-width: 2.5; transition: r .35s var(--glide); cursor: ns-resize; pointer-events: none; }
 .eq-pt:hover .eq-dot, .eq-pt.drag .eq-dot { r: 9; }
-.eq-hz { fill: rgba(255, 255, 255, .6); font: 600 10.5px "Segoe UI", sans-serif; text-anchor: middle; }
-.eq-val { fill: #fff; font: 700 10.5px "Segoe UI", sans-serif; text-anchor: middle; opacity: 0; transition: opacity .3s var(--glide); pointer-events: none; }
+.eq-hz { fill: rgba(255, 255, 255, .6); font: 600 10.5px "Segoe UI", system-ui, sans-serif; text-anchor: middle; }
+.eq-val { fill: #fff; font: 700 10.5px "Segoe UI", system-ui, sans-serif; text-anchor: middle; opacity: 0; transition: opacity .3s var(--glide); pointer-events: none; }
 .eq-pt:hover .eq-val, .eq-pt.drag .eq-val { opacity: 1; }
 
 /* What's new */
@@ -1435,7 +1440,7 @@ body.maximized, body.fs { clip-path: none; border-radius: 0; }
 .pn-text span { display: block; margin-top: 2px; font-size: 12px; line-height: 1.45; color: var(--ink-2); }
 
 /* the speed button next to Lyrics */
-.speed-btn { width: auto; min-width: 38px; padding: 0 9px; font: 700 12.5px/1 "Segoe UI", sans-serif; font-variant-numeric: tabular-nums; letter-spacing: .2px; }
+.speed-btn { width: auto; min-width: 38px; padding: 0 9px; font: 700 12.5px/1 "Segoe UI", system-ui, sans-serif; font-variant-numeric: tabular-nums; letter-spacing: .2px; }
 .speed-btn span { display: inline-block; }
 .speed-btn.on { background-color: rgba(255, 255, 255, .16); box-shadow: inset 0 0 0 1px rgba(255, 255, 255, .3); }
 
