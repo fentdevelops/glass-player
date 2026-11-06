@@ -1708,7 +1708,7 @@ html.intro-hide .ambient, html.intro-hide .body, html.intro-hide .gear { visibil
 :where(.su) button { font: inherit; color: inherit; border: 0; background: none; cursor: pointer; }
 .su-mark { position: absolute; left: 28px; top: calc(var(--su-top) + 12px); width: 44px; height: 44px; border-radius: 22px; display: grid; place-items: center;
   background: linear-gradient(160deg, rgba(255, 255, 255, .2), rgba(255, 255, 255, .07) 42%, rgba(255, 255, 255, .12)); box-shadow: inset 0 0 0 1px rgba(255, 255, 255, .2), inset 3px 4px 10px -4px rgba(255, 255, 255, .6); }
-.su-mark svg { width: 15px; height: 15px; margin-left: 2px; fill: #fff; }
+.su-mark svg { width: 15px; height: 15px; fill: #fff; }
 .su-intro .su-mark { display: none; }
 .su-logo { position: absolute; left: 80px; top: calc(var(--su-top) + 20px); font-size: 21px; font-weight: 600; letter-spacing: -.01em; }
 .su-close { position: absolute; right: 22px; top: calc(var(--su-top) + 14px); width: 40px; height: 40px; border-radius: 50%; display: grid; place-items: center; transition: background-color .35s var(--glide); }
