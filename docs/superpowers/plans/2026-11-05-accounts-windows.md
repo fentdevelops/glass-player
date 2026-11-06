@@ -2,15 +2,15 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Optional accounts on Windows: Google, or email and password with six-digit codes, a unique username, and a profile with a picture and bio that other signed-in people can find, plus report, block, export and delete.
+**Goal:** A first-launch intro, then optional accounts on Windows: Google, a passkey, a phone number, or email and password with six-digit codes, a unique username, and a profile with a picture and bio that other signed-in people can find, plus report, block, export and delete.
 
 **Architecture:** One Supabase backend, defined entirely by migration files and tested on GitHub Actions against a throwaway local Supabase. In the app, `@supabase/supabase-js` runs only in the main process under `account/`, and the renderer talks to it through validated `account:*` IPC. Everything stays switched off in releases until the launch list is done.
 
 **Tech Stack:** Supabase (Postgres, Auth, Storage, Edge Functions on Deno), pgTAP, Electron 44 `safeStorage`, `node:test`, the app's off-screen `GLASS_SHOT` harness.
 
-**Spec:** `docs/superpowers/specs/2026-11-05-accounts-design.md`
+**Spec:** `docs/superpowers/specs/2026-11-05-accounts-design.md`, `docs/superpowers/specs/2026-11-05-intro-design.md`
 
-**Out of this plan:** Apple sign-in, Mac accounts, iPhone screens (all wait for Apple Developer membership), authenticator codes, sync, playlists on profiles. Those get their own plans.
+**Out of this plan:** Apple sign-in, Mac accounts, iPhone screens (all wait for Apple Developer membership), authenticator codes, sync, playlists on profiles. The iPhone session builds the same intro, terms-first flow, passkeys and phone number for iPhone. Those get their own plans.
 
 ## Global Constraints
 
@@ -18,6 +18,9 @@
 - Bio: plain text, at most 160 characters, shown as text only, links not clickable.
 - Passwords: at least 15 characters, at most 72, no required symbols.
 - Email codes are 6 digits. Email templates contain the code and no links.
+- Terms are read before sign-in: I agree lights up only after scrolling to the end, and Continue without an account skips them.
+- Phone sign-in: US and Canada only at first, with a low hourly cap for the whole project.
+- Passkeys run in the system browser on a page on our own domain, behind their own switch, because Supabase's are in beta.
 - Minimum age 13. Teens (13 to 17) are left out of search and can't change that. A full date of birth is never stored.
 - Pictures: JPEG, 512 by 512, at most 512 KB, bucket `avatars`, path `{user id}/{random}.jpg`.
 - A person's email is never visible to anyone else. No token reaches the renderer or a log.
@@ -38,6 +41,36 @@
 - **HTML in a bio or a search result:** `<img src=x onerror=alert(1)>` shows as literal text. Pinned in Task 8.
 
 ---
+
+### Task 0: The first-launch intro
+
+Can ship in a public release straight away, because its account screen is skipped while accounts are off.
+
+**Files:**
+- Create: `renderer/intro.js`, `tests/ui/intro.js`
+- Modify: `renderer/index.html`, `renderer/styles.css`, `renderer/settings.js` (Replay intro)
+
+**Interfaces:**
+- Produces: `Intro.maybeShow()` at startup, `Intro.replay()`, and `Intro.accountStep = null`, a slot Task 7 fills
+
+- [ ] **Step 1: Write the failing test:**
+
+```js
+// new install (fresh userData, empty library): the intro shows
+// library or playlists already present: no intro, and localStorage is marked seen
+// seen once: not shown again; Settings > Replay shows it again
+// Skip from any screen lands in the app with nothing broken
+// accounts off: no account screen
+// when the intro ends the canvas is removed and no animation frame is still requested
+// reduced motion on: no moving background, screens crossfade
+// a song opened from Explorer on first launch: the intro doesn't block it, and it plays once the intro ends
+```
+
+- [ ] **Step 2: Run, confirm the failure, write it, run, confirm the pass.** Colors and flow come from the intro spec. Run: `node scripts/ui-test.js tests/ui/intro.js`. Move `scripts/ui-test.js` here from Task 7.
+
+- [ ] **Step 3: Read screenshots of every screen and a frame strip of the entry animation.** Check it glides, with no jump where the panels take over.
+
+- [ ] **Step 4: Commit, then ship with notes,** per the standing release rule.
 
 ### Task 1: Usernames, ages and profiles in the database
 
@@ -254,23 +287,61 @@ test('a second call cancels the first: first resolves cancelled, its port is fre
 
 - [ ] **Step 3: Commit.**
 
+### Task 6a: Phone number sign-in
+
+**Files:**
+- Modify: `supabase/config.toml` (SMS settings from `env()`, `sms_sent` rate limit 30 an hour), `account/client.js`, `account/fake.js`
+- Test: `tests/account/client.test.js`, `supabase/tests/integration/auth.test.mjs`
+
+**Interfaces:**
+- Produces: `phoneStart(number)`, `phoneVerify(number, code)`, `linkPhone(number)`, `linkPhoneVerify(number, code)`. New code `phone_region` for numbers outside `+1`.
+
+- [ ] **Step 1: Write the failing tests:**
+
+```js
+test('a non +1 number is refused with phone_region before anything is sent');
+test('hitting the provider cap returns rate_limited, and email sign-in still works');
+test('a wrong code returns bad_code');
+test('a phone number never appears in get_profile, search_profiles or export-data of another user');
+test('a session signed in by text alone can\'t delete the account without a fresh code');
+```
+
+- [ ] **Step 2: Run, confirm the failure, write it, run, confirm the pass. Commit.**
+
+### Task 6b: Passkeys
+
+**Files:**
+- Create: `web/passkey/index.html`, `web/passkey/passkey.js` (static page for the owner's domain, using the Supabase JS client with `experimental: { passkey: true }`)
+- Modify: `account/config.js` (`passkeysEnabled`, off by default), `account/oauth.js` (reused for the return trip), `account/client.js`
+
+**Interfaces:**
+- Produces: `passkeySignIn()`, `passkeyAdd()`. Both open the page through `signInWithBrowser` with the page's exact address allow-listed, and return the same results as `google()`.
+
+- [ ] **Step 1: Read the current Supabase passkey docs first,** since the API is in beta, and note anything that differs from this task.
+
+- [ ] **Step 2: Write the failing tests:** the page only redirects to `http://127.0.0.1:53682` to `53684` or `glassy://`; any other return address is refused; a code comes back and is exchanged like Google's; `passkeysEnabled` false hides both buttons and starts nothing.
+
+- [ ] **Step 3: Run, confirm the failure, write it, run, confirm the pass. Commit.** A real Windows Hello test waits for Task 9, when the domain exists.
+
 ### Task 7: Sign-in screens in Settings
 
 **Files:**
-- Create: `renderer/account.js`, `tests/ui/account-signin.js`, `scripts/ui-test.js`
+- Create: `renderer/account.js`, `tests/ui/account-signin.js`
 - Modify: `renderer/settings.js`, `renderer/index.html` (script tag before `settings.js`; add the Supabase storage host to `img-src` from `account/config.js`'s value when accounts ship), `renderer/styles.css`
 
 **Interfaces:**
 - Consumes: `glass.account.*`, `Art.layer`, `esc`, `toast`
 - Produces: `window.Account = { sectionHTML(), mount(form), openPicker(), state() }`. `scripts/ui-test.js <eval file>` runs an eval off-screen and muted with `GLASS_ACCOUNT_FAKE=1`, failing on any renderer error.
 
-**Screens, as glass sheets over Settings:** the Account section goes above Glass in Settings. Signed out: Continue with Google, and an email form (Apple isn't shown). The flow is email and password, then a six-digit code box, then date of birth, then terms and privacy with a checkbox, then a username picker with a live check. Forgot password goes email, code, new password. Each step glides into the next inside one sheet.
+**Screens, as glass sheets over Settings:** the Account section goes above Glass in Settings. Signed out: Continue with Google, Use a passkey, Phone number, and Email (Apple isn't shown yet). Choosing any of them opens the scrolling terms first, and I agree lights up at the end. Then the method's own steps, then date of birth, then a username picker with a live check. The same screen fills `Intro.accountStep`. Forgot password goes email, code, new password. Each step glides into the next inside one sheet.
 
 - [ ] **Step 1: Write the failing test** in `tests/ui/account-signin.js`:
 
 ```js
 // accounts off (no GLASS_ACCOUNTS): no Account section, window.glass.account undefined
-// fake on, signed out: Settings shows Continue with Google and no Apple button
+// fake on, signed out: Settings shows Google, passkey, phone and email, and no Apple button
+// choosing a method opens the terms; I agree stays off until scrolled to the end, and no sign-in call happens before it
+// terms version changed since accepted: asked again at next sign-in
 // app launch shows no sheet and no prompt
 // password of 14 characters: inline hint, nothing sent
 // wrong code: inline message, the box stays
@@ -326,12 +397,12 @@ test('a second call cancels the first: first resolves cancelled, its port is fre
 
 - [ ] **Step 1: Write `supabase-deploy.yml`.** `workflow_dispatch` with an `environment` input of `development` or `production`, using that GitHub environment's secrets, runs `supabase link`, `supabase db push` and `supabase functions deploy`. It never echoes a secret. The production environment requires the owner's approval.
 
-- [ ] **Step 2: Write `owner-setup.md`** as click-by-click steps: the Supabase development project, Google client, GitHub environments and secrets, domain and email sender. It repeats that secrets are typed into dashboards only.
+- [ ] **Step 2: Write `owner-setup.md`** as click-by-click steps: the Supabase development project, Google client, GitHub environments and secrets, domain and email sender, text message provider with a spending alert, and hosting the passkey page. It repeats that secrets are typed into dashboards only.
 
 - [ ] **Step 3: Draft the terms, privacy policy and community guidelines** from the checklist in the private legal research, including the retention schedule, marked at the top as drafts for a lawyer. `accept_terms` stores the version string.
 
 - [ ] **Step 4: Write `launch-list.md`** from the spec's launch list, each line with how to prove it.
 
-- [ ] **Step 5: Once the owner has the development project,** run the deploy workflow, then with `GLASS_ACCOUNTS=1` try real sign-up, reset, Google, profile edit, search and delete. Fix what real email and Google expose.
+- [ ] **Step 5: Once the owner has the development project,** run the deploy workflow, then with `GLASS_ACCOUNTS=1` try real sign-up, reset, Google, a real text, a Windows Hello passkey, profile edit, search and delete. Fix what real email and Google expose.
 
 - [ ] **Step 6: Commit.** Ship releases with `ENABLED` false until `launch-list.md` is complete and the owner says go.

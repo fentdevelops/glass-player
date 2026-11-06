@@ -8,7 +8,7 @@ Glassy is a local player. Accounts are the first step online: a person gets a un
 
 ## Goals
 
-- Sign in with Google, Sign in with Apple, or email and password, on Windows, Mac and iPhone, all on one shared backend.
+- Sign in with Google, Sign in with Apple, a passkey, a phone number, or email and password, on Windows, Mac and iPhone, all on one shared backend.
 - Password reset, and six-digit email codes wherever an email has to prove something.
 - A unique username and a profile: picture, bio, shared playlists.
 - Find a person by username and open their profile.
@@ -18,7 +18,6 @@ Glassy is a local player. Accounts are the first step online: a person gets a un
 
 - Syncing playlists, favorites and settings, and playlists appearing on profiles. Both need the song identity work, so they get their own design next. The profile page leaves room for playlists.
 - Following, feeds, comments, messages, uploads, streaming, listening activity.
-- Passkeys and SMS codes.
 
 ## Must never happen
 
@@ -41,7 +40,9 @@ Glassy is a local player. Accounts are the first step online: a person gets a un
 
 ### The owner's
 
-- Google, Apple, and email and password with reset. This overrides the earlier research advice of no passwords at launch.
+- Google, Apple, passkeys, phone number, and email and password with reset. This overrides the earlier research advice of no passwords or SMS at launch.
+- **People read the terms before signing in**, not after.
+- A first-launch intro comes with this: see `2026-11-05-intro-design.md`.
 - Profiles show picture, bio and shared playlists.
 - Usernames are unique, have no minimum length, 18 characters at most, allow periods and underscores, and allow no spaces or other special characters.
 - **Accounts are 13 and up.** Teen profiles are hidden from search.
@@ -71,6 +72,8 @@ Each of these is the builder's default unless the owner changes it.
 **Not included: a code on every new device.** Supabase's second factors are an authenticator app or a phone, not email ([Supabase MFA](https://supabase.com/docs/guides/auth/auth-mfa)), so this would mean writing our own sign-in gate, the riskiest code in the project.
 
 **Later: an authenticator app code** as an optional second step. It gets its own small design, because the hard part is getting back in after losing the phone, and Supabase's docs disagree on recovery codes. Nothing in this design enforces a second factor.
+
+**Text message codes** are the same six digits, for phone sign-in. NIST rates texts weaker than the other methods because of SIM swaps, so a phone number can't be used to change a password or delete an account on its own.
 
 **Encryption:**
 - All traffic uses encrypted connections.
@@ -131,11 +134,31 @@ Built by the iPhone session against this same backend, which it doesn't change. 
 
 An **Account** section at the top of Settings.
 - Signed out: Continue with Apple, Continue with Google, and an email form. Never shown as a prompt at launch.
-- After first sign-in: pick a username, with a live availability check. Date of birth comes first, then terms and privacy policy, accepted with a checkbox.
+- Choosing any sign-in method opens the terms and privacy policy first, in a scrolling sheet. **I agree** lights up once they've scrolled to the end, and only then does sign-in start. Continue without an account skips this. The agreement is logged to `consents` once the account exists.
+- After first sign-in: date of birth, then pick a username, with a live availability check.
 - Signed in: picture, username, bio, View profile, Sign out, Sign out everywhere, Delete account.
 - Someone else's profile opens as a page in the side panel, built like the artist pages, with Report and Block in its menu.
 
 Everything follows the app's taste rules: liquid glass, everything glides, nothing snaps, plain language, no emojis. A server problem shows as a calm message and never touches playback.
+
+### Passkeys
+
+The kind where Face ID, Touch ID or Windows Hello signs you in. Supabase's passkeys are in beta, and the API may change without notice ([Supabase](https://supabase.com/changelog/46458-passkeys-for-supabase-auth-beta)), so they sit behind their own switch and we follow its changelog.
+
+- **Added after the first sign-in:** in Settings, "Add a passkey". After that, "Use a passkey" signs in on its own.
+- **They happen in the system browser**, on a small page on our own domain. Passkeys belong to a web domain, Supabase's client examples use browser calls, and the app loads from a local file, where passkey calls are generally blocked. The page returns to the app through the same one-time `127.0.0.1` listener as Google, or `glassy://` on iPhone.
+- **Needs testing:** a native iPhone passkey needs Apple's Associated Domains. The browser sheet route is the fallback.
+
+### Phone number
+
+An option for signing in with a six-digit text message, through Supabase with a provider such as Twilio Verify. It can also be linked to an existing account. A number is never visible to anyone else.
+
+Texts cost money per message, and bots can run up bills by requesting them. Supabase's docs say to adjust rate limits and configure a bot check. Since the app has no bot check at launch, cost is limited another way:
+- US and Canada only at first
+- a low hourly cap on texts for the whole project
+- the provider's fraud protection on, and a spending alert
+
+If an attack hits the cap, phone sign-in stops for a while and everything else keeps working. Phone-only accounts have no email, so moderation notices for them show in the app.
 
 ### Email
 
@@ -176,9 +199,10 @@ Removing a profile sets `hidden`, deletes the picture file (hiding alone would l
 |---|---|---|---|
 | Supabase development project | Building and testing | Free, pauses after 7 idle days | First |
 | Supabase production project | Real accounts, leaked-password check | About $25 a month | Before launch |
-| Domain | Email sender, public terms and privacy pages | About $10 to $15 a year | Before email sign-up works for anyone else |
+| Domain | Email sender, public terms and privacy pages, the passkey page | About $10 to $15 a year | Before email sign-up works for anyone else |
 | Email sender (SMTP) | Codes | Free tier is likely enough at first | With the domain |
 | Google Cloud sign-in client | Google button | Free | Any time |
+| Text message provider | Phone sign-in | A few cents per text (estimate), with a spending alert | Before phone sign-in works |
 | Apple Developer | Apple button on every platform, and the iPhone app | $99 a year | Apple sign-in waits for this |
 | GitHub settings | Secrets for the deploy workflow, the production approval click | Free | With the development project |
 | DMCA agent registration | People can post pictures | About $6 | Before launch |
@@ -192,10 +216,10 @@ Removing a profile sets `hidden`, deletes the picture file (hiding alone would l
 
 1. Migrations, policies and tests for usernames and profiles, including tests as a signed-out client and as a second account.
 2. Desktop: email and password with codes, username picker, profile editing.
-3. Windows: Google.
+3. Windows: Google, then phone number, then passkeys.
 4. Search, viewing profiles, report, block, delete account.
 5. Windows launch.
-6. Once membership exists: Apple sign-in, Mac accounts with Developer ID signing, and the iPhone screens. The iPhone session can start its screens earlier against the development project if the owner tells it to.
+6. Once membership exists: Apple sign-in, Mac accounts with Developer ID signing, and the iPhone screens, including the same terms-first flow, passkeys and phone number. The iPhone session can start its screens earlier against the development project if the owner tells it to.
 7. Next design: sync and shared playlists.
 
 Account features stay switched off in public releases until the launch list below is complete, so releases can keep shipping meanwhile.
