@@ -25,7 +25,7 @@
 
 Glassy plays the music and videos you already have. Point it at your files and you get a library, synced lyrics and sound you can shape, in a window made of glass panels that bend whatever sits behind them.
 
-There's no account and no subscription. Glassy doesn't come with any music, it plays the files you give it. It goes online to look up lyrics, artist info and covers (it sends the song or artist name) and to check for updates. Your files stay on your computer.
+There's no subscription, and an account is optional: it stays on your computer, and you can carry on without one. Glassy doesn't come with any music, it plays the files you give it. It goes online to look up lyrics, artist info and covers (it sends the song or artist name), to check for updates, and to talk to Google if you choose Sign in with Google. Your files stay on your computer.
 
 ## Features
 

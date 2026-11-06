@@ -3,7 +3,7 @@
 A liquid-glass music and video player for Windows and Mac (Electron). This file lists everything built so far,
 how to use it, where it lives in the code, and what's still waiting on you.
 
-**Current version:** 0.2.17 · **Code:** https://github.com/fentdevelops/glass-player (public) · **Releases:** the repo's Releases page. Installed copies update themselves from there.
+**Current version:** 0.2.18 · **Code:** https://github.com/fentdevelops/glass-player (public) · **Releases:** the repo's Releases page. Installed copies update themselves from there.
 
 ---
 
@@ -12,6 +12,18 @@ how to use it, where it lives in the code, and what's still waiting on you.
 | What | Why | How |
 |---|---|---|
 | Check the window corners | The rounded-corner fix was checked off-screen only | Look at the four corners of the installed Glass on your screen |
+
+---
+
+## 0.2.18: first-launch intro, song finder and an optional account
+
+- **Intro** (`renderer/intro.js`): shows once per fresh install; skipped when a library or playlists already exist. Skip/Esc go on to sign-up. Settings can replay it.
+- **Song finder** (`scan/`, `renderer/firstrun.js`): scans Music and Downloads on first launch, scores each file, and shows "Here's what we found" with groups, previews and search. Anything under 15 seconds is never ticked. Also in Settings → Library → Find songs on this PC.
+- **Account on this computer** (`account/local.js`, `renderer/signup.js`): email or phone, username, scrypt-hashed password in `local-account.json`, no network. Optional: Continue without an account.
+- **Sign in with Google** (`account/google.js`): PKCE desktop flow on a one-time 127.0.0.1 listener. Needs `account/google-client.json` in the checkout you build from; it is gitignored and never in this repo. Without it the Google button is hidden.
+- **Default background:** the playing song's cover (moving colours until there's a picture).
+- **Glassy Dev** (`npm run dev-build`, `diag.js`): a private test copy with its own data folder, a red icon, no self-updating and a click recorder. The normal build never turns any of that on.
+- **Tests:** `npm test` (67 unit tests) and `scripts/ui-test.js` for in-app UI tests.
 
 ---
 
