@@ -2614,7 +2614,10 @@ window.addEventListener('drop', async (e) => {
 });
 const pendingOpen = [];
 let loaded = false;
-api.onOpenPaths((infos) => (loaded ? addTracks(infos, { playFirst: true }) : pendingOpen.push(infos)));
+api.onOpenPaths((infos) => {
+  window.Intro?.dismiss();     // a song opened from Explorer doesn't wait behind the first-launch intro
+  if (loaded) addTracks(infos, { playFirst: true }); else pendingOpen.push(infos);
+});
 
 // ---------- persistence ----------
 let saveTimer = 0;
@@ -2699,6 +2702,7 @@ async function restore() {
   window.Undo?.init();
   rebuild(true);
   paintHeader();
+  window.Intro?.libraryLoaded();
   for (const infos of pendingOpen.splice(0)) addTracks(infos, { playFirst: true });
   window.Lyrics?.restore(!!s.lyrics);
 }

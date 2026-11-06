@@ -1477,3 +1477,94 @@ body.mac .titlebar { justify-content: flex-end; }
 .undo-pop b { position: relative; z-index: 3; font-size: 13px; font-weight: 650; }
 .undo-pop span { position: relative; z-index: 3; font-size: 11.5px; color: var(--ink-2); }
 .undo-pop span:empty { display: none; }
+
+/* ---------- first-launch intro (intro.js). Its look comes from docs/superpowers/mockups/intro-preview.html.
+   Everything is sized in real pixels through --k (window size against 1240 x 800, with --ox and --oy centering that
+   stage), set by intro.js: a scale transform above the glass would break its filter. ---------- */
+html.intro-on .app { z-index: 95; pointer-events: none; }     /* above the intro: the real window buttons, the strip that drags */
+html.intro-on .titlebar { pointer-events: auto; }
+/* from the first paint until the hand-over, nothing of the app shows */
+html.intro-hide body { background: #0d0726; }
+html.intro-hide .ambient, html.intro-hide .body, html.intro-hide .gear { visibility: hidden; }
+
+#intro {
+  --intro-glide: cubic-bezier(.42, .02, .2, 1); --intro-ink2: rgba(255, 255, 255, .68);
+  --k: 1; --ox: 0px; --oy: 0px;
+  position: fixed; inset: 0; z-index: 90; overflow: hidden; color: #fff;
+  font-family: "Segoe UI Variable Display", "Segoe UI", system-ui, sans-serif;
+}
+#intro.leaving, #intro.leaving * { pointer-events: none; }
+.intro-bg { position: absolute; inset: 0; background: #0d0726; }
+.intro-amb { position: absolute; left: -12%; top: -12%; width: 124%; height: 124%; filter: blur(calc(52px * var(--k))); }
+.intro-grain { position: absolute; inset: 0; pointer-events: none; opacity: .055; mix-blend-mode: overlay; background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='220' height='220'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='2'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E"); }
+
+/* the one glass shape that travels through the whole intro */
+.intro-glass {
+  position: absolute; overflow: hidden; will-change: transform, width, height;
+  background: linear-gradient(160deg, rgba(255, 255, 255, .2), rgba(255, 255, 255, .07) 42%, rgba(255, 255, 255, .12));
+  -webkit-backdrop-filter: var(--lg, blur(14px)) saturate(1.5) brightness(1.18);
+  backdrop-filter: var(--lg, blur(14px)) saturate(1.5) brightness(1.18);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, .2), inset 3px 4px 10px -4px rgba(255, 255, 255, .6), inset -3px -4px 12px -6px rgba(255, 255, 255, .3), 0 40px 90px -36px rgba(8, 2, 40, .75), 0 4px 14px rgba(8, 2, 40, .18);
+}
+.intro-glass.lg-busy {   /* while it's changing shape: plain frost, the refraction comes back when it lands */
+  -webkit-backdrop-filter: blur(11px) saturate(1.5) brightness(1.18);
+  backdrop-filter: blur(11px) saturate(1.5) brightness(1.18);
+}
+.intro-glass::before {
+  content: ""; position: absolute; inset: 0; border-radius: inherit; padding: 1.6px; pointer-events: none; z-index: 3;
+  background: linear-gradient(140deg, rgba(255, 255, 255, .95), rgba(255, 255, 255, .32) 20%, rgba(255, 255, 255, .05) 48%, rgba(255, 255, 255, .1) 70%, rgba(255, 255, 255, .62));
+  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor;
+  mask-composite: exclude;
+}
+.intro-tint { position: absolute; inset: 0; opacity: 0; pointer-events: none; transition: opacity .9s var(--intro-glide), background-color .9s var(--intro-glide); }
+.intro-view { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; opacity: 0; pointer-events: none; transition: opacity .55s var(--intro-glide); }
+.intro-view.on { opacity: 1; pointer-events: auto; transition-delay: .3s; }
+.intro-play { width: 34%; height: 34%; margin-left: 5%; fill: #fff; filter: drop-shadow(0 8px 16px rgba(28, 11, 77, .4)); }
+
+/* words: big, on the background itself */
+.intro-words { position: absolute; left: calc(var(--ox) + 99px * var(--k)); top: 50%; width: calc(446px * var(--k)); transform: translateY(-50%); }
+.intro-words.center { left: 50%; width: calc(760px * var(--k)); text-align: center; transform: translate(-50%, 0); }
+.intro-words h1 { margin: 0; font-size: calc(62px * var(--k)); line-height: 1.02; font-weight: 600; letter-spacing: -.028em; text-wrap: balance; opacity: 0; }
+.intro-words p { margin: calc(22px * var(--k)) 0 0; font-size: max(14px, calc(18px * var(--k))); line-height: 1.5; color: var(--intro-ink2); font-weight: 400; max-width: 30em; opacity: 0; }
+.intro-words.center p { margin-inline: auto; }
+
+.intro-go {
+  position: absolute; left: calc(var(--ox) + 99px * var(--k)); bottom: calc(var(--oy) + 64px * var(--k)); height: max(40px, calc(50px * var(--k))); padding: 0 calc(30px * var(--k)); border-radius: 999px;
+  background: #fff; color: #17103f; font-weight: 600; font-size: max(13px, calc(15px * var(--k))); opacity: 0;
+  box-shadow: 0 14px 30px -14px rgba(8, 2, 40, .6); transition: transform .35s var(--intro-glide), box-shadow .35s var(--intro-glide);
+}
+.intro-go:hover { transform: scale(1.035); }
+.intro-go:active { transform: scale(.98); }
+.intro-go.center { left: 50%; translate: -50% 0; }
+.intro-skip { position: absolute; right: 30px; top: 50px; padding: 8px 12px; font-size: max(13.5px, calc(13.5px * var(--k))); color: var(--intro-ink2); opacity: 0; transition: color .35s; }
+.intro-skip:hover { color: #fff; }
+.intro-go:focus-visible, .intro-skip:focus-visible, .intro-sw button:focus-visible { outline: 2px solid #fff; outline-offset: 3px; }
+.intro-ticks { position: absolute; right: calc(var(--ox) + 99px * var(--k)); bottom: calc(var(--oy) + 85px * var(--k)); display: flex; gap: calc(8px * var(--k)); }
+.intro-ticks i { width: calc(26px * var(--k)); height: 3px; border-radius: 2px; background: rgba(255, 255, 255, .22); overflow: hidden; }
+.intro-ticks i::after { content: ""; display: block; height: 100%; background: #fff; transform: scaleX(0); transform-origin: left; transition: transform .8s var(--intro-glide); }
+.intro-ticks i.on::after { transform: scaleX(1); }
+
+/* inside the glass: songs */
+.intro-rows { width: 100%; padding: calc(24px * var(--k)) calc(22px * var(--k)); }
+.intro-row { display: flex; align-items: center; gap: calc(14px * var(--k)); padding: calc(9px * var(--k)) calc(8px * var(--k)); border-radius: calc(14px * var(--k)); }
+.intro-row u { flex: none; width: calc(46px * var(--k)); height: calc(46px * var(--k)); border-radius: calc(11px * var(--k)); box-shadow: inset 0 0 0 1px rgba(255, 255, 255, .2); }
+.intro-row b { display: block; font-size: max(12px, calc(15px * var(--k))); font-weight: 600; }
+.intro-row s { display: block; text-decoration: none; font-size: max(10.5px, calc(12.5px * var(--k))); color: var(--intro-ink2); margin-top: calc(2px * var(--k)); }
+.intro-row em { margin-left: auto; font-style: normal; font-size: max(9.5px, calc(11px * var(--k))); font-weight: 700; padding: max(2.5px, calc(3px * var(--k))) max(7px, calc(8px * var(--k))); border-radius: max(6px, calc(8px * var(--k))); color: #bff5e6; box-shadow: inset 0 0 0 1px rgba(191, 245, 230, .55); }
+/* lyrics */
+.intro-lyr { position: absolute; left: calc(34px * var(--k)); right: calc(26px * var(--k)); top: 50%; transition: transform .95s var(--intro-glide); }
+.intro-lyr div { font-size: calc(27px * var(--k)); font-weight: 700; letter-spacing: -.012em; line-height: 1.22; padding: calc(9px * var(--k)) 0; opacity: .32; transform-origin: left center; transition: opacity .8s var(--intro-glide), transform .9s var(--intro-glide), text-shadow .9s; }
+.intro-lyr div.cur { opacity: 1; transform: scale(1.05); text-shadow: 0 0 calc(26px * var(--k)) rgba(255, 255, 255, .34); }
+/* sound */
+.intro-eq { width: 100%; height: 100%; display: block; }
+/* colours */
+.intro-sw { display: flex; gap: calc(14px * var(--k)); }
+.intro-sw button { width: calc(46px * var(--k)); height: calc(46px * var(--k)); border-radius: 50%; box-shadow: inset 0 0 0 1.5px rgba(255, 255, 255, .75), 0 6px 16px -6px rgba(8, 2, 40, .5); transition: transform .4s var(--intro-glide); }
+.intro-sw button:hover { transform: scale(1.12); }
+
+@media (prefers-reduced-motion: reduce) {
+  .intro-go:hover, .intro-go:active, .intro-sw button:hover { transform: none; }
+  .intro-glass { transition-property: none; }    /* the shape goes straight to its new size, under its crossfade */
+  .intro-tint { transition-duration: .5s !important; }   /* trying a colour is still a crossfade */
+}

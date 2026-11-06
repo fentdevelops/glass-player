@@ -181,6 +181,9 @@
       <div class="set-sec"><h4>Updates</h4>
         <div class="set-row"><div><b>Glassy ${esc(window.Updates?.state().version || '')}</b><span data-upd>${esc(window.Updates ? Updates.label() : 'Glass updates itself')}</span></div>
           <button type="button" class="btn" data-upd-btn>Check</button></div></div>
+      <div class="set-sec"><h4>Welcome</h4>
+        <div class="set-row"><div><b>Replay intro</b><span>See the welcome screens again</span></div>
+          <button type="button" class="btn" data-replay-intro>Replay</button></div></div>
       <div class="set-sec" data-news><h4>What's new</h4>${window.PatchNotes ? PatchNotes.html() : ''}</div>
       </div>
       <div class="modal-actions"><span class="grow"></span><button type="submit" class="btn primary">Done</button></div>`, {
@@ -205,6 +208,7 @@
           updBtn.addEventListener('click', () => Updates.press());
           if (Updates.stale()) Updates.check();
         } else updBtn.hidden = true;
+        form.querySelector('[data-replay-intro]').addEventListener('click', async () => { await modalClose?.(); Intro.replay(); });
       },
       onSubmit() { save(); },
     });

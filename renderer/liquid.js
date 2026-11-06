@@ -189,9 +189,18 @@
   // small panels that come and go (the zoom pill) join in here
   const extra = new Set();
   function watch(el) { extra.add(el); el.classList.add('lg'); ro.observe(el); if (on) build(el); }
+  // a panel that's gone for good (the intro's glass): its filter goes with it
+  function unwatch(el) {
+    extra.delete(el); pending.delete(el); ro.unobserve(el);
+    clearTimeout(settle.get(el)); settle.delete(el);
+    const f = filters.get(el);
+    if (f) { host.querySelector('#' + f.id)?.remove(); filters.delete(el); }
+    el.style.removeProperty('--lg');
+  }
   window.Liquid = {
     apply,
     watch,
+    unwatch,
     // the artwork on screen changed
     art(url) { artUrl = url || ''; setWall(wallFor()); },
     // a panel is about to animate at a new size: fit its glass now, so it doesn't swap partway through the motion
