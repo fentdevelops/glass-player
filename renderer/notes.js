@@ -8,6 +8,8 @@
     <rect width="96" height="64" rx="12" fill="url(#pn${id})"/><rect width="96" height="64" rx="12" fill="url(#pg${id})"/>
     <g fill="none" stroke="#fff" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round">${body}</g></svg>`;
   const NOTES = [
+    { v: '0.2.17', title: 'Steadier glass edges', text: 'Aimed at the strip that could flicker along the bottom of the panels while lyrics play. Tell us if you still see it.',
+      art: wash(38, '<rect x="18" y="14" width="60" height="36" rx="8"/><path d="M26 42h44"/>') },
     { v: '0.2.16', title: 'Check for updates yourself', text: 'Settings has a Check button next to the version. It also looks again whenever you open Settings and says when it last checked.',
       art: wash(37, '<circle cx="48" cy="32" r="16"/><path d="m40 32 6 6 11-12"/>') },
     { v: '0.2.15', title: 'Change a cover everywhere', text: 'Editing a cover now shows every other song with that exact picture, and one switch changes them all at once.',

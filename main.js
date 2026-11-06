@@ -11,6 +11,11 @@ const MEDIA_EXT = new Set([...AUDIO_EXT, ...VIDEO_EXT].map((e) => '.' + e));
 let win = null;
 
 const isMac = process.platform === 'darwin';
+// Windows: always redraw the whole window. A panel's glass bends what's behind it, so if only part of the window is
+// redrawn it can read its own finished picture from the last frame, which showed as a bright strip with smeared
+// songs along the bottom of the panels. Seen only on the user's screen, never in a test, so this is the likely fix
+// rather than a proven one. Take it out if big windows lose smoothness.
+if (process.platform === 'win32') app.commandLine.appendSwitch('ui-disable-partial-swap');
 // Glassy used to be called Glass Player: on Windows its library and settings stay in the folder they've always been in.
 // (Windows names that folder after the app, so without this the rename would look like an empty library.)
 // Dev: GLASS_USERDATA isolates test runs from the real library

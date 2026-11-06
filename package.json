@@ -1,6 +1,6 @@
 {
   "name": "glass-player",
-  "version": "0.2.16",
+  "version": "0.2.17",
   "description": "Liquid glass music and video player",
   "main": "main.js",
   "scripts": {

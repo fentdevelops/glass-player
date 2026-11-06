@@ -3,7 +3,7 @@
 A liquid-glass music and video player for Windows and Mac (Electron). This file lists everything built so far,
 how to use it, where it lives in the code, and what's still waiting on you.
 
-**Current version:** 0.2.16 · **Code:** https://github.com/fentdevelops/glass-player (public) · **Releases:** the repo's Releases page. Installed copies update themselves from there.
+**Current version:** 0.2.17 · **Code:** https://github.com/fentdevelops/glass-player (public) · **Releases:** the repo's Releases page. Installed copies update themselves from there.
 
 ---
 
@@ -12,6 +12,13 @@ how to use it, where it lives in the code, and what's still waiting on you.
 | What | Why | How |
 |---|---|---|
 | Check the window corners | The rounded-corner fix was checked off-screen only | Look at the four corners of the installed Glass on your screen |
+
+---
+
+## 0.2.17: steadier glass edges (Windows)
+
+- **The flickering strip along the bottom of the panels:** Glassy now redraws the whole window on Windows, so the glass can't read its own last frame.
+- **Not proven yet:** the strip has only been seen on the owner's screen and never appeared in a test, on or off screen. Check that it's gone, and that big and fullscreen windows still feel smooth. If they don't, this one line in `main.js` comes back out.
 
 ---
 
