@@ -220,6 +220,11 @@
     if (busy) return;       // still moving to this screen: a double-click on the one before must not go past the last screen
     if (step < 0 || leaving || inAccountStep || inFinder) return;
     if (step < STEPS.length - 1) return goTo(step + 1);
+    return toAccount();
+  }
+  // the last screen's button, Skip and Esc: on to the account step (while there is one), then the finder and the app
+  async function toAccount() {
+    if (leaving || inAccountStep || inFinder) return;
     if (Intro.accountStep) {
       inAccountStep = true;
       try {
@@ -309,7 +314,7 @@
     if (inFinder) { finderStage?.onKey?.(e); return; }
     if (e.key === 'ArrowRight' && step >= 0 && step < STEPS.length - 1) goTo(step + 1);
     else if (e.key === 'ArrowLeft' && step > 0) goTo(step - 1);
-    else if (e.key === 'Escape') leave();
+    else if (e.key === 'Escape') toAccount();
   }
   function onResize() {
     measure();
@@ -400,7 +405,7 @@
     measure();
 
     go.addEventListener('click', forward);
-    skip.addEventListener('click', leave);
+    skip.addEventListener('click', toAccount);
     q('.intro-sw').addEventListener('click', onSwatch);
     addEventListener('resize', onResize);
     addEventListener('keydown', onKey, true);

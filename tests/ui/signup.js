@@ -38,6 +38,18 @@ const COMMON = `
 const page = (fn) => `async (T) => { ${COMMON} await (${fn})(T); }`;
 const small = () => ({ GLASS_SCAN_ROOTS: Files.roots(Files.small()) });
 
+// ---- Skip goes to the sign-up screen, from the first screen on, and on from there as usual ----
+const skipButton = page(async (T) => {
+  await T.until(() => T.heading() === 'Glassy', 'the welcome screen');
+  await T.wait(1800);
+  T.$('.intro-skip').click();
+  await T.until(T.su, 'Skip opens the sign-up screen');
+  T.ok(!T.finder(), 'the song finder has not opened yet');
+  await T.wait(1400);
+  T.$('.su-noacc').click();
+  await T.pastFinder();
+});
+
 // ---- the screen is after the last intro screen and before the finder; Continue without an account writes nothing ----
 const skipping = page(async (T) => {
   T.ok(typeof Intro.accountStep === 'function', 'signup.js fills the intro\'s account slot');
@@ -241,6 +253,7 @@ const googleDenied = page(async (T) => {
 module.exports = [
   { name: 'after the last intro screen: Continue without an account goes on, nothing stored', signup: true, env: small, page: skipping, timeout: 180000 },
   { name: 'sign up: checks, Coming soon, terms, username, Settings, sign out and in', signup: true, profile: 'acct', env: small, page: journey, timeout: 180000 },
+  { name: 'Skip goes to the sign-up screen', signup: true, env: small, page: skipButton },
   { name: 'an existing user\'s normal launch shows none of it', signup: true, profile: 'acct', env: small, page: again },
   { name: 'Google (stand-in): terms first, then the browser, then the username; sign in later', signup: true, profile: 'google', env: () => ({ ...small(), GLASS_FAKE_GOOGLE: 'new' }), page: googleNew, timeout: 180000 },
   { name: 'Google without the client file says Coming soon', signup: true, env: () => ({ ...small(), GLASS_FAKE_GOOGLE: 'missing' }), page: googleMissing },
