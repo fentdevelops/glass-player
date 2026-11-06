@@ -1523,7 +1523,7 @@ html.intro-hide .ambient, html.intro-hide .body, html.intro-hide .gear { visibil
 .intro-tint { position: absolute; inset: 0; opacity: 0; pointer-events: none; transition: opacity .9s var(--intro-glide), background-color .9s var(--intro-glide); }
 .intro-view { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; opacity: 0; pointer-events: none; transition: opacity .55s var(--intro-glide); }
 .intro-view.on { opacity: 1; pointer-events: auto; transition-delay: .3s; }
-.intro-play { width: 34%; height: 34%; margin-left: 5%; fill: #fff; filter: drop-shadow(0 8px 16px rgba(28, 11, 77, .4)); }
+.intro-play { width: 34%; height: 34%; fill: #fff; filter: drop-shadow(0 8px 16px rgba(28, 11, 77, .4)); }
 
 /* words: big, on the background itself */
 .intro-words { position: absolute; left: calc(var(--ox) + 99px * var(--k)); top: 50%; width: calc(446px * var(--k)); transform: translateY(-50%); }
