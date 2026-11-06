@@ -11,6 +11,8 @@ const MEDIA_EXT = new Set([...AUDIO_EXT, ...VIDEO_EXT].map((e) => '.' + e));
 let win = null;
 
 const isMac = process.platform === 'darwin';
+// Glassy Dev (scripts/dev-build.js): the owner's test copy, with its own library and settings, and no self-updating
+const isDevCopy = (() => { try { return require('./package.json').glassyChannel === 'dev'; } catch { return false; } })();
 // Windows: always redraw the whole window. A panel's glass bends what's behind it, so if only part of the window is
 // redrawn it can read its own finished picture from the last frame, which showed as a bright strip with smeared
 // songs along the bottom of the panels. Seen only on the user's screen, never in a test, so this is the likely fix
@@ -19,7 +21,7 @@ if (process.platform === 'win32') app.commandLine.appendSwitch('ui-disable-parti
 // Glassy used to be called Glass Player: on Windows its library and settings stay in the folder they've always been in.
 // (Windows names that folder after the app, so without this the rename would look like an empty library.)
 // Dev: GLASS_USERDATA isolates test runs from the real library
-app.setPath('userData', process.env.GLASS_USERDATA || path.join(app.getPath('appData'), isMac ? 'Glassy' : 'Glass Player'));
+app.setPath('userData', process.env.GLASS_USERDATA || path.join(app.getPath('appData'), isDevCopy ? 'Glassy Dev' : isMac ? 'Glassy' : 'Glass Player'));
 // Dev: GLASS_SHOT runs render off-screen (no window ever appears, nothing steals focus) and are muted.
 // GLASS_SCREEN needs a real on-screen window, so only that mode shows one; ask the user before using it.
 const OFFSCREEN_TEST = !!process.env.GLASS_SHOT && !process.env.GLASS_SCREEN;
@@ -732,7 +734,7 @@ const newer = (a, b) => { const pa = String(a).replace(/^v/, '').split(/[.-]/).m
 let autoUpdater = null, lastCheck = 0, checkGuard = 0;
 const upToDate = () => sendUpdate({ state: 'current', checkedAt: Date.now() });
 async function checkUpdates(manual = false) {
-  if (!ghPub || !app.isPackaged || (process.env.GLASS_SHOT && !process.env.GLASS_TEST_UPDATES)) { if (manual) sendUpdate({ state: 'off' }); return; }
+  if (isDevCopy || !ghPub || !app.isPackaged || (process.env.GLASS_SHOT && !process.env.GLASS_TEST_UPDATES)) { if (manual) sendUpdate({ state: 'off' }); return; }
   // an update already on its way (or waiting for a restart) isn't looked for again, even by the Check button
   if (['downloading', 'ready'].includes(updateState.state)) return;
   if (!manual && updateState.state === 'checking' && Date.now() - lastCheck < 5 * 60e3) return;
