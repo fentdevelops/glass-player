@@ -804,6 +804,48 @@ ipcMain.handle('localAccount:state', (e) => {
 });
 ipcMain.handle('localAccount:create', (e, contact, password, username) => (fromWindow(e) && isText(contact, 256) && isText(password, 256) && isText(username, 64) ? account().create(contact, password, username) : NO_ACCOUNT));
 ipcMain.handle('localAccount:signIn', (e, contact, password) => (fromWindow(e) && isText(contact, 256) && isText(password, 256) ? account().signIn(contact, password) : { ok: false, error: 'mismatch' }));
+// ---- Google sign-in (account/google.js): the owner's client file is read here, at the moment it's needed, and never sent to the window ----
+// GLASS_FAKE_GOOGLE (tests only, with GLASS_SHOT): 'new' | 'denied' | 'missing' swaps Google for a stand-in; no network, no browser.
+const fakeGoogle = () => (process.env.GLASS_SHOT && ['new', 'denied', 'missing'].includes(process.env.GLASS_FAKE_GOOGLE) ? process.env.GLASS_FAKE_GOOGLE : '');
+function googleClient() {
+  if (fakeGoogle()) return fakeGoogle() === 'missing' ? null : { clientId: 'fake-client' };
+  try {
+    const j = JSON.parse(fs.readFileSync(path.join(__dirname, 'account', 'google-client.json'), 'utf8'));
+    const c = j && (j.installed || j.web);
+    return c && typeof c.client_id === 'string' && c.client_id ? { clientId: c.client_id, clientSecret: typeof c.client_secret === 'string' ? c.client_secret : '' } : null;
+  } catch { return null; }
+}
+let googlePending = null;      // { who, at }: a new Google identity waiting for its username; it never leaves main
+const PENDING_MS = 10 * 60 * 1000;
+const GOOGLE_PREFIX = 'https://accounts.google.com/o/oauth2/v2/auth?';
+ipcMain.handle('localAccount:googleAvailable', (e) => fromWindow(e) && !!googleClient());
+ipcMain.handle('localAccount:googleStart', async (e) => {
+  if (!fromWindow(e)) return { ok: false, error: 'failed' };
+  const client = googleClient();
+  if (!client) return { ok: false, error: 'unavailable' };
+  googlePending = null;
+  const google = require('./account/google');
+  const fake = fakeGoogle();
+  const opts = fake ? require('./account/google-fake')(fake) : {
+    open: (u) => { if (!String(u).startsWith(GOOGLE_PREFIX)) throw new Error('Blocked link'); return shell.openExternal(u); },
+    fetch: (...a) => fetch(...a),
+  };
+  const r = await google.signInWithGoogle({ ...client, ...opts, focus: () => { if (win && !win.isDestroyed()) { if (win.isMinimized()) win.restore(); win.show(); win.focus(); } } });
+  if (r.error) return { ok: false, error: r.error };
+  const s = account().signInGoogle(r);
+  if (!s.ok) return s;
+  if (s.status === 'new') { googlePending = { who: r, at: Date.now() }; return { ok: true, status: 'new' }; }
+  return s;
+});
+ipcMain.handle('localAccount:googleCancel', (e) => { if (fromWindow(e)) { require('./account/google').cancel(); googlePending = null; } return true; });
+ipcMain.handle('localAccount:googleFinish', (e, username) => {
+  if (!fromWindow(e) || !isText(username, 64)) return NO_ACCOUNT;
+  const p = googlePending;
+  if (!p || Date.now() - p.at > PENDING_MS) { googlePending = null; return { ok: false, error: 'expired' }; }
+  const r = account().createGoogle(p.who, username);
+  if (r.ok || r.error === 'exists') googlePending = null;
+  return r;
+});
 ipcMain.handle('localAccount:signOut', (e) => (fromWindow(e) ? account().signOut() : NO_ACCOUNT));
 ipcMain.handle('localAccount:remove', (e) => (fromWindow(e) ? account().remove() : NO_ACCOUNT));
 

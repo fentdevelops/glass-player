@@ -32,7 +32,7 @@
     <p style="margin-top:0">Glassy is a personal music player that lives on your computer. This is the whole agreement, and it is short.</p>
     <h3>What this is</h3>A personal app that runs on your computer. There is no Glassy server, and nobody else can see your account.
     <h3>Your account and your music</h3>The email or phone number, password and username you choose are saved in one file on this computer. The password is scrambled before it is saved. None of it is uploaded. Your music and videos stay where they are, and Glassy does not upload them either.
-    <h3>When Glassy goes online</h3>Only to look up lyrics, artist info and covers, and to check for updates. Your account details are not part of those requests.
+    <h3>When Glassy goes online</h3>Only to look up lyrics, artist info and covers, and to check for updates. Your account details are not part of those requests. Google is contacted only if you choose to sign in with it.
     <h3>What you play</h3>Only use Glassy with files you have the right to play.
     <h3>As is</h3>Glassy is provided as is, with no promise that it will always work or be free of mistakes.
     <h3>Leaving</h3>You can remove your account at any time in Settings. That deletes the account file and nothing else, so your music and library stay.
@@ -54,6 +54,7 @@
           <div class="su-or"><span></span></div>
           <div class="su-soc">${WAYS.map(([l, svg]) => `<button type="button" class="su-way" data-way="${l}" aria-label="${l}">${svg}<span>${l}</span></button>`).join('')}</div>
           <div class="su-soon" role="status" aria-live="polite"></div>
+          <div class="su-wait" hidden><p role="status">Finish signing in in your browser</p><button type="button" class="su-wait-x">Cancel</button></div>
           <p class="su-honest">For now, your account stays on this computer.</p>
         </div>
         <div class="su-name" hidden>
@@ -95,6 +96,7 @@
     const sheet = q('.su-sheet'), terms = q('.su-terms'), agree = q('.su-agree'), scrim = q('.su-scrim'), soon = q('.su-soon');
     sheet.inert = true;      // shut: nothing in it can be reached by keyboard
     let signingIn = false, phase = 'creds', sheetOpen = false, busy = false, over = false, soonT = 0;
+    let nextStep = 'name', waiting = false, googleName = false;      // what 'I agree' leads to; a browser sign-in is open; the username is for a Google account
     let creds = null;      // email or phone number, and password, held only between the terms and the end of the username step
 
     // ---- mode: Sign up or Sign in ----
@@ -125,8 +127,8 @@
     }
 
     // ---- the terms ----
-    function openTerms() {
-      sheetOpen = true;
+    function openTerms(next = 'name') {
+      sheetOpen = true; nextStep = next;
       sheet.inert = false; form.inert = true;      // the form waits while the sheet is up
       scrim.classList.add('on'); sheet.classList.add('on');
       agree.disabled = true; agree.classList.remove('ready'); agree.textContent = 'Scroll to the end';
@@ -137,7 +139,7 @@
     }
     function closeTerms(refocus = true) {
       if (!sheetOpen) return;
-      sheetOpen = false;
+      sheetOpen = false; nextStep = 'name';
       sheet.inert = true; form.inert = false;
       agree.disabled = true; agree.classList.remove('ready'); agree.textContent = 'Scroll to the end';      // not left ready for the next time
       scrim.classList.remove('on'); sheet.classList.remove('on');
@@ -149,7 +151,14 @@
     }
     terms.addEventListener('scroll', onScroll);
     scrim.addEventListener('click', () => closeTerms());
-    agree.addEventListener('click', () => { if (agree.disabled) return; closeTerms(false); toName(); });
+    agree.addEventListener('click', () => {
+      if (agree.disabled) return;
+      const n = nextStep;
+      closeTerms(false);
+      if (n === 'google') return googleGo();
+      if (n === 'gname') googleName = true;
+      toName();
+    });
 
     // ---- the username step ----
     function toName() {
@@ -188,6 +197,7 @@
         const r = await api.signIn(email, pass).catch(() => null);
         busy = false;
         if (over) return;
+        if (r && r.error === 'google') return bad(hint, 'This account uses Google. Use the Google button.');
         if (!r || !r.ok) return bad(hint, 'That email, phone number or password doesn\'t match.');
         take(r);
         return end({ account: true, signedIn: true });
@@ -205,13 +215,13 @@
     async function finish() {
       const r = Username.check(un.value);
       if (!r.ok) return bad(nameHint, r.error);
-      if (!creds) return;
+      if (!creds && !googleName) return;
       busy = true;
-      const res = await api.create(creds.email, creds.pass, r.name).catch(() => null);
+      const res = await (googleName ? api.googleFinish(r.name) : api.create(creds.email, creds.pass, r.name)).catch(() => null);
       busy = false;
       if (over) return;
-      if (!res || !res.ok) return bad(nameHint, res && res.error === 'exists' ? 'There is already an account on this computer.' : 'The account couldn\'t be saved. Try again.');
-      creds = null;
+      if (!res || !res.ok) return bad(nameHint, res && res.error === 'exists' ? 'There is already an account on this computer.' : res && res.error === 'expired' ? 'That took too long. Go back and sign in with Google again.' : 'The account couldn\'t be saved. Try again.');
+      creds = null; googleName = false;
       take(res);
       end({ account: true, signedIn: true });
     }
@@ -223,15 +233,59 @@
       q('.su-eye').setAttribute('aria-label', show ? 'Hide password' : 'Show password');
     });
     q('.su-forgot').addEventListener('click', () => plain(hint, 'Password reset needs online accounts, which aren\'t here yet. You can remove this account in Settings and make a new one.'));
-    q('.su-have-b').addEventListener('click', () => { if (phase === 'creds' && !busy) setMode(!signingIn); });
-    // Apple, Google, passkey and phone aren't here yet: a note, nothing else
-    q('.su-soc').addEventListener('click', (e) => {
-      const b = e.target.closest('[data-way]');
-      if (!b) return;
+    q('.su-have-b').addEventListener('click', () => { if (phase === 'creds' && !busy && !waiting) setMode(!signingIn); });
+    // Apple isn't here yet (and Google, until the app has its client file): a note, nothing else
+    const comingSoon = () => {
       soon.textContent = 'Coming soon';
       soon.classList.add('on');
       clearTimeout(soonT);
       soonT = setTimeout(() => soon.classList.remove('on'), 2400);
+    };
+    // ---- Google: Sign up reads the terms first, then the browser; Sign in goes straight to the browser ----
+    const GOOGLE_ERR = {
+      denied: 'Google sign-in was declined. Try again whenever you like.',
+      timeout: 'That took too long. Try again.',
+      failed: 'Google sign-in didn\'t work. Try again.',
+      exists: 'This computer already has an account. Remove it in Settings first.',
+    };
+    async function google() {
+      if (busy || sheetOpen || phase !== 'creds') return;
+      busy = true;
+      const ok = await api.googleAvailable().catch(() => false);
+      busy = false;
+      if (over) return;
+      if (!ok) return comingSoon();
+      plain(hint, signingIn ? '' : `At least ${MIN_PASSWORD} characters`);
+      if (signingIn) googleGo(); else openTerms('google');
+    }
+    async function googleGo() {
+      busy = true; waiting = true;
+      layer.dataset.wait = '1';
+      q('.su-wait').hidden = false;
+      q('.su-wait-x').focus({ preventScroll: true });
+      const r = await api.googleStart().catch(() => ({ ok: false, error: 'failed' }));
+      busy = false; waiting = false;
+      if (over) return;
+      delete layer.dataset.wait;
+      q('.su-wait').hidden = true;
+      if (r && r.ok && r.status === 'signedIn') { take(r); return end({ account: true, signedIn: true }); }
+      if (r && r.ok && r.status === 'new') {
+        // signing in with nothing here yet makes an account, so the terms come first
+        if (signingIn) return openTerms('gname');
+        googleName = true;
+        return toName();
+      }
+      const err = r && r.error;
+      if (err === 'cancelled') return;
+      if (err === 'unavailable') return comingSoon();
+      bad(hint, GOOGLE_ERR[err] || GOOGLE_ERR.failed);
+    }
+    const stopWaiting = () => { if (waiting) api.googleCancel().catch(() => {}); };
+    q('.su-wait-x').addEventListener('click', stopWaiting);
+    q('.su-soc').addEventListener('click', (e) => {
+      const b = e.target.closest('[data-way]');
+      if (!b) return;
+      if (b.dataset.way === 'Google') google(); else comingSoon();
     });
     q('.su-noacc').addEventListener('click', () => end({ account: false }));
     q('.su-close').addEventListener('click', () => end({ account: false }));
@@ -240,7 +294,8 @@
     function onKey(e) {
       e.stopPropagation();       // the app's shortcuts (and the intro's) wait
       if (e.key !== 'Escape') return;
-      if (sheetOpen) { closeTerms(); e.preventDefault(); }
+      if (waiting) { stopWaiting(); e.preventDefault(); }
+      else if (sheetOpen) { closeTerms(); e.preventDefault(); }
       else if (!inIntro) end({ account: false });
     }
     addEventListener('keydown', onKey, true);
@@ -271,6 +326,7 @@
     function end(result) {
       if (over) return;
       over = true;
+      stopWaiting();
       closeTerms(false);
       creds = null; pw.value = '';
       const fade = host.animate([{ opacity: 1 }, { opacity: 0 }], { duration: rm() ? 160 : 380, easing: E, fill: 'forwards' });
@@ -278,7 +334,7 @@
       fade.onfinish = () => fin(result);
       setTimeout(() => fin(result), 700);
     }
-    const ctl = { abort() { fin({ account: false, aborted: true }); } };
+    const ctl = { abort() { stopWaiting(); fin({ account: false, aborted: true }); } };
 
     // ---- in ----
     setMode(opts.startIn === 'signin', true);

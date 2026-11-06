@@ -66,6 +66,10 @@ contextBridge.exposeInMainWorld('glass', {
     signIn: (contact, password) => ipcRenderer.invoke('localAccount:signIn', contact, password),
     signOut: () => ipcRenderer.invoke('localAccount:signOut'),
     remove: () => ipcRenderer.invoke('localAccount:remove'),
+    googleAvailable: () => ipcRenderer.invoke('localAccount:googleAvailable'),
+    googleStart: () => ipcRenderer.invoke('localAccount:googleStart'),
+    googleCancel: () => ipcRenderer.invoke('localAccount:googleCancel'),
+    googleFinish: (username) => ipcRenderer.invoke('localAccount:googleFinish', username),
   },
   updates: {
     state: () => ipcRenderer.invoke('update:state'),

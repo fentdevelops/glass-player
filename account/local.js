@@ -32,7 +32,9 @@ function createAccountStore(file) {
   function read() {
     try {
       const a = JSON.parse(fs.readFileSync(file, 'utf8'));
-      if (a && a.v === 1 && typeof contactOf(a) === 'string' && typeof a.username === 'string' && Username.check(a.username).ok
+      // a Google account has no password: it keeps the Google sub instead of a salt and hash
+      if (a && a.v === 1 && a.provider === 'google' && typeof a.sub === 'string' && a.sub && typeof contactOf(a) === 'string' && typeof a.username === 'string' && Username.check(a.username).ok) return a;
+      if (a && a.v === 1 && !a.provider && typeof contactOf(a) === 'string' && typeof a.username === 'string' && Username.check(a.username).ok
         && typeof a.salt === 'string' && typeof a.hash === 'string' && Buffer.from(a.hash, 'hex').length === KEY_LEN) return a;
     } catch { /* no file, or a damaged one */ }
     return null;
@@ -69,11 +71,34 @@ function createAccountStore(file) {
     if (typeof contact !== 'string' || typeof password !== 'string' || password.length > MAX_FIELD) return fail('mismatch');
     const a = read();
     if (!a) return fail('mismatch');
+    if (a.provider === 'google') return fail('google');
     // the hash is worked out either way, so a wrong email or number and a wrong password take the same time
     const got = await scrypt(password.normalize('NFKC'), Buffer.from(a.salt, 'hex'), paramsOf(a));
     const same = crypto.timingSafeEqual(got, Buffer.from(a.hash, 'hex'));
     if (!same || !Contact.same(cleanContact(contact), contactOf(a))) return fail('mismatch');
     if (!a.signedIn) write({ ...a, signedIn: true });
+    return { ok: true, ...state() };
+  }
+
+  // identity is { sub, email, name } from account/google.js. Nothing is written until there is a username.
+  const goodIdentity = (i) => !!i && typeof i.sub === 'string' && !!i.sub && typeof i.email === 'string' && typeof i.name === 'string';
+  // -> { ok: true, status: 'signedIn' | 'new' }, or fail('exists') when this computer has an account for someone else
+  function signInGoogle(identity) {
+    if (!goodIdentity(identity)) return fail('invalid');
+    const a = read();
+    if (!a) return { ok: true, status: 'new', ...state() };
+    if (a.provider !== 'google' || a.sub !== identity.sub) return fail('exists');
+    if (!a.signedIn) write({ ...a, signedIn: true });
+    return { ok: true, status: 'signedIn', ...state() };
+  }
+  function createGoogle(identity, username) {
+    if (!goodIdentity(identity) || typeof username !== 'string') return fail('invalid');
+    const who = cleanContact(identity.email);
+    if (!who) return fail('contact');
+    const u = Username.check(username);
+    if (!u.ok) return fail('username');
+    if (read()) return fail('exists');
+    write({ v: 1, provider: 'google', sub: identity.sub, contact: who, name: identity.name.slice(0, 100), username: u.name, signedIn: true });
     return { ok: true, ...state() };
   }
 
@@ -89,7 +114,7 @@ function createAccountStore(file) {
     return { ok: true, ...state() };
   }
 
-  return { create, signIn, signOut, remove, state };
+  return { create, signIn, signInGoogle, createGoogle, signOut, remove, state };
 }
 
 module.exports = { createAccountStore, MIN_PASSWORD };

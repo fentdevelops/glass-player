@@ -175,8 +175,74 @@ const again = page(async (T) => {
   T.ok(T.$('[data-acct-name]')?.textContent === 'tester', 'still signed in as tester, got ' + T.account());
 });
 
+// ---- Google, with the stand-in provider (GLASS_FAKE_GOOGLE, honoured only under GLASS_SHOT): no browser, no network ----
+const googleNew = page(async (T) => {
+  await T.toScreen();
+  const sheetOn = () => !!T.$('.su-sheet.on');
+  T.$('[data-way="Google"]').click();
+  await T.until(sheetOn, 'Sign up with Google opens the terms first');
+  await T.wait(900);
+  T.ok(T.$('.su-wait').hidden, 'the browser has not been asked yet');
+  T.ok(/Google is contacted only if you choose to sign in with it/.test(T.$('.su-terms').textContent), 'the terms say when Google is contacted');
+  T.$('.su-terms').scrollTop = T.$('.su-terms').scrollHeight;
+  await T.wait(300);
+  T.$('.su-agree').click();
+  await T.until(() => !T.$('.su-wait').hidden, 'the waiting note shows after the terms');
+  T.ok(T.$('.su-wait p').textContent === 'Finish signing in in your browser' && T.$('.su-wait-x').textContent === 'Cancel', 'the note and a Cancel');
+  await T.until(() => !T.$('.su-name').hidden, 'a new Google account goes on to the username step');
+  await T.wait(700);
+  T.ok(T.$('.su-wait').hidden, 'the waiting note is gone');
+  T.type('.su-un', 'gtester');
+  T.send();
+  await T.until(() => !T.su(), 'the screen finishes');
+  await T.pastFinder();
+  await T.openSettings();
+  T.ok(T.$('[data-acct-name]')?.textContent === 'gtester', 'Settings shows gtester, got ' + T.account());
+  T.ok(!/example\.com|fake-sub|Google Tester/.test(document.body.innerHTML), 'no email, sub or name in the page');
+  // signing out, then password sign-in says to use Google
+  T.$('[data-acct-out]').click();
+  await T.until(() => T.$('[data-acct-in]'), 'Sign out leaves a Sign in button');
+  T.$('[data-acct-in]').click();
+  await T.until(() => T.$('.su-overlay .su'), 'the screen opens over the app');
+  await T.wait(1000);
+  T.type('.su-em', 'google.tester@example.com');
+  T.type('.su-pw', 'correct horse battery staple');
+  T.send();
+  await T.until(() => /Google/.test(T.hint()), 'a password on a Google account points to Google');
+  // and Google itself signs straight in: no terms
+  T.$('[data-way="Google"]').click();
+  await T.until(() => !T.$('.su-overlay'), 'Google signs the existing account in');
+  T.ok(!sheetOn(), 'no terms on Sign in');
+  await T.until(() => T.$('[data-acct-name]'), 'Settings comes back signed in');
+});
+
+const googleMissing = page(async (T) => {
+  await T.toScreen();
+  T.$('[data-way="Google"]').click();
+  await T.wait(600);
+  T.ok(T.$('.su-soon').textContent === 'Coming soon' && +getComputedStyle(T.$('.su-soon')).opacity > 0.5, 'without the client file Google says Coming soon');
+  T.ok(!T.$('.su-sheet.on') && T.$('.su-wait').hidden && T.$('.su-creds').hidden === false, 'no terms, no waiting, nothing changed');
+});
+
+const googleDenied = page(async (T) => {
+  await T.toScreen();
+  T.$('[data-way="Google"]').click();
+  await T.until(() => !!T.$('.su-sheet.on'), 'the terms');
+  await T.wait(900);
+  T.$('.su-terms').scrollTop = T.$('.su-terms').scrollHeight;
+  await T.wait(300);
+  T.$('.su-agree').click();
+  await T.until(() => /declined/.test(T.hint()), 'a declined sign-in says so in plain text');
+  T.ok(T.$('.su-wait').hidden && T.$('.su-name').hidden, 'back on the form, no username step');
+  const st = await glass.localAccount.state();
+  T.ok(!st.exists, 'nothing stored');
+});
+
 module.exports = [
   { name: 'after the last intro screen: Continue without an account goes on, nothing stored', signup: true, env: small, page: skipping, timeout: 180000 },
   { name: 'sign up: checks, Coming soon, terms, username, Settings, sign out and in', signup: true, profile: 'acct', env: small, page: journey, timeout: 180000 },
   { name: 'an existing user\'s normal launch shows none of it', signup: true, profile: 'acct', env: small, page: again },
+  { name: 'Google (stand-in): terms first, then the browser, then the username; sign in later', signup: true, profile: 'google', env: () => ({ ...small(), GLASS_FAKE_GOOGLE: 'new' }), page: googleNew, timeout: 180000 },
+  { name: 'Google without the client file says Coming soon', signup: true, env: () => ({ ...small(), GLASS_FAKE_GOOGLE: 'missing' }), page: googleMissing },
+  { name: 'Google declined shows plain text and stores nothing', signup: true, env: () => ({ ...small(), GLASS_FAKE_GOOGLE: 'denied' }), page: googleDenied },
 ];

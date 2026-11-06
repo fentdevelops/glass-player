@@ -38,7 +38,8 @@
       "preload.js",
       "renderer/**/*",
       "scan/**/*",
-      "account/**/*"
+      "account/**/*",
+      "account/google-client.json"
     ],
     "win": {
       "target": [

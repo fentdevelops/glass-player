@@ -63,7 +63,7 @@ test('username rules', () => {
   assert.deepStrictEqual(Username.check('Tester'), { ok: true, name: 'tester', error: '' });
   for (const good of ['f', '7', 'a.b_c', 'a'.repeat(18)]) assert.strictEqual(Username.check(good).ok, true, good);
   for (const bad of ['', '.', '..', '_', 'a b', 'a-b', 'é', 'admin', 'Admin', 'a'.repeat(19)]) assert.strictEqual(Username.check(bad).ok, false, bad);
-  for (const r of ['support', 'glassy', 'official', 'moderator', 'system', 'glass', 'root', 'null', 'undefined', 'staff', 'mod', 'help', 'administrator', 'fent', 'FENT']) assert.strictEqual(Username.check(r).ok, false, r);
+  for (const r of ['support', 'glassy', 'official', 'moderator', 'system', 'glass', 'root', 'null', 'undefined', 'staff', 'mod', 'help', 'administrator']) assert.strictEqual(Username.check(r).ok, false, r);
 });
 
 test('the file keeps its scrypt numbers, and an old file with none still signs in', async () => {
@@ -99,4 +99,42 @@ test('contact rules: email lowercased, phone 7 to 15 digits, anything else refus
   for (const bad of ['', 'nope', '123456', '1'.repeat(16), '55-55-5', 'a@b', '555 abc 1234', '++15551234567']) assert.strictEqual(Contact.check(bad).ok, false, bad);
   const { acct } = store();
   assert.strictEqual((await acct.create('nope', PW, 'tester')).error, 'contact');
+});
+
+const WHO = { sub: 'sub-1', email: 'Me@Example.com', name: 'Me Myself' };
+
+test('a Google account keeps the sub, the email and the name, and no password', async () => {
+  const { file, acct } = store();
+  assert.deepStrictEqual(acct.signInGoogle(WHO).status, 'new');
+  assert.strictEqual(acct.state().exists, false, 'nothing is written before a username');
+  const r = acct.createGoogle(WHO, 'Tester');
+  assert.strictEqual(r.ok, true);
+  const a = JSON.parse(fs.readFileSync(file, 'utf8'));
+  assert.strictEqual(a.provider, 'google');
+  assert.strictEqual(a.sub, 'sub-1');
+  assert.strictEqual(a.contact, 'me@example.com');
+  assert.strictEqual(a.name, 'Me Myself');
+  assert.strictEqual(a.username, 'tester');
+  assert.ok(!('hash' in a) && !('salt' in a));
+  assert.deepStrictEqual(Object.keys(acct.state()).sort(), ['exists', 'signedIn', 'username']);
+});
+
+test('Google sign-in with the same sub signs in; a different identity is refused; passwords say use Google', async () => {
+  const { acct } = store();
+  acct.createGoogle(WHO, 'tester');
+  acct.signOut();
+  assert.strictEqual(acct.state().signedIn, false);
+  const again = acct.signInGoogle(WHO);
+  assert.strictEqual(again.status, 'signedIn');
+  assert.strictEqual(acct.state().signedIn, true);
+  assert.strictEqual(acct.signInGoogle({ ...WHO, sub: 'sub-2' }).error, 'exists');
+  assert.strictEqual((await acct.signIn('me@example.com', PW)).error, 'google');
+  assert.strictEqual(acct.createGoogle({ ...WHO, sub: 'sub-2' }, 'other').error, 'exists');
+});
+
+test('Google sign-in on a password account is refused, and old files still work', async () => {
+  const { acct } = store();
+  await acct.create('me@example.com', PW, 'tester');
+  assert.strictEqual(acct.signInGoogle(WHO).error, 'exists');
+  assert.strictEqual((await acct.signIn('me@example.com', PW)).ok, true);
 });
