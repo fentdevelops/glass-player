@@ -763,6 +763,30 @@ async function checkUpdates(manual = false) {
     await autoUpdater.checkForUpdates();
   } catch (e) { sendUpdate({ state: 'error', message: String((e && e.message) || e).split('\n')[0].slice(0, 160) }); }
 }
+// ---- song finder (scan/service.js): scans Music and Downloads, scores each file, streams results to the window ----
+// Tests: with GLASS_SHOT, GLASS_SCAN_ROOTS (";"-separated, first one counts as the Music folder) replaces the real folders.
+let scanService = null;
+function scan() {
+  if (scanService) return scanService;
+  const testRoots = process.env.GLASS_SHOT && process.env.GLASS_SCAN_ROOTS ? process.env.GLASS_SCAN_ROOTS.split(';').filter(Boolean) : null;
+  const roots = testRoots || [app.getPath('music'), app.getPath('downloads')];
+  scanService = require('./scan/service').createScanService({
+    roots,
+    musicRoot: roots[0],
+    statePath: ud('scan-state.json'),
+    send: (channel, msg) => { if (win && !win.isDestroyed()) win.webContents.send(channel, msg); },
+    resolve: resolvePaths,
+    toUrl: fileUrl,
+  });
+  return scanService;
+}
+const fromWindow = (e) => !!win && !win.isDestroyed() && e.sender === win.webContents;
+ipcMain.handle('scan:start', (e) => { if (!fromWindow(e)) return false; scan().start().catch(() => {}); return true; });
+ipcMain.handle('scan:stop', (e) => { if (fromWindow(e)) scan().stop(); return true; });
+ipcMain.handle('scan:add', (e, paths, skipped) => (fromWindow(e) ? scan().add(paths, skipped) : []));
+ipcMain.handle('scan:find', (e) => { if (!fromWindow(e)) return false; scan().findFromSettings().catch(() => {}); return true; });
+ipcMain.handle('scan:status', (e) => (fromWindow(e) ? scan().status() : null));
+
 ipcMain.handle('update:state', () => updateState);
 ipcMain.handle('update:check', () => checkUpdates(true));
 // Restart to update: the new version installs silently in the background (no setup window) and Glass reopens

@@ -52,6 +52,14 @@ contextBridge.exposeInMainWorld('glass', {
   },
   onOpenPaths: (cb) => ipcRenderer.on('open-paths', (_e, tracks) => cb(tracks)),
   onMaximized: (cb) => ipcRenderer.on('maximized', (_e, v) => cb(v)),
+  scan: {
+    start: () => ipcRenderer.invoke('scan:start'),
+    stop: () => ipcRenderer.invoke('scan:stop'),
+    add: (paths, skipped) => ipcRenderer.invoke('scan:add', paths, skipped),
+    findFromSettings: () => ipcRenderer.invoke('scan:find'),
+    status: () => ipcRenderer.invoke('scan:status'),
+    onProgress: (cb) => ipcRenderer.on('scan:progress', (_e, m) => cb(m)),
+  },
   updates: {
     state: () => ipcRenderer.invoke('update:state'),
     check: () => ipcRenderer.invoke('update:check'),
