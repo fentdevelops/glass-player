@@ -59,7 +59,7 @@ Each of these is the builder's default unless the owner changes it.
 - **Filtering:** a blocklist of slurs for usernames and bios. Apple requires filtering once people can post content.
 - **Bio:** plain text, 160 characters at most, shown as text only. Links aren't clickable.
 - **Who can see profiles:** signed-in people only, so strangers can't scrape them. Search by username prefix, rate limited, in the Search tab under a People group while signed in.
-- **Ages:** a date of birth is asked once, on a neutral screen that doesn't hint at the required age. Only the date someone turns 18 is kept, never the full date of birth, and clients can't write it. Under 13: no account, the just-created sign-in is deleted, and that device can't simply try again with another date. If anything later shows someone is under 13, the account is deleted.
+- **Ages:** a date of birth is asked once, on a neutral screen that doesn't hint at the required age. Adults keep nothing beyond the fact they're adults. Teens keep only the first of the month after they turn 18, which can't reveal the birthday. It lives in a private table no client can read or write. Under 13: no account, the just-created sign-in is deleted, and that device can't simply try again with another date. If anything later shows someone is under 13, the account is deleted.
 - **Teens (13 to 17):** left out of People search and suggestions, with no switch to change that until they turn 18, when it lifts by itself. Someone with their exact username or link can still open their profile, and report and block still work.
 - **Passwords:** at least 15 characters, no required symbols, and a check against leaked passwords (needs Supabase Pro). NIST asks for 15 when a password is the only factor. Supabase's hashing limit means a 72 character maximum.
 - **Bundle ID:** the iPhone app's ID still needs choosing, and it can't change after launch. Recommended: `com.fentdevelops.glassy`. The desktop ID stays `com.glass.player` so updates keep working.
@@ -87,17 +87,19 @@ All schema changes are migration files in `supabase/migrations/`. Every table ha
 
 | Table | Holds | Access |
 |---|---|---|
-| `profiles` | `id` (the auth user, cascade delete), `username` (unique, checked as above), `username_changed_at`, `bio`, `avatar_path`, `hidden`, `turns_18_on`, timestamps. **No email or date of birth.** | Signed-in people read rows that aren't hidden and aren't blocked either way. Owners update only `bio` and `avatar_path`, through column grants. `username`, `hidden` and `turns_18_on` are never written directly |
+| `profiles` | `id` (the auth user, cascade delete), `username` (unique, checked as above), `username_changed_at`, `bio`, `avatar_path`, `hidden`, timestamps. **No email or age.** | People read only their own row directly. Everyone else's goes through `get_profile` and `search_profiles`, so teens can't be listed and scraping can't skip the rate limits. Hidden and blocked profiles are left out. `username` and `hidden` are never written directly |
 | `reserved_usernames` | Names nobody can take, including held old names with an expiry | No client access |
 | `blocks` | Who blocked whom | Owners read and write their own rows |
 | `reports` | Reporter, reported profile, reason, time | Insert only |
-| `private.apple_tokens` | Apple refresh tokens | Edge Functions only |
+| `private.ages` | `turns_18_on`, as above | No client access |
+| `private.apple_tokens` | Apple refresh tokens, added with Apple sign-in | Edge Functions only |
 
 Functions, as security-definer with `search_path = ''`, in a private schema behind thin public wrappers:
 - `set_username(name)` is the only way to create or change a username. It enforces the rules and the 30 days, and the unique index settles any race.
 - `username_available(name)` for the live check while typing, rate limited.
+- `get_profile(username)`, rate limited, for an exact name.
 - `search_profiles(prefix)`, rate limited, leaves out anyone under 18.
-- `set_age(date_of_birth)`, once only: refuses under 13 and stores just `turns_18_on`.
+- `set_age(date_of_birth)`, once only: refuses under 13 and keeps only what's described above.
 
 A signed-in account has no profile until it picks a username.
 
