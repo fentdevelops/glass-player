@@ -133,11 +133,19 @@ Built by the iPhone session against this same backend, which it doesn't change. 
 ### Screens (desktop)
 
 An **Account** section at the top of Settings.
-- Signed out: Continue with Apple, Continue with Google, and an email form. Never shown as a prompt at launch.
-- Choosing any sign-in method opens the terms and privacy policy first, in a scrolling sheet. **I agree** lights up once they've scrolled to the end, and only then does sign-in start. Continue without an account skips this. The agreement is logged to `consents` once the account exists.
+- Signed out: a Sign in button, which opens the sign-up screen below. Never shown as a prompt at launch.
+- Signing up with any method opens the terms and privacy policy first, in a scrolling sheet. **I agree** lights up once they've scrolled to the end, and only then does sign-in start. Continue without an account skips this. The agreement is logged to `consents` once the account exists.
 - After first sign-in: date of birth, then pick a username, with a live availability check.
 - Signed in: picture, username, bio, View profile, Sign out, Sign out everywhere, Delete account.
 - Someone else's profile opens as a page in the side panel, built like the artist pages, with Report and Block in its menu.
+
+**The sign-up screen, following the owner's example** (`docs/superpowers/mockups/intro-preview.html` shows it), on the moving background with no card around it:
+- top left: the Glassy logo and name
+- center column: a small line ("Start your journey"), the heading ("Sign up to Glassy"), Email and Password fields with their labels set into the top border, a mail icon and a show-password eye, the hint "At least 15 characters", a full-width Sign up button, an "or sign up with" divider, then a row of equal icon buttons for Apple, Google (full-color logo), passkey and phone
+- bottom left: "Have an account? Sign in", which switches the same screen to "Welcome back / Sign in to Glassy" with Forgot password
+- bottom right: "Continue without an account"
+
+Signing up with any method opens the terms first. Signing in doesn't, unless the terms have changed since they last agreed. Methods that aren't live yet are left out of the row.
 
 Everything follows the app's taste rules: liquid glass, everything glides, nothing snaps, plain language, no emojis. A server problem shows as a calm message and never touches playback.
 

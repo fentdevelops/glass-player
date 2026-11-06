@@ -333,13 +333,14 @@ test('a session signed in by text alone can\'t delete the account without a fres
 - Consumes: `glass.account.*`, `Art.layer`, `esc`, `toast`
 - Produces: `window.Account = { sectionHTML(), mount(form), openPicker(), state() }`. `scripts/ui-test.js <eval file>` runs an eval off-screen and muted with `GLASS_ACCOUNT_FAKE=1`, failing on any renderer error.
 
-**Screens, as glass sheets over Settings:** the Account section goes above Glass in Settings. Signed out: Continue with Google, Use a passkey, Phone number, and Email (Apple isn't shown yet). Choosing any of them opens the scrolling terms first, and I agree lights up at the end. Then the method's own steps, then date of birth, then a username picker with a live check. The same screen fills `Intro.accountStep`. Forgot password goes email, code, new password. Each step glides into the next inside one sheet.
+**Screens, as glass sheets over Settings:** the Account section goes above Glass in Settings. The sign-up screen follows the layout in the accounts spec and `docs/superpowers/mockups/intro-preview.html`, with Apple left out of the button row for now. Signing up with any method opens the scrolling terms first, and I agree lights up at the end. Then the method's own steps, then date of birth, then a username picker with a live check. The same screen fills `Intro.accountStep`. Forgot password goes email, code, new password. Each step glides into the next inside one sheet.
 
 - [ ] **Step 1: Write the failing test** in `tests/ui/account-signin.js`:
 
 ```js
 // accounts off (no GLASS_ACCOUNTS): no Account section, window.glass.account undefined
-// fake on, signed out: Settings shows Google, passkey, phone and email, and no Apple button
+// fake on, signed out: the screen shows email and password fields, Google, passkey and phone buttons, and no Apple button
+// 'Have an account? Sign in' switches the wording and shows Forgot password; Continue without an account closes it with nothing sent
 // choosing a method opens the terms; I agree stays off until scrolled to the end, and no sign-in call happens before it
 // terms version changed since accepted: asked again at next sign-in
 // app launch shows no sheet and no prompt
