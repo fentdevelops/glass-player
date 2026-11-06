@@ -179,10 +179,13 @@
   // behind the glass: the playing song's artwork, or your own picture (Settings > Glass > Background)
   let artUrl = '';
   const wallFor = () => (S.ui.wall === 'custom' && S.ui.wallImg ? S.ui.wallImg : artUrl);
+  // a picture background with no picture yet (nothing playing) shows the moving colours instead, until there is one
+  const picture = () => S.ui.wall !== 'colors' && !!wallFor();
+  const syncMode = () => body.classList.toggle('wall-art', picture());
   function apply() {
     on = true;                       // always liquid now (the Frosted style was removed)
     body.classList.toggle('liquid', on);
-    body.classList.toggle('wall-art', S.ui.wall !== 'colors');
+    syncMode();
     setWall(wallFor());
     if (on) { for (const sel of TARGETS) { const el = $(sel); if (el) build(el); } extra.forEach(build); }
   }
@@ -202,7 +205,9 @@
     watch,
     unwatch,
     // the artwork on screen changed
-    art(url) { artUrl = url || ''; setWall(wallFor()); },
+    art(url) { artUrl = url || ''; syncMode(); setWall(wallFor()); },
+    // true while a picture (artwork or your own image) is what's behind the glass, false while the colours are
+    shown: picture,
     // a panel is about to animate at a new size: fit its glass now, so it doesn't swap partway through the motion
     snap(el) { if (!el || !on) return; clearTimeout(settle.get(el)); settle.delete(el); build(el); el.classList.remove('lg-busy'); },
   };

@@ -48,7 +48,7 @@ const skipping = page(async (T) => {
   T.ok(T.$('.su-h').textContent === 'Sign up to Glassy' && T.$('.su-kick').textContent === 'Start your journey', 'the words, got ' + T.$('.su-h').textContent);
   T.ok(T.$('.su-honest')?.textContent === 'For now, your account stays on this computer.', 'the honesty line is there');
   T.ok(T.$('.su-creds .su-hint-t').textContent === 'At least 15 characters', 'the hint');
-  T.ok(T.$$('.su-way').length === 4, 'four icon buttons');
+  T.ok(T.$$('.su-way').length === 2 && T.$$('.su-way').map((b) => b.textContent).join() === 'Apple,Google', 'only Apple and Google buttons');
   // the logo and links sit below the 44 px title bar, and the bar still takes clicks
   for (const s of ['.su-logo', '.su-stage', '.su-noacc', '.su-have']) {
     const b = T.box(s);
@@ -77,12 +77,14 @@ const journey = page(async (T) => {
   T.ok(+getComputedStyle(T.$('.su-soon')).opacity > 0.5, 'and the note shows');
   T.ok(!sheetOn() && T.$('.su').dataset.mode === 'signup' && T.$('.su-creds').hidden === false, 'Apple opens no terms and changes nothing');
 
+  T.ok(T.$('.su-f legend').textContent === 'Email or phone number' && T.$('.su-em').placeholder === 'you@example.com', 'the first field takes either, with an email as the example');
+  T.ok(T.$('.su-sheet').inert, 'the shut terms cannot be reached by keyboard');
   // checks come first
   T.type('.su-em', 'nope');
   T.type('.su-pw', 'a'.repeat(15));
   T.send();
   await T.wait(200);
-  T.ok(/valid email/.test(T.hint()) && !sheetOn(), 'a bad email says so and opens no terms, got ' + T.hint());
+  T.ok(T.hint() === 'Enter your email or phone number' && !sheetOn(), 'a bad value says so and opens no terms, got ' + T.hint());
   T.type('.su-em', 'me@example.com');
   T.type('.su-pw', 'a'.repeat(14));
   T.send();
@@ -108,19 +110,28 @@ const journey = page(async (T) => {
   terms.scrollTop = terms.scrollHeight;
   await T.wait(300);
   T.ok(!agree.disabled && agree.textContent === 'I agree', 'I agree lights up at the end, got ' + agree.textContent);
+  // Esc shuts the terms: I agree is off again and out of reach, the form is back; opening them again starts from the top
+  document.body.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
+  await T.wait(300);
+  T.ok(!sheetOn() && T.$('.su-sheet').inert && agree.disabled && !T.$('.su-form').inert, 'Esc: sheet shut and inert, I agree off, form live');
+  T.send();
+  await T.until(sheetOn, 'the terms open again');
+  T.ok(T.$('.su-form').inert && agree.disabled, 'while the terms are up the form is inert and I agree starts off');
+  terms.scrollTop = terms.scrollHeight;
+  await T.wait(400);
   agree.click();
 
   // username, with a live check
   await T.until(() => !T.$('.su-name').hidden, 'the username step');
   await T.wait(700);
   const nh = () => T.$('.su-name-hint .su-hint-t');
-  T.type('.su-un', 'Fent');
-  T.ok(T.$('.su-un').value === 'fent' && nh().classList.contains('good'), 'capitals become lowercase and it looks good, got ' + T.$('.su-un').value);
+  T.type('.su-un', 'Tester');
+  T.ok(T.$('.su-un').value === 'tester' && nh().classList.contains('good'), 'capitals become lowercase and it looks good, got ' + T.$('.su-un').value);
   T.type('.su-un', 'admin');
   T.ok(nh().classList.contains('bad'), 'admin is refused live, got ' + nh().textContent);
   T.type('.su-un', 'a b');
   T.ok(nh().classList.contains('bad'), 'a space is refused live');
-  T.type('.su-un', 'Fent');
+  T.type('.su-un', 'Tester');
   T.send();
   await T.until(() => !T.su(), 'the screen finishes');
   await T.pastFinder();
@@ -128,7 +139,7 @@ const journey = page(async (T) => {
   // Settings shows the account
   await T.openSettings();
   T.ok(T.$('.set-scroll .set-sec h4').textContent === 'Account', 'Account is the top section');
-  T.ok(T.$('[data-acct-name]')?.textContent === 'fent', 'Settings shows fent, got ' + T.account());
+  T.ok(T.$('[data-acct-name]')?.textContent === 'tester', 'Settings shows tester, got ' + T.account());
   T.ok(/Saved on this computer/.test(T.account()) && T.$('[data-acct-out]'), 'it says Saved on this computer and has Sign out');
   T.ok(!/example\.com|battery/.test(document.body.innerHTML), 'no email or password in the page');
 
@@ -146,12 +157,12 @@ const journey = page(async (T) => {
   T.type('.su-pw', 'wrong wrong wrong wrong');
   T.send();
   await T.until(() => /doesn't match/.test(T.hint()), 'a wrong password says so');
-  T.ok(T.hint() === "That email or password doesn't match." && !sheetOn(), 'the message, and no terms, got ' + T.hint());
+  T.ok(T.hint() === "That email, phone number or password doesn't match." && !sheetOn(), 'the message, and no terms, got ' + T.hint());
   T.type('.su-pw', 'correct horse battery staple');
   T.send();
   await T.until(() => !T.$('.su-overlay'), 'the right password signs in');
   await T.until(() => T.$('[data-acct-name]'), 'Settings comes back signed in');
-  T.ok(T.$('[data-acct-name]').textContent === 'fent', 'signed in as fent again');
+  T.ok(T.$('[data-acct-name]').textContent === 'tester', 'signed in as tester again');
 });
 
 // ---- the same install, launched again: none of this ----
@@ -161,7 +172,7 @@ const again = page(async (T) => {
   T.ok(!T.intro() && !T.su() && !T.$('.su-overlay'), 'a normal launch shows no intro and no sign-up screen');
   T.ok(!document.documentElement.className.includes('intro'), 'no intro class on the page');
   await T.openSettings();
-  T.ok(T.$('[data-acct-name]')?.textContent === 'fent', 'still signed in as fent, got ' + T.account());
+  T.ok(T.$('[data-acct-name]')?.textContent === 'tester', 'still signed in as tester, got ' + T.account());
 });
 
 module.exports = [

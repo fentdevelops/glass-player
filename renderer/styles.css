@@ -1698,6 +1698,8 @@ html.intro-hide .ambient, html.intro-hide .body, html.intro-hide .gear { visibil
    Inside the intro it fills the window under the 44 px title bar; from Settings it is a full-window overlay below it. ---------- */
 .su-overlay { position: fixed; inset: 44px 0 0 0; z-index: 85; overflow: hidden; background: #0d0726;
   background-image: radial-gradient(60% 70% at 24% 28%, rgba(124, 59, 224, .34), transparent 70%), radial-gradient(50% 60% at 80% 72%, rgba(242, 88, 156, .22), transparent 70%), radial-gradient(40% 50% at 8% 96%, rgba(74, 47, 208, .3), transparent 70%); }
+/* the title bar strip above the overlay is covered too (the gear sits there), except the window buttons on the right (3 x 40 + 2 x 4 gap + 8 padding) */
+.su-overlay::before { content: ""; position: fixed; top: 0; left: 0; right: 136px; height: 44px; -webkit-app-region: no-drag; }
 .su {
   --su-top: 0px; --su-s: 1; --glide: cubic-bezier(.42, .02, .2, 1); --ink2: rgba(255, 255, 255, .68);
   position: absolute; inset: 0; color: #fff; font-family: "Segoe UI Variable Display", "Segoe UI", system-ui, sans-serif; -webkit-font-smoothing: antialiased;
@@ -1736,12 +1738,13 @@ html.intro-hide .ambient, html.intro-hide .body, html.intro-hide .gear { visibil
 .su-main:hover { transform: scale(1.015); } .su-main:active { transform: scale(.985); }
 .su-or { display: flex; align-items: center; gap: 14px; margin: 24px 0 16px; font-size: 13px; color: var(--ink2); }
 .su-or::before, .su-or::after { content: ""; flex: 1; height: 1px; background: rgba(255, 255, 255, .2); }
-.su-soc { display: grid; grid-template-columns: repeat(4, 1fr); gap: 11px; }
-.su-way { height: 56px; border-radius: 14px; display: grid; place-items: center; transition: transform .4s var(--glide);
+.su-soc { display: grid; grid-template-columns: repeat(2, 1fr); gap: 11px; }
+.su-way { height: 56px; border-radius: 14px; display: flex; align-items: center; justify-content: center; gap: 10px; font-size: 15px; color: #fff; transition: transform .4s var(--glide);
   background: linear-gradient(160deg, rgba(255, 255, 255, .2), rgba(255, 255, 255, .07) 42%, rgba(255, 255, 255, .12));
   -webkit-backdrop-filter: blur(14px) saturate(1.5) brightness(1.18); backdrop-filter: blur(14px) saturate(1.5) brightness(1.18);
   box-shadow: inset 0 0 0 1px rgba(255, 255, 255, .2), inset 3px 4px 10px -4px rgba(255, 255, 255, .6), inset -3px -4px 12px -6px rgba(255, 255, 255, .3), 0 14px 30px -18px rgba(8, 2, 40, .7); }
 .su-way:hover { transform: translateY(-2px); }
+.su-way span { font-weight: 500; }
 .su-way svg { width: 23px; height: 23px; fill: none; stroke: #fff; stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; }
 .su-soon { min-height: 18px; margin-top: 10px; text-align: center; font-size: 12.5px; color: #fff; opacity: 0; transition: opacity .4s var(--glide); }
 .su-soon.on { opacity: 1; }

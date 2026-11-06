@@ -62,7 +62,7 @@ function createScanService({ roots, musicRoot, statePath, send, resolve, toUrl, 
     try { return { ...(await readInfo(p)), path: p }; } catch { return { path: p }; }
   }
 
-  async function scan(mine) {
+  async function scan(mine, ignoreSeen) {
     offered = new Set();
     const live = () => run && run.ctrl === mine && !mine.signal.aborted;
     let scanned = 0, found = 0, pending = [], lastSent = 0, looking = '';
@@ -99,7 +99,7 @@ function createScanService({ roots, musicRoot, statePath, send, resolve, toUrl, 
       // 2. folder by folder: read, count album neighbours among every file in the folder, offer only the fresh ones
       for (const files of folders.values()) {
         if (!live()) break;
-        const isFresh = (p) => !state.seen[p] && !state.skipped[p];
+        const isFresh = (p) => (ignoreSeen || !state.seen[p]) && !state.skipped[p];
         if (!files.some(isFresh)) continue;
         looking = whereIs(files[0]);
         const infos = [];
@@ -137,11 +137,11 @@ function createScanService({ roots, musicRoot, statePath, send, resolve, toUrl, 
   }
 
   // A scan already running is returned as it is.
-  function start() {
+  function start(ignoreSeen) {
     if (run) return run.promise;
     const mine = new AbortController();
     run = { ctrl: mine, promise: null };
-    run.promise = scan(mine);
+    run.promise = scan(mine, ignoreSeen === true);
     return run.promise;
   }
 
@@ -174,7 +174,7 @@ function createScanService({ roots, musicRoot, statePath, send, resolve, toUrl, 
     }
     state.skipped = {};
     save();
-    return start();
+    return start(true);   // this run only: "seen" itself is kept
   }
 
   const status = () => ({ ran: state.ran, watching: state.watching, scanning: !!run });

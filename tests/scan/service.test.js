@@ -155,14 +155,14 @@ test('stop() ends the scan and no more progress is sent', async () => {
   } finally { fs.rmSync(d, { recursive: true, force: true }); fs.rmSync(st, { recursive: true, force: true }); }
 });
 
-test('findFromSettings() forgets earlier skips, keeps added songs, and scans again', async () => {
+test('findFromSettings() forgets earlier skips and scans again, offering seen songs too', async () => {
   const d = scratch(), st = scratch();
   try {
     const a = touch(d, 'a.mp3'), b = touch(d, 'b.mp3');
     fs.writeFileSync(path.join(st, 'scan-state.json'), JSON.stringify({ seen: { [a]: true }, skipped: { [b]: true }, watching: false, ran: true }));
     const { svc, sent } = make(d, st);
     await svc.findFromSettings();
-    assert.deepStrictEqual(items(sent).map((i) => i.path), [b]);
+    assert.deepStrictEqual(items(sent).map((i) => i.path).sort(), [a, b].sort(), 'seen songs are offered again; the window hides those in the library');
     assert.strictEqual(svc.status().watching, false, 'watching only turns on when songs are added');
   } finally { fs.rmSync(d, { recursive: true, force: true }); fs.rmSync(st, { recursive: true, force: true }); }
 });
@@ -330,4 +330,19 @@ test('progress says where it is looking, with the root and the folders under it,
     assert.strictEqual(lastMsg(sent).done, true);
     assert.strictEqual(lastMsg(sent).looking, '', 'done clears it');
   } finally { fs.rmSync(d, { recursive: true, force: true }); fs.rmSync(st, { recursive: true, force: true }); }
+});
+
+test('findFromSettings() offers songs already seen (removed from the library), without clearing seen', async () => {
+  const d = scratch(), st = scratch();
+  try {
+    const a = touch(d, 'a.mp3'), b = touch(d, 'b.mp3');
+    fs.writeFileSync(stateFile(st), JSON.stringify({ seen: { [a]: true, [b]: true }, skipped: {}, watching: false, ran: true }));
+    const { svc, sent } = make(d, st);
+    await svc.findFromSettings();
+    assert.deepStrictEqual(items(sent).map((i) => i.path).sort(), [a, b].sort());
+    assert.deepStrictEqual(Object.keys(JSON.parse(fs.readFileSync(stateFile(st), 'utf8')).seen).sort(), [a, b].sort());
+    const again = make(d, st);
+    await again.svc.start();
+    assert.strictEqual(items(again.sent).length, 0, 'a plain scan still skips seen songs');
+  } finally { clean(d, st); }
 });

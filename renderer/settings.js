@@ -159,7 +159,7 @@
     const pickWall = async () => {
       const r = await api.pickWallpaper(S.ui.wallImg || null).catch((e) => { toast(cleanErr(e), true); return null; });
       if (r) { S.ui.wallImg = r.url; S.ui.wallImgSize = `${r.width}×${r.height}`; S.ui.wall = 'custom'; }
-      else if (!S.ui.wallImg) S.ui.wall = 'colors';         // nothing picked and nothing from before: back to the default
+      else if (!S.ui.wallImg) S.ui.wall = 'art';         // nothing picked and nothing from before: back to the default (artwork)
       applyUi(); save(); paintWall();
     };
     // after the chip's own handler has stored the choice (it's added later, so it runs after this one)

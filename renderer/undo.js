@@ -150,6 +150,7 @@
     if (k !== 'z' && k !== 'y') return;
     if (e.target && e.target.matches && e.target.matches('input, textarea, [contenteditable]')) return;
     if (!document.querySelector('#modalRoot').hidden) return;
+    if (document.querySelector('#intro, .su-overlay')) return;      // the intro or sign-up is up: nothing behind it changes
     e.preventDefault();
     e.stopImmediatePropagation();
     if (k === 'y' || e.shiftKey) redo(); else undo();

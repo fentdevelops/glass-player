@@ -8,6 +8,7 @@
   const SEEN = 'glass.introSeen';
   // A new install whose intro hasn't been finished. updates.js notes the version on every launch, so without this a first
   // launch that was closed part way, or ended by opening a song, would look like an existing user next time.
+  // Any library or playlist at launch ends it: someone who has songs never gets the intro, sign-up or finder in front of them.
   const OWED = 'glass.introOwed';
   const VERSION = 'glass.seenVersion';
   const page = document.documentElement;
@@ -56,7 +57,7 @@
     <div class="intro-ticks">${STEPS.map(() => '<i></i>').join('')}</div>`;
 
   // ---------- state of the running intro ----------
-  let wanted = false, isNew = false;
+  let wanted = false;
   let el = null, bg, cv, glass, words, hEl, pEl, go, skip, ticks, lyr, eq, tint;
   let k = 1, ox = 0, oy = 0;
   let step = -1, busy = false, leaving = false, inAccountStep = false, morph = null;
@@ -70,7 +71,7 @@
     if (localStorage.getItem(SEEN)) { /* done */ }
     else if (localStorage.getItem(OWED)) wanted = true;
     else if (localStorage.getItem(VERSION)) localStorage.setItem(SEEN, '1');     // updated from before the intro existed
-    else { localStorage.setItem(OWED, '1'); wanted = isNew = true; }
+    else { localStorage.setItem(OWED, '1'); wanted = true; }
   } catch { /* no storage: no intro */ }
   if (wanted) page.classList.add('intro-on', 'intro-hide');   // styles.css: nothing of the app paints under it
 
@@ -229,18 +230,23 @@
       } catch (e) { console.warn('Intro account step:', e); }
       inAccountStep = false; accountStage = null;
       if (!el) return;
+      setInert(false, go);      // the finder's button, and the last screen's if there is no finder, are live again
     }
     leave();
   }
 
   // ---------- the sign-up screen (signup.js) borrows the stage: the words go, the one glass shape becomes the logo ----------
   // Its layer sits inside the intro, above the background. shape() takes a box in window pixels.
+  // Controls that can't be seen must not be reachable by keyboard either.
+  const swatches = () => el.querySelector('.intro-sw');
+  function setInert(on, ...els) { for (const e of els) if (e) e.inert = on; }
   function accountStageNow() {
     clearTimers();
     busy = false;
     lyrOn(false); eqOn(false);
     tint.style.opacity = 0;
     for (const e of [go, skip]) e.style.pointerEvents = 'none';
+    setInert(true, go, skip, swatches());
     for (const e of [hEl, pEl, go, skip, ticks]) animateWord(e, [{ opacity: getComputedStyle(e).opacity }, { opacity: 0, ...rise(-12) }], { duration: reduceMotion ? 240 : 340, easing: 'ease-in' });
     return {
       root: el, glass,
@@ -254,7 +260,7 @@
   // The last screen's button, Skip and Esc all come through here. Only a fresh install with an empty library has the window
   // due, once; everyone else goes straight into the app.
   async function leave() {
-    if (!el || leaving || inFinder) return;
+    if (!el || leaving || inFinder || inAccountStep) return;
     if (!finderDue || !Intro.finderStep) return enter();
     finderDue = false;
     inFinder = true;
@@ -268,6 +274,7 @@
     tint.style.opacity = 0;
     go.style.pointerEvents = 'none';      // firstrun.js gives it back with its own words on it
     skip.style.pointerEvents = 'none';
+    setInert(true, skip, swatches());
     for (const e of [skip, ticks]) animateWord(e, [{ opacity: getComputedStyle(e).opacity }, { opacity: 0, ...rise(-14) }], { duration: reduceMotion ? 240 : 480 });
     finderStage = {
       root: el, glass, go, p: pEl,
@@ -429,10 +436,7 @@
     // songs or playlists doesn't need this
     libraryLoaded() {
       const empty = lib.size === 0 && S.playlists.length === 0;
-      if (isNew) {
-        isNew = false;
-        if (wanted && !empty) { markSeen(); finish(); }
-      }
+      if (wanted && !empty) { markSeen(); finish(); }
       // A first launch with nothing in the library: the song finder is due after this intro, and its scan starts now so the
       // results are there when the intro reaches them. The scripts may not all be in yet at this point.
       if (!wanted || !empty || leaving) return;

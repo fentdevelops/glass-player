@@ -22,6 +22,7 @@
   const HEADING = "Here's what we found";
   const EMPTY_HEADING = 'No songs here yet';
   const LOOKED = "We looked through your Music and Downloads folders and didn't find any. If your music lives somewhere else, show Glassy where.";
+  const FAILED = "Couldn't look through your folders.";
   const ALL_HAVE_HEADING = 'Nothing new';
   const ALL_HAVE = 'Every song we found is already in your library.';
   const ICON_SEARCH = '<svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="7" /><path d="m20 20-3.5-3.5" /></svg>';
@@ -276,6 +277,9 @@
         audio.addEventListener('ended', stopPreview);
         audio.addEventListener('error', () => failed(playing));
       }
+      // previews follow the app's volume and mute (the deck squares the slider, so the same here)
+      if (typeof vol !== 'undefined' && vol) audio.volume = Math.max(0, Math.min(1, (+vol.value / 100) ** 2));
+      audio.muted = typeof muted !== 'undefined' && !!muted;
       if (typeof deck !== 'undefined' && deck && !deck.paused) deck.pause();     // the main player is paused for good: it never resumes by itself
       playing = it;
       audio.src = it.url;
@@ -446,6 +450,8 @@
       searchT = setTimeout(() => setQuery(input.value), 110);
     });
     input.addEventListener('keydown', (e) => { if (e.key === 'Enter') e.preventDefault(); });   // never presses Add
+    // nor does Enter on a tick box anywhere in the list (implicit form submit); buttons still work with Enter
+    work.addEventListener('keydown', (e) => { if (e.key === 'Enter' && e.target.matches?.('input')) e.preventDefault(); });
 
     return {
       work, input, refresh, paint,
@@ -568,7 +574,7 @@
         if (!wordsIn || closed) return;
         if (s.dirty) regroup(s);      // the count and the button always agree
         if (state === 'empty') {
-          p.textContent = LOOKED;
+          p.textContent = s.failed ? FAILED : LOOKED;
           go.textContent = 'Add a folder';
           go.disabled = false;
         } else {
@@ -659,9 +665,9 @@
         const panel = form.querySelector('.fr-panel'), btn = form.querySelector('button[type=submit]'), line = form.querySelector('.fr-status');
         panel.dataset.state = state;
         const all = s.hidden > 0;
-        form.querySelector('.modal-title').textContent = state !== 'empty' ? HEADING : all ? ALL_HAVE_HEADING : EMPTY_HEADING;
+        form.querySelector('.modal-title').textContent = state !== 'empty' ? HEADING : s.failed ? EMPTY_HEADING : all ? ALL_HAVE_HEADING : EMPTY_HEADING;
         if (state === 'empty') {
-          form.querySelector('.fr-empty p').textContent = all ? ALL_HAVE : LOOKED;
+          form.querySelector('.fr-empty p').textContent = s.failed ? FAILED : all ? ALL_HAVE : LOOKED;
           btn.textContent = 'Add a folder';
           btn.disabled = false;
           line.hidden = true;
@@ -724,7 +730,7 @@
     const st = await scan.status().catch(() => null);
     if (session !== s) return;
     if (st && st.ran) { s.off = true; return; }      // it has been answered before: not asked again by itself
-    scan.start().catch(() => {});
+    scan.start().catch(() => { take(s, { done: true, error: true }); });
   };
   // The intro was dismissed (a song opened, a file dropped): no window, nothing left running.
   FirstRun.abandon = () => {
@@ -741,7 +747,8 @@
     if (!s) {
       if (session) endSession(session);
       s = session = newSession(auto);
-      (auto ? scan.start() : scan.findFromSettings()).catch(() => {});
+      const started = s;
+      (auto ? scan.start() : scan.findFromSettings()).catch(() => { take(started, { done: true, error: true }); });
     }
     if (s.off) { session = null; return Promise.resolve(); }
     openNow = (stage ? openOnStage(s, stage) : openSheet(s)).finally(() => { openNow = null; });

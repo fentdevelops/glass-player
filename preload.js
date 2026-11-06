@@ -62,8 +62,8 @@ contextBridge.exposeInMainWorld('glass', {
   },
   localAccount: {
     state: () => ipcRenderer.invoke('localAccount:state'),
-    create: (email, password, username) => ipcRenderer.invoke('localAccount:create', email, password, username),
-    signIn: (email, password) => ipcRenderer.invoke('localAccount:signIn', email, password),
+    create: (contact, password, username) => ipcRenderer.invoke('localAccount:create', contact, password, username),
+    signIn: (contact, password) => ipcRenderer.invoke('localAccount:signIn', contact, password),
     signOut: () => ipcRenderer.invoke('localAccount:signOut'),
     remove: () => ipcRenderer.invoke('localAccount:remove'),
   },

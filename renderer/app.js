@@ -49,10 +49,10 @@ const S = {
   filters: { type: 'all', formats: [], fav: false, missing: false, nocover: false },   // Library filter menu
   lib: { group: 'album', sort: 'title', layout: 'list' },
   wide: false,
-  // Settings > Glass (style: liquid | frosted, wall: art | colors | custom). A new install starts clean: the colour
-  // background, no extra darkness, no background blur. Saved settings always win over these.
+  // Settings > Glass (style: liquid | frosted, wall: art | colors | custom). A new install starts clean: the artwork
+  // background (the moving colours until a song has artwork), no extra darkness. Saved settings always win over these.
   // wallBlurArt: blur behind the artwork background (max, so it reads as coloured light); wallBlur: behind your own image
-  ui: { glow: 55, tint: 0, tintColor: '', style: 'liquid', wall: 'colors', quickEdit: true, zoom: 1, wallBlurArt: 40, wallBlur: 0, wallImg: '', wallImgSize: '' },
+  ui: { glow: 55, tint: 0, tintColor: '', style: 'liquid', wall: 'art', quickEdit: true, zoom: 1, wallBlurArt: 40, wallBlur: 0, wallImg: '', wallImgSize: '' },
   albumArt: {},             // album key -> { cover, thumb } made when songs are dragged together
   tags: [],                 // [{ id, name, color }] (tags.js)
   songTags: {},             // path -> [tag ids]
@@ -295,7 +295,7 @@ function dimFor([r, g, b]) {
   const y = (0.2126 * r + 0.7152 * g + 0.0722 * b) / 255;
   return Math.max(0, Math.min(1, (y - 0.45) / 0.35)) * 0.62;
 }
-const dimNow = () => (S.ui.wall === 'colors' ? dimTarget : 0);
+const dimNow = () => (!window.Liquid?.shown?.() ? dimTarget : 0);      // colours showing: also while a picture background has no picture yet
 const ambSettled = () => Math.abs(dimNow() - dim) < 0.004 && pal.every((c, i) => c.every((v, k) => Math.abs(palTarget[i][k] - v) < 0.6));
 function drawAmbient(ts) {
   const w = amb.width, h = amb.height;

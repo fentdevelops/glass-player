@@ -474,7 +474,7 @@ const skipped = page(async (T) => {
   await T.appIsBack(T.vars.how);
 });
 
-// ---- a song opened from Explorer on first launch: no window, no scan, and the next launch doesn't bring it back ----
+// ---- a song opened from Explorer on first launch: no window, no scan, and the next launch has no intro either ----
 const fromExplorer = page(async (T) => {
   const msgs = [];
   glass.scan.onProgress((m) => msgs.push(m));
@@ -490,13 +490,9 @@ const fromExplorer = page(async (T) => {
 });
 const afterExplorer = page(async (T) => {
   await T.until(() => typeof loaded !== 'undefined' && loaded, 'the library loads');
-  await T.wait(500);
-  T.ok(T.intro(), 'the next plain launch shows the intro, as before');
-  T.$('.intro-skip').click();
-  let ever = false;
-  const t0 = performance.now();
-  while (T.intro() && performance.now() - t0 < 6000) { ever ||= T.open(); await T.wait(30); }
-  T.ok(!ever, 'but a library with a song in it gets no window');
+  await T.wait(800);
+  T.ok(!T.intro() && !T.open() && !T.$('.su-overlay'), 'the next plain launch has a song, so no intro, sign-up or window');
+  T.ok(localStorage.getItem('glass.introOwed') === null && localStorage.getItem('glass.introSeen') === '1', 'and the owed flag is cleared');
   await T.appIsBack('after Explorer');
   T.ok(!(await glass.scan.status()).scanning, 'and no scan');
 });

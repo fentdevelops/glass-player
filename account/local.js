@@ -6,24 +6,33 @@ const crypto = require('crypto');
 const fs = require('fs');
 const path = require('path');
 const Username = require('./username');
+const Contact = require('./contact');
 
-const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const MIN_PASSWORD = 15;
-const MAX_FIELD = 256;
+const MAX_FIELD = Contact.MAX;
 const KEY_LEN = 64;
-const SCRYPT = { N: 16384, r: 8, p: 1 };
+// New accounts use these; the file keeps its own N, r and p so the numbers can be raised later without breaking old files.
+// Files from before that were written with Node's defaults (16384, 8, 1) and carry no numbers.
+const SCRYPT = { N: 2 ** 17, r: 8, p: 1 };
+const LEGACY_SCRYPT = { N: 16384, r: 8, p: 1 };
+const paramsOf = (a) => (a && a.scrypt && Number.isInteger(a.scrypt.N) && Number.isInteger(a.scrypt.r) && Number.isInteger(a.scrypt.p)
+  ? { N: a.scrypt.N, r: a.scrypt.r, p: a.scrypt.p } : LEGACY_SCRYPT);
 
-const scrypt = (password, salt) => new Promise((resolve, reject) => {
-  crypto.scrypt(password, salt, KEY_LEN, SCRYPT, (err, key) => (err ? reject(err) : resolve(key)));
+const scrypt = (password, salt, params = SCRYPT) => new Promise((resolve, reject) => {
+  // maxmem: scrypt needs about 128 * N * r bytes (N=2^17, r=8 is 128 MiB), over Node's 32 MiB default
+  const maxmem = 128 * params.N * params.r + 16 * 1024 * 1024;
+  crypto.scrypt(password, salt, KEY_LEN, { ...params, maxmem }, (err, key) => (err ? reject(err) : resolve(key)));
 });
-const cleanEmail = (e) => String(e == null ? '' : e).trim().toLowerCase();
+const cleanContact = (e) => { const c = Contact.check(e); return c.ok ? c.value : ''; };
+// the file says "email" in accounts made before phone numbers were allowed; new ones say "contact" (an email or a phone number)
+const contactOf = (a) => (typeof a.contact === 'string' ? a.contact : a.email);
 
 function createAccountStore(file) {
   // a missing, unreadable or odd file is simply "no account"
   function read() {
     try {
       const a = JSON.parse(fs.readFileSync(file, 'utf8'));
-      if (a && a.v === 1 && typeof a.email === 'string' && typeof a.username === 'string' && Username.check(a.username).ok
+      if (a && a.v === 1 && typeof contactOf(a) === 'string' && typeof a.username === 'string' && Username.check(a.username).ok
         && typeof a.salt === 'string' && typeof a.hash === 'string' && Buffer.from(a.hash, 'hex').length === KEY_LEN) return a;
     } catch { /* no file, or a damaged one */ }
     return null;
@@ -42,28 +51,28 @@ function createAccountStore(file) {
     return { exists: !!a, signedIn: !!(a && a.signedIn), username: a && a.signedIn ? a.username : '' };
   }
 
-  async function create(email, password, username) {
-    if (typeof email !== 'string' || typeof password !== 'string' || typeof username !== 'string') return fail('invalid');
-    const mail = cleanEmail(email);
-    if (!EMAIL.test(mail) || mail.length > MAX_FIELD) return fail('email');
+  async function create(contact, password, username) {
+    if (typeof contact !== 'string' || typeof password !== 'string' || typeof username !== 'string') return fail('invalid');
+    const who = cleanContact(contact);
+    if (!who) return fail('contact');
     if (password.length < MIN_PASSWORD || password.length > MAX_FIELD) return fail('password');
     const u = Username.check(username);
     if (!u.ok) return fail('username');
     if (read()) return fail('exists');
     const salt = crypto.randomBytes(16);
     const hash = await scrypt(password.normalize('NFKC'), salt);
-    write({ v: 1, email: mail, username: u.name, salt: salt.toString('hex'), hash: hash.toString('hex'), signedIn: true });
+    write({ v: 1, contact: who, username: u.name, salt: salt.toString('hex'), hash: hash.toString('hex'), scrypt: { ...SCRYPT }, signedIn: true });
     return { ok: true, ...state() };
   }
 
-  async function signIn(email, password) {
-    if (typeof email !== 'string' || typeof password !== 'string' || password.length > MAX_FIELD) return fail('mismatch');
+  async function signIn(contact, password) {
+    if (typeof contact !== 'string' || typeof password !== 'string' || password.length > MAX_FIELD) return fail('mismatch');
     const a = read();
     if (!a) return fail('mismatch');
-    // the hash is worked out either way, so a wrong email and a wrong password take the same time
-    const got = await scrypt(password.normalize('NFKC'), Buffer.from(a.salt, 'hex'));
+    // the hash is worked out either way, so a wrong email or number and a wrong password take the same time
+    const got = await scrypt(password.normalize('NFKC'), Buffer.from(a.salt, 'hex'), paramsOf(a));
     const same = crypto.timingSafeEqual(got, Buffer.from(a.hash, 'hex'));
-    if (!same || cleanEmail(email) !== a.email) return fail('mismatch');
+    if (!same || !Contact.same(cleanContact(contact), contactOf(a))) return fail('mismatch');
     if (!a.signedIn) write({ ...a, signedIn: true });
     return { ok: true, ...state() };
   }

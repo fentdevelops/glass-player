@@ -191,6 +191,17 @@ const updater = page(async (T) => {
   T.ok(localStorage.getItem('glass.introSeen'), 'updating user: marked seen');
 });
 
+// ---- the background: artwork by default (the moving colours until there is a picture); a saved choice stays ----
+const wallDefault = page(async (T) => {
+  await T.until(() => typeof loaded !== 'undefined' && loaded, 'the library loads');
+  T.ok(S.ui.wall === 'art' && S.ui.wallBlurArt === 40, 'a fresh install defaults to the artwork background at max blur, got ' + S.ui.wall + ' ' + S.ui.wallBlurArt);
+  T.ok(Liquid.shown() === false && !document.body.classList.contains('wall-art'), 'with no song there is no picture, so the colours show behind the glass');
+});
+const wallSaved = page(async (T) => {
+  await T.until(() => typeof loaded !== 'undefined' && loaded, 'the library loads');
+  T.ok(S.ui.wall === 'colors', 'a saved Colours choice stays, got ' + S.ui.wall);
+});
+
 // ---- reduced motion: nothing moves, screens crossfade ----
 const reduced = page(async (T) => {
   T.frames = T.spyFrames();
@@ -277,12 +288,9 @@ const fromExplorer = page(async (T) => {
 const afterExplorer = page(async (T) => {
   await T.until(() => typeof loaded !== 'undefined' && loaded, 'the library loads');
   T.ok(lib.size === 1, 'the library holds the song from last time, got ' + lib.size);
-  await T.wait(500);
-  T.ok(T.shown(), 'the next plain launch shows the intro, even with that song in the library');
-  if (!T.shown()) return;
-  T.$('.intro-skip').click();
-  await T.ended('next launch');
-  T.ok(localStorage.getItem('glass.introSeen'), 'now it counts as seen');
+  await T.wait(800);
+  T.ok(!T.shown(), 'the next plain launch has a library, so no intro');
+  T.ok(localStorage.getItem('glass.introSeen') === '1' && localStorage.getItem('glass.introOwed') === null, 'it counts as seen and is no longer owed');
 });
 
 // ---- a song opened while it's playing (second copy of the app, or a drop): it gets out of the way too ----
@@ -498,6 +506,8 @@ module.exports = [
   { name: 'playlists already there: no intro', vars: { what: 'playlists' }, page: notForExisting, library: () => ({ v: 3, tracks: [], queue: [], playlists: [{ id: 'p1', name: 'Mix', tracks: [] }] }) },
   { name: 'updating user: set up', profile: 'u', page: seedVersionNote },
   { name: 'updating user: no intro', profile: 'u', page: updater },
+  { name: 'background: a fresh install defaults to artwork', page: wallDefault },
+  { name: 'background: a saved Colours choice stays', page: wallSaved, library: () => ({ v: 3, tracks: [], queue: [], playlists: [{ id: 'p1', name: 'Mix', tracks: [] }], ui: { wall: 'colors' } }) },
   { name: 'reduced motion', vars, page: reduced, args: ['--force-prefers-reduced-motion'] },
   { name: 'opened from Explorer: dismisses at once, plays, stays unseen', profile: 'e', songs: 1, page: fromExplorer },
   { name: 'opened from Explorer: next plain launch shows it', profile: 'e', page: afterExplorer },

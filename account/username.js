@@ -7,7 +7,7 @@
   else root.Username = make();
 })(typeof self !== 'undefined' ? self : this, () => {
   const MAX = 18;
-  const RESERVED = ['admin', 'support', 'glassy', 'official', 'moderator', 'system'];
+  const RESERVED = ['admin', 'support', 'glassy', 'official', 'moderator', 'system', 'glass', 'root', 'null', 'undefined', 'staff', 'mod', 'help', 'administrator', 'fent'];
   // check('Fent') -> { ok: true, name: 'fent' }; otherwise { ok: false, name, error } with a plain sentence for the person
   function check(raw) {
     const name = String(raw == null ? '' : raw).toLowerCase();

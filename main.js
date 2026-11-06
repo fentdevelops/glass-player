@@ -802,8 +802,8 @@ ipcMain.handle('localAccount:state', (e) => {
   if (!fromWindow(e)) return { exists: false, signedIn: false, username: '' };
   return { ...account().state(), skipScreen: !!(process.env.GLASS_SHOT && process.env.GLASS_NO_SIGNUP) };
 });
-ipcMain.handle('localAccount:create', (e, email, password, username) => (fromWindow(e) && isText(email, 256) && isText(password, 256) && isText(username, 64) ? account().create(email, password, username) : NO_ACCOUNT));
-ipcMain.handle('localAccount:signIn', (e, email, password) => (fromWindow(e) && isText(email, 256) && isText(password, 256) ? account().signIn(email, password) : { ok: false, error: 'mismatch' }));
+ipcMain.handle('localAccount:create', (e, contact, password, username) => (fromWindow(e) && isText(contact, 256) && isText(password, 256) && isText(username, 64) ? account().create(contact, password, username) : NO_ACCOUNT));
+ipcMain.handle('localAccount:signIn', (e, contact, password) => (fromWindow(e) && isText(contact, 256) && isText(password, 256) ? account().signIn(contact, password) : { ok: false, error: 'mismatch' }));
 ipcMain.handle('localAccount:signOut', (e) => (fromWindow(e) ? account().signOut() : NO_ACCOUNT));
 ipcMain.handle('localAccount:remove', (e) => (fromWindow(e) ? account().remove() : NO_ACCOUNT));
 
