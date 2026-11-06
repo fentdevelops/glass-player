@@ -208,6 +208,7 @@
   }
   // the button: on to the next screen, or from the last one to the account step (while there is one) and into the app
   async function forward() {
+    if (busy) return;       // still moving to this screen: a double-click on the one before must not go past the last screen
     if (step < 0 || leaving || inAccountStep) return;
     if (step < STEPS.length - 1) return goTo(step + 1);
     if (Intro.accountStep) {

@@ -216,9 +216,29 @@ const reduced = page(async (T) => {
   const box = T.box(glass);
   T.ok(box.x > innerWidth / 2 && +getComputedStyle(glass).opacity === 1, 'reduced motion: the shape is at its new place');
 
-  // the still pictures inside the shape: the lyrics don't scroll, the curve is drawn once and isn't stretched
+  // what you see of the contents is the shape's opacity times their own. Frame by frame, the old ones leave and the
+  // new ones arrive gradually with the shape: no frame where they snap, and frames where they're part-way
+  const arriving = T.$('.intro-view[data-v="lyr"]'), leaving = T.$('.intro-view[data-v="lib"]');
+  const seen = [];
+  let sampling = true;
+  const sample = () => {
+    const g = +getComputedStyle(glass).opacity;
+    seen.push({ in: g * +getComputedStyle(arriving).opacity, out: g * +getComputedStyle(leaving).opacity });
+    if (sampling) requestAnimationFrame(sample);
+  };
   T.$('.intro-go').click();
-  await T.wait(800);
+  sample();
+  await T.wait(1100);
+  sampling = false;
+  const jump = (k) => seen.reduce((top, f, i) => (i ? Math.max(top, Math.abs(f[k] - seen[i - 1][k])) : top), 0);
+  T.ok(seen.length > 20, 'reduced motion: enough frames sampled, got ' + seen.length);
+  T.ok(seen.at(-1).in === 1 && seen.at(-1).out === 0, 'reduced motion: the new contents end fully there, the old ones fully gone');
+  T.ok(seen.some((f) => f.in > 0.05 && f.in < 0.95), 'reduced motion: the new contents pass through part-way');
+  T.ok(seen.some((f) => f.out > 0.05 && f.out < 0.95), 'reduced motion: the old contents pass through part-way');
+  T.ok(jump('in') < 0.5, 'reduced motion: the new contents fade in with the shape, biggest jump in one frame ' + jump('in').toFixed(2));
+  T.ok(jump('out') < 0.5, 'reduced motion: the old contents fade out with the shape, biggest jump in one frame ' + jump('out').toFixed(2));
+
+  // the still pictures inside the shape: the lyrics don't scroll, the curve is drawn once and isn't stretched
   const lyr = T.$('.intro-lyr').style.transform;
   T.ok(lyr && T.$('.intro-lyr .cur'), 'reduced motion: the lyrics are in place');
   await T.wait(1900);
@@ -317,6 +337,31 @@ const accountSlot = page(async (T) => {
   T.ok(localStorage.getItem('glass.introSeen'), 'seen after the slot');
   await T.appIsBack('after the slot');
   Intro.accountStep = null;
+});
+
+// ---- a double-click moves one screen, never past a screen: the intro only shows once, so a lost screen is lost for good ----
+const doubleClick = page(async (T) => {
+  const heading = () => T.$('.intro-words h1')?.textContent;
+  await T.until(() => heading() === 'Glassy', 'welcome');
+  await T.wait(650);
+  let calls = 0;
+  Intro.accountStep = () => { calls++; };
+  for (let i = 1; i < T.vars.HEADINGS.length; i++) {
+    T.$('.intro-go').click();
+    await T.wait(120);
+    T.$('.intro-go').click();
+    await T.wait(800);
+    const at = 'double-click towards ' + T.vars.HEADINGS[i];
+    T.ok(heading() === T.vars.HEADINGS[i], at + ': lands on that screen, got ' + heading());
+    T.ok(T.shown() && !T.$('#intro').classList.contains('leaving'), at + ': not on the way into the app');
+    T.ok(calls === 0, at + ': the account step stays shut');
+    T.ok(localStorage.getItem('glass.introSeen') === null, at + ': not marked seen');
+  }
+  // and the last screen's own button still does its job
+  T.$('.intro-go').click();
+  await T.ended('after the double-clicks');
+  T.ok(calls === 1, 'the account step ran once, from the last screen, ran ' + calls);
+  T.ok(localStorage.getItem('glass.introSeen'), 'seen after really finishing');
 });
 
 // ---- every size: fills the window, words never touch the glass ----
@@ -455,6 +500,7 @@ module.exports = [
   { name: 'closed part way: first launch', profile: 'c', page: closedPartWay },
   { name: 'closed part way: shown again', profile: 'c', page: reopened },
   { name: 'account slot runs before the app', vars, page: accountSlot },
+  { name: 'double-click moves one screen, even onto the last', vars, page: doubleClick },
   ...SIZES.map((size) => ({ name: `fits ${size}`, size, vars: { ...vars, size }, page: sizes })),
   { name: 'window resized during the intro', vars, page: resizing },
   ...[['1240x800', 5], ['900x600', 5], ['1240x800', 1], ['2560x1440', 3]].map(([size, at]) => ({ name: `hand-over at ${size} from screen ${at}`, size, vars: { ...vars, at }, page: handOver })),

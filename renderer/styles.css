@@ -1567,4 +1567,5 @@ html.intro-hide .ambient, html.intro-hide .body, html.intro-hide .gear { visibil
   .intro-go:hover, .intro-go:active, .intro-sw button:hover { transform: none; }
   .intro-glass { transition-property: none; }    /* the shape goes straight to its new size, under its crossfade */
   .intro-tint { transition-duration: .5s !important; }   /* trying a colour is still a crossfade */
+  .intro-view.on { transition-delay: 0s !important; }    /* contents arrive while the shape is unseen, then fade in with it */
 }
