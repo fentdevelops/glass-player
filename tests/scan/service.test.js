@@ -35,7 +35,7 @@ const lastMsg = (sent) => sent[sent.length - 1].msg;
 test('progress arrives in batches, and the event loop stays free during 5000 files', async () => {
   const d = scratch(), st = scratch();
   try {
-    for (let i = 0; i < 5000; i++) fs.writeFileSync(path.join(d, `s${i}.mp3`), 'x');
+    for (let f = 0; f < 50; f++) { fs.mkdirSync(path.join(d, `f${f}`)); for (let i = 0; i < 100; i++) fs.writeFileSync(path.join(d, `f${f}`, `s${i}.mp3`), 'x'); }
     const { svc, sent } = make(d, st);
     let gap = 0, last = Date.now();
     const timer = setInterval(() => { const n = Date.now(); gap = Math.max(gap, n - last); last = n; }, 10);
@@ -165,4 +165,148 @@ test('findFromSettings() forgets earlier skips, keeps added songs, and scans aga
     assert.deepStrictEqual(items(sent).map((i) => i.path), [b]);
     assert.strictEqual(svc.status().watching, false, 'watching only turns on when songs are added');
   } finally { fs.rmSync(d, { recursive: true, force: true }); fs.rmSync(st, { recursive: true, force: true }); }
+});
+
+const album = (n, dir) => Array.from({ length: n }, (_, i) => touch(dir, `t${String(i).padStart(2, '0')}.mp3`));
+const sameAlbum = async (p) => ({ path: p, size: 4e6, duration: 200, title: path.parse(p).name, artist: 'A', album: 'Same', channels: 2, sampleRate: 44100 });
+const stateFile = (st) => path.join(st, 'scan-state.json');
+const clean = (...dirs) => dirs.forEach((x) => fs.rmSync(x, { recursive: true, force: true }));
+
+test('an album that straddles a batch boundary still counts every neighbour', async () => {
+  const d = scratch(), st = scratch();
+  try {
+    // 7 loose files first, so the 12-track album starts mid-batch (batches of 5)
+    for (let i = 0; i < 7; i++) touch(path.join(d, 'a-loose'), `l${i}.mp3`);
+    const tracks = album(12, path.join(d, 'z-album'));
+    const seen = [];
+    const { svc } = make(d, st, { batchSize: 5, readInfo: sameAlbum, onScore: (i) => seen.push(i) });
+    await svc.start();
+    for (const t of tracks) assert.strictEqual(seen.find((i) => i.path === t).albumNeighbours, 11);
+  } finally { clean(d, st); }
+});
+
+test('a rescan counts already-seen siblings as neighbours but only offers the fresh ones', async () => {
+  const d = scratch(), st = scratch();
+  try {
+    const tracks = album(12, d);
+    const seenSet = {};
+    tracks.slice(0, 6).forEach((t) => { seenSet[t] = true; });
+    fs.writeFileSync(stateFile(st), JSON.stringify({ seen: seenSet, skipped: {}, watching: true, ran: true }));
+    const scored = [];
+    const { svc, sent } = make(d, st, { readInfo: sameAlbum, onScore: (i) => scored.push(i) });
+    await svc.start();
+    assert.deepStrictEqual(items(sent).map((i) => i.path), tracks.slice(6));
+    for (const i of scored) assert.strictEqual(i.albumNeighbours, 11);
+  } finally { clean(d, st); }
+});
+
+test('a folder where every file is already seen or skipped is not read at all', async () => {
+  const d = scratch(), st = scratch();
+  try {
+    const old = album(3, path.join(d, 'old'));
+    const fresh = album(2, path.join(d, 'new'));
+    fs.writeFileSync(stateFile(st), JSON.stringify({ seen: { [old[0]]: true, [old[1]]: true }, skipped: { [old[2]]: true }, watching: true, ran: true }));
+    const reads = [];
+    const { svc } = make(d, st, { readInfo: async (p) => { reads.push(p); return tagged()(p); } });
+    await svc.start();
+    assert.deepStrictEqual(reads.sort(), fresh.slice().sort());
+  } finally { clean(d, st); }
+});
+
+test('progress counts files during listing, and stop() ends listing promptly', async () => {
+  const d = scratch(), st = scratch();
+  try {
+    for (let f = 0; f < 20; f++) for (let i = 0; i < 50; i++) touch(path.join(d, `f${f}`), `s${i}.mp3`);
+    const full = make(d, scratch());
+    await full.svc.start();
+    assert.ok(full.sent.some((s) => !s.msg.done && s.msg.items.length === 0 && s.msg.scanned > 0), 'a listing-time message');
+    const { svc, sent } = make(d, st, { batchSize: 10 });
+    const run = svc.start();
+    svc.stop();
+    await run;
+    assert.strictEqual(sent.length, 0);
+  } finally { clean(d, st); }
+});
+
+test('start() during a scan returns the running scan, and only one scan runs', async () => {
+  const d = scratch(), st = scratch();
+  try {
+    album(30, d);
+    let reads = 0;
+    const { svc, sent } = make(d, st, { readInfo: async (p) => { reads++; return tagged()(p); } });
+    const a = svc.start(), b = svc.start();
+    assert.strictEqual(a, b);
+    await a;
+    assert.strictEqual(reads, 30);
+    assert.strictEqual(sent.filter((s) => s.msg.done).length, 1);
+  } finally { clean(d, st); }
+});
+
+test('findFromSettings() during a scan ends it, forgets skips, and runs one fresh scan', async () => {
+  const d = scratch(), st = scratch();
+  try {
+    const [a, b] = album(2, d);
+    fs.writeFileSync(stateFile(st), JSON.stringify({ seen: {}, skipped: { [b]: true }, watching: false, ran: true }));
+    const slow = async (p) => { await new Promise((r) => setTimeout(r, 40)); return tagged()(p); };
+    const { svc, sent } = make(d, st, { readInfo: slow });
+    const first = svc.start();
+    await new Promise((r) => setTimeout(r, 20));
+    await svc.findFromSettings();
+    await first;
+    const dones = sent.filter((s) => s.msg.done);
+    assert.strictEqual(dones.length, 1, 'the ended scan sent no done');
+    assert.deepStrictEqual(items(sent).map((i) => i.path).sort(), [a, b]);
+    assert.strictEqual(svc.status().scanning, false);
+  } finally { clean(d, st); }
+});
+
+test('a scan that fails still ends with done and error, and start() does not reject', async () => {
+  const d = scratch(), st = scratch();
+  try {
+    const { svc, sent } = make(d, st, { roots: null });
+    await svc.start();
+    assert.deepStrictEqual(lastMsg(sent), { scanned: 0, found: 0, done: true, items: [], error: true });
+    assert.strictEqual(svc.status().scanning, false);
+  } finally { clean(d, st); }
+});
+
+test('one file that cannot be turned into an item does not fail the scan', async () => {
+  const d = scratch(), st = scratch();
+  try {
+    const [a, b, c] = album(3, d);
+    const { svc, sent } = make(d, st, { toUrl: (p) => { if (p === b) throw new Error('bad'); return 'file:///' + p; } });
+    await svc.start();
+    assert.deepStrictEqual(items(sent).map((i) => i.path), [a, c]);
+    assert.strictEqual(lastMsg(sent).done, true);
+    assert.ok(!lastMsg(sent).error);
+  } finally { clean(d, st); }
+});
+
+test('a corrupt scan-state.json is read as empty, odd shapes and values included', async () => {
+  const d = scratch();
+  try {
+    const t = touch(d, 'a.mp3');
+    const cases = ['not json', 'null', '[1,2]', '{"seen":"abc","skipped":["x"],"watching":1}', JSON.stringify({ seen: { [t]: 1 }, skipped: { [t]: 'yes' } }), JSON.stringify({ seen: [t] })];
+    for (const text of cases) {
+      const st = scratch();
+      fs.writeFileSync(stateFile(st), text);
+      const { svc, sent } = make(d, st);
+      await svc.start();
+      assert.deepStrictEqual(items(sent).map((i) => i.path), [t], text);
+      clean(st);
+    }
+  } finally { clean(d); }
+});
+
+test('a failed state write does not throw out of add() or findFromSettings()', async () => {
+  const d = scratch(), st = scratch();
+  try {
+    const a = touch(d, 'a.mp3');
+    fs.writeFileSync(path.join(st, 'blocker'), 'x');   // a file where the state folder should be
+    const { svc } = make(d, st, { statePath: path.join(st, 'blocker', 'scan-state.json') });
+    await svc.start();
+    assert.deepStrictEqual(svc.add([a], []).map((t) => t.path), [a]);
+    assert.deepStrictEqual(svc.status(), { ran: true, watching: true, scanning: false });
+    await assert.doesNotReject(svc.findFromSettings());
+  } finally { clean(d, st); }
 });

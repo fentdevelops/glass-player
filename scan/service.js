@@ -16,80 +16,123 @@ const MAX_ADD = 100000;
 const yieldToLoop = () => new Promise((r) => setImmediate(r));
 const isPathList = (v) => Array.isArray(v) && v.length <= MAX_ADD && v.every((p) => typeof p === 'string');
 
-function createScanService({ roots, musicRoot, statePath, send, resolve, toUrl, readInfo = defaultReadInfo, onScore }) {
+// Anything that isn't a plain object of `true` values counts as empty.
+function cleanSet(v) {
+  const out = {};
+  if (v && typeof v === 'object' && !Array.isArray(v)) for (const k of Object.keys(v)) if (v[k] === true) out[k] = true;
+  return out;
+}
+
+const folderKey = (p) => path.dirname(p).toLowerCase();
+
+function createScanService({ roots, musicRoot, statePath, send, resolve, toUrl, readInfo = defaultReadInfo, onScore, batchSize = 200 }) {
   let state = { seen: {}, skipped: {}, watching: false, ran: false };
   try {
     const s = JSON.parse(fs.readFileSync(statePath, 'utf8'));
-    state = { seen: { ...s.seen }, skipped: { ...s.skipped }, watching: !!s.watching, ran: !!s.ran };
+    state = { seen: cleanSet(s && s.seen), skipped: cleanSet(s && s.skipped), watching: !!(s && s.watching), ran: !!(s && s.ran) };
   } catch { /* first run, or an unreadable file: start fresh */ }
 
-  let ctrl = null;           // AbortController of the running scan
+  let run = null;            // { ctrl, promise } of the running scan
   let offered = new Set();   // paths this scan has shown the window; add() accepts only these
 
+  // A failed write must not break the app: state stays right in memory and is saved again next time.
   function save() {
-    fs.mkdirSync(path.dirname(statePath), { recursive: true });
-    const tmp = statePath + '.tmp';
-    fs.writeFileSync(tmp, JSON.stringify(state));
-    fs.renameSync(tmp, statePath);
+    try {
+      fs.mkdirSync(path.dirname(statePath), { recursive: true });
+      const tmp = statePath + '.tmp';
+      fs.writeFileSync(tmp, JSON.stringify(state));
+      fs.renameSync(tmp, statePath);
+    } catch { /* retry on the next save */ }
   }
 
   async function infoFor(p) {
     try { return { ...(await readInfo(p)), path: p }; } catch { return { path: p }; }
   }
 
-  async function start() {
-    if (ctrl) return;
-    const mine = (ctrl = new AbortController());
+  async function scan(mine) {
     offered = new Set();
-    const live = () => ctrl === mine && !mine.signal.aborted;
+    const live = () => run && run.ctrl === mine && !mine.signal.aborted;
     let scanned = 0, found = 0, pending = [], lastSent = 0;
 
-    const flush = (done) => {
+    const flush = (done, error) => {
       if (!live()) return;
-      send('scan:progress', { scanned, found, done, items: pending });
+      const msg = { scanned, found, done, items: pending };
+      if (error) msg.error = true;
+      send('scan:progress', msg);
       pending = [];
       lastSent = Date.now();
     };
-
-    async function onBatch(paths) {
-      const fresh = paths.filter((p) => !state.seen[p] && !state.skipped[p]);
-      scanned += paths.length - fresh.length;
-      const infos = [];
-      for (let i = 0; i < fresh.length && live(); i += READ_AT_ONCE) {
-        infos.push(...await Promise.all(fresh.slice(i, i + READ_AT_ONCE).map(infoFor)));
-        await yieldToLoop();
-      }
-      if (!live()) return;
-      countAlbumNeighbours(infos);
-      for (const info of infos) {
-        if (onScore) onScore(info);
-        const { ticked, reason } = scoreFile({
-          ...info,
-          albumNeighbours: info.albumNeighbours || 0,
-          inMusicFolder: !!musicRoot && isUnder(info.path, musicRoot),
-        });
-        scanned++;
-        if (ticked) found++;
-        offered.add(info.path);
-        pending.push({
-          path: info.path, title: info.title, artist: info.artist, album: info.album, duration: info.duration,
-          ticked, reason, folder: path.dirname(info.path), url: toUrl(info.path),
-        });
-      }
-      if (Date.now() - lastSent >= PROGRESS_EVERY_MS) flush(false);
-    }
+    const maybeFlush = () => { if (Date.now() - lastSent >= PROGRESS_EVERY_MS) flush(false); };
 
     try {
-      await walk(roots, { onBatch, signal: mine.signal });
+      // 1. list every audio file (progress shows the count growing)
+      const folders = new Map();   // folder -> all its audio files
+      await walk(roots, {
+        batchSize,
+        signal: mine.signal,
+        onBatch: async (paths) => {
+          for (const p of paths) {
+            const k = folderKey(p);
+            if (!folders.has(k)) folders.set(k, []);
+            folders.get(k).push(p);
+          }
+          scanned += paths.length;
+          maybeFlush();
+          await yieldToLoop();
+        },
+      });
+
+      // 2. folder by folder: read, count album neighbours among every file in the folder, offer only the fresh ones
+      for (const files of folders.values()) {
+        if (!live()) break;
+        const isFresh = (p) => !state.seen[p] && !state.skipped[p];
+        if (!files.some(isFresh)) continue;
+        const infos = [];
+        for (let i = 0; i < files.length && live(); i += READ_AT_ONCE) {
+          infos.push(...await Promise.all(files.slice(i, i + READ_AT_ONCE).map(infoFor)));
+          await yieldToLoop();
+        }
+        if (!live()) break;
+        countAlbumNeighbours(infos);
+        for (const info of infos.filter((i) => isFresh(i.path))) {
+          try {
+            if (onScore) onScore(info);
+            const { ticked, reason } = scoreFile({
+              ...info,
+              albumNeighbours: info.albumNeighbours || 0,
+              inMusicFolder: !!musicRoot && isUnder(info.path, musicRoot),
+            });
+            const item = {
+              path: info.path, title: info.title, artist: info.artist, album: info.album, duration: info.duration,
+              ticked, reason, folder: path.dirname(info.path), url: toUrl(info.path),
+            };
+            pending.push(item);
+            offered.add(info.path);
+            if (ticked) found++;
+          } catch { /* one odd file doesn't stop the scan */ }
+        }
+        maybeFlush();
+      }
       flush(true);
+    } catch {
+      flush(true, true);
     } finally {
-      if (ctrl === mine) ctrl = null;
+      if (run && run.ctrl === mine) run = null;
     }
   }
 
+  // A scan already running is returned as it is.
+  function start() {
+    if (run) return run.promise;
+    const mine = new AbortController();
+    run = { ctrl: mine, promise: null };
+    run.promise = scan(mine);
+    return run.promise;
+  }
+
   function stop() {
-    if (ctrl) ctrl.abort();
-    ctrl = null;
+    if (run) run.ctrl.abort();
+    run = null;
   }
 
   // paths: ticked songs to add; skipped: the ones left unticked. Both must be files this scan offered.
@@ -105,14 +148,21 @@ function createScanService({ roots, musicRoot, statePath, send, resolve, toUrl, 
     return resolve(added);
   }
 
-  // "Find songs on this PC": the user is asking again, so earlier "no"s are forgotten. Songs already added stay added.
-  function findFromSettings() {
+  // "Find songs on this PC": the user is asking again, so a running scan is ended and earlier "no"s are forgotten.
+  // Songs already added stay added.
+  async function findFromSettings() {
+    while (run) {
+      const old = run;
+      old.ctrl.abort();
+      run = null;
+      await old.promise;
+    }
     state.skipped = {};
     save();
     return start();
   }
 
-  const status = () => ({ ran: state.ran, watching: state.watching, scanning: !!ctrl });
+  const status = () => ({ ran: state.ran, watching: state.watching, scanning: !!run });
 
   return { start, stop, add, findFromSettings, status };
 }
