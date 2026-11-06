@@ -59,3 +59,36 @@ test('a file with no duration is judged on its other signals', () => {
   assert(scoreFile({ path: 'C:/m/song.mp3', title: 'T', artist: 'A' }).ticked);
   assert(!scoreFile({ path: 'C:/m/notification.mp3' }).ticked);
 });
+
+test('a short tagged snippet is ticked in the Music folder, but a 10 second one is not', () => {
+  assert(scoreFile({ path: 'C:/m/snippet.mp3', duration: 30, title: 'T', artist: 'A', inMusicFolder: true }).ticked);
+  assert(!scoreFile({ path: 'C:/m/tag.mp3', duration: 10, title: 'T', artist: 'A', inMusicFolder: true }).ticked);
+});
+
+test('a 30 second tagged clip outside Music is not ticked', () => {
+  assert(!scoreFile({ path: 'C:/d/clip.mp3', duration: 30, title: 'T', artist: 'A' }).ticked);
+});
+
+test('no known length and a tiny file is not ticked, with a plain reason', () => {
+  const r = scoreFile({ path: 'C:/d/x.ogg', size: 300000 });
+  assert(!r.ticked);
+  assert.match(r.reason, /very small file/);
+});
+
+test('a soundtrack folder with tagged songs stays ticked', () => {
+  assert(scoreFile({ path: 'C:/m/Video Game Music/x.mp3', duration: 180, title: 'T', artist: 'A', album: 'B' }).ticked);
+  assert(scoreFile({ path: 'C:/m/Games/Zelda Soundtrack/x.mp3', duration: 180, title: 'T', artist: 'A', album: 'B' }).ticked);
+});
+
+test('an untagged file in a game folder says so', () => {
+  const r = scoreFile({ path: 'C:/Downloads/MyGame/Audio/music1.ogg', duration: 95 });
+  assert(!r.ticked);
+  assert.match(r.reason, /inside a game or app folder/);
+});
+
+test('sfx folder and alarm names say sound effect', () => {
+  assert.match(scoreFile({ path: 'C:/d/sfx/pop.mp3', duration: 120 }).reason, /sound effect/);
+  const r = scoreFile({ path: 'C:/d/alarm.mp3', duration: 120 });
+  assert(!r.ticked);
+  assert.match(r.reason, /sound effect/);
+});

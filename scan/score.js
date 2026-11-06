@@ -5,7 +5,11 @@ const START = 60;
 const THRESHOLD = 50;
 
 const POINTS = {
-  tooShort: -70,       // under 45 s
+  tooShort: -40,       // under 45 s
+  veryShort: -25,      // under 15 s, on top of tooShort
+  inMusicFolder: 20,   // the file sits in the Music folder: put there on purpose
+  noLength: -20,       // length couldn't be read
+  tinyNoLength: -40,   // ...and the file is under 0.5 MB too
   shortish: -15,       // 45-90 s
   tooLong: -60,        // over 30 minutes
   titleAndArtist: 15,
@@ -15,12 +19,15 @@ const POINTS = {
   nameJunk: -45,       // junk word in the file or folder name, file has no title + artist tags
   nameJunkTagged: -10, // same, but the file is properly tagged (a song called "Hat Trick")
   voiceSound: -40,     // mono at a low sample rate
-  gameFolder: -40,
+  gameFolder: -40,      // file lacks title + artist tags
+  gameFolderTagged: -10, // a tagged song in a folder like "Video Game Music"
   album3: 15,          // several tagged files of the same album in one folder
 };
 
 const SHORT_SECONDS = 45;
+const VERY_SHORT_SECONDS = 15;
 const SHORTISH_SECONDS = 90;
+const TINY_BYTES = 500 * 1024;
 const LONG_SECONDS = 30 * 60;
 const LOW_SAMPLE_RATE = 24000;
 const ALBUM_NEIGHBOURS = 3;
@@ -29,7 +36,10 @@ const ALBUM_NEIGHBOURS = 3;
 const SFX_WORDS = ['sfx', 'sound effect', 'sound effects', 'soundeffect', 'notification', 'notifications', 'ringtone', 'ringtones', 'alarm'];
 const VOICE_WORDS = ['recording', 'recordings', 'voice memo', 'voice memos', 'voice note', 'voicenote', 'whatsapp audio', 'ptt', 'voice message'];
 const SAMPLE_WORDS = ['kick', 'snare', 'hat', 'hihat', 'loop', 'loops', 'one-shot', 'one shot', 'oneshot', 'sample', 'samples', 'stem', 'stems', 'bpm', 'pack', 'packs'];
+// Substring on purpose ("MyGame", "GameData"), but folders that are about game *music* are exempt, and a tagged
+// song only loses a little, so "Video Game Music" in a Music folder stays ticked.
 const GAME_FOLDER = /game|steamapps|unity|unreal|godot|renpy/i;
+const GAME_MUSIC_FOLDER = /music|soundtrack|ost|score/i;
 
 function wordRegex(words) {
   const alt = words.map((w) => w.replace(/[-\s]/g, '[-_\\s]?')).join('|');
@@ -58,10 +68,18 @@ function scoreFile(f) {
   // length (a missing duration is judged on the other signals)
   if (typeof f.duration === 'number' && f.duration > 0) {
     const d = f.duration;
-    if (d < SHORT_SECONDS) add(POINTS.tooShort, `${Math.round(d)} seconds, too short for a song`);
+    if (d < SHORT_SECONDS) {
+      add(POINTS.tooShort, `${Math.round(d)} seconds, too short for a song`);
+      if (d < VERY_SHORT_SECONDS) add(POINTS.veryShort, `${Math.round(d)} seconds, too short for a song`);
+    }
     else if (d < SHORTISH_SECONDS) add(POINTS.shortish, `${Math.round(d)} seconds, quite short`);
     else if (d > LONG_SECONDS) add(POINTS.tooLong, 'over 30 minutes, likely a podcast or audiobook');
+  } else if (f.size > 0 && f.size < TINY_BYTES) {
+    add(POINTS.noLength + POINTS.tinyNoLength, 'very small file');
+  } else {
+    add(POINTS.noLength, 'length unknown');
   }
+  if (f.inMusicFolder) add(POINTS.inMusicFolder);
 
   // tags
   if (hasTitle && hasArtist) add(POINTS.titleAndArtist);
@@ -77,7 +95,9 @@ function scoreFile(f) {
   if (hit(VOICE_RE)) add(junkPts, 'looks like a voice recording', true);
   else if (hit(SFX_RE)) add(junkPts, 'looks like a sound effect', true);
   else if (hit(SAMPLE_RE) || BPM_RE.test(file)) add(junkPts, 'looks like part of a sample pack', true);
-  if (folders.slice(-4).some((s) => GAME_FOLDER.test(s))) add(POINTS.gameFolder, 'inside a game or app folder', true);
+  if (folders.slice(-4).some((s) => GAME_FOLDER.test(s) && !GAME_MUSIC_FOLDER.test(s))) {
+    add(tagged ? POINTS.gameFolderTagged : POINTS.gameFolder, 'inside a game or app folder', true);
+  }
 
   // sound
   if (f.channels === 1 && f.sampleRate > 0 && f.sampleRate < LOW_SAMPLE_RATE) add(POINTS.voiceSound, 'looks like a voice recording', true);

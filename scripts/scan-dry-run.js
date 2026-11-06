@@ -1,49 +1,34 @@
-// Read-only dry run of the song score. Usage:  npx electron scripts/scan-dry-run.js <folder> [<folder> ...]
+// Read-only dry run of the song score. Usage:  npx electron scripts/scan-dry-run.js [--music=<folder>] <folder> [<folder> ...]
 // (also works with plain `node`). Prints totals only: ticked/unticked, a score histogram, how many files hit each
 // reason, and the extensions seen. It never prints a file or folder name, writes nothing, and only reads.
 
 const path = require('path');
 const { walk } = require('../scan/walk');
 const { scoreFile, THRESHOLD } = require('../scan/score');
+const { readInfo } = require('../scan/info');
+const { countAlbumNeighbours, isUnder } = require('../scan/neighbours');
 
-async function run(folders) {
-  const mm = await import('music-metadata');
+async function run(folders, musicFolders) {
   const files = [];
   const exts = {};
   const { scanned } = await walk(folders, {
     onBatch: (b) => { for (const p of b) { files.push(p); const e = path.extname(p).toLowerCase(); exts[e] = (exts[e] || 0) + 1; } },
   });
 
-  // Same tag fields as main.js readMeta (no cover art here: it is not needed for scoring).
   const infos = [];
   let unreadable = 0;
   for (const p of files) {
-    const info = { path: p };
-    try {
-      const { common, format } = await mm.parseFile(p, { duration: false, skipPostHeaders: true });
-      if (common.title) info.title = common.title;
-      if (common.artist) info.artist = common.artist;
-      if (common.album) info.album = common.album;
-      if (format.duration) info.duration = format.duration;
-      if (format.numberOfChannels) info.channels = format.numberOfChannels;
-      if (format.sampleRate) info.sampleRate = format.sampleRate;
-    } catch { unreadable++; }
+    const info = await readInfo(p);
+    if (!info.duration) unreadable++;
+    if (musicFolders.some((m) => isUnder(p, m))) info.inMusicFolder = true;
     infos.push(info);
   }
-
-  // Tagged files sharing an album in one folder
-  const perAlbum = new Map();
-  for (const i of infos) {
-    if (!i.album) continue;
-    const k = path.dirname(i.path).toLowerCase() + '\n' + i.album.toLowerCase();
-    perAlbum.set(k, (perAlbum.get(k) || 0) + 1);
-  }
+  countAlbumNeighbours(infos);
 
   let ticked = 0;
   const hist = {};
   const reasons = {};
   for (const i of infos) {
-    if (i.album) i.albumNeighbours = perAlbum.get(path.dirname(i.path).toLowerCase() + '\n' + i.album.toLowerCase()) - 1;
     const r = scoreFile(i);
     if (r.ticked) ticked++;
     else reasons[r.reason] = (reasons[r.reason] || 0) + 1;
@@ -53,7 +38,7 @@ async function run(folders) {
 
   const out = [];
   out.push(`audio files found: ${scanned}`);
-  out.push(`tags unreadable: ${unreadable}`);
+  out.push(`length unknown: ${unreadable}`);
   out.push(`threshold: ${THRESHOLD}`);
   out.push(`ticked: ${ticked}   unticked: ${infos.length - ticked}`);
   out.push('score histogram (bucket start: count)');
@@ -65,7 +50,10 @@ async function run(folders) {
   console.log(out.join('\n'));
 }
 
-const folders = process.argv.slice(2).filter((a) => !a.startsWith('--'));
+const args = process.argv.slice(2);
+const folders = args.filter((a) => !a.startsWith('--'));
+// --music=<folder> marks files under that folder as sitting in the Music folder (repeatable)
+const musicFolders = args.filter((a) => a.startsWith('--music=')).map((a) => a.slice(8));
 if (!folders.length) {
   console.log('Give at least one folder.');
   process.exitCode = 1;
@@ -74,6 +62,6 @@ const done = (code) => {
   if (process.versions.electron) require('electron').app.exit(code);
   else process.exitCode = code;
 };
-const go = () => (folders.length ? run(folders).then(() => done(0), () => { console.log('dry run failed'); done(1); }) : done(1));
+const go = () => (folders.length ? run(folders, musicFolders).then(() => done(0), () => { console.log('dry run failed'); done(1); }) : done(1));
 if (process.versions.electron) require('electron').app.whenReady().then(go);
 else go();
