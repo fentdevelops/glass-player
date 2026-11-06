@@ -4,6 +4,7 @@
 
 const fs = require('fs');
 
+const MIN_SECONDS = 1;
 let mm = null;
 
 async function readInfo(p) {
@@ -12,14 +13,14 @@ async function readInfo(p) {
   try {
     mm ??= await import('music-metadata');
     let r = await mm.parseFile(p, { duration: false, skipPostHeaders: true });
-    if (!r.format.duration) {
+    if (!(r.format.duration >= MIN_SECONDS)) {      // 0, missing or under a second is a reader's guess, not a length
       try { r = await mm.parseFile(p, { duration: true, skipCovers: true }); } catch { /* keep the quick read */ }
     }
     const { common, format } = r;
     if (common.title) info.title = common.title;
     if (common.artist) info.artist = common.artist;
     if (common.album) info.album = common.album;
-    if (format.duration) info.duration = format.duration;
+    if (format.duration >= MIN_SECONDS) info.duration = format.duration;     // otherwise unknown: scored by the unknown-length rule
     if (format.numberOfChannels) info.channels = format.numberOfChannels;
     if (format.sampleRate) info.sampleRate = format.sampleRate;
   } catch { /* unreadable tags: scored on name, folder and size */ }

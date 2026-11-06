@@ -265,7 +265,7 @@ test('a scan that fails still ends with done and error, and start() does not rej
   try {
     const { svc, sent } = make(d, st, { roots: null });
     await svc.start();
-    assert.deepStrictEqual(lastMsg(sent), { scanned: 0, found: 0, done: true, items: [], error: true });
+    assert.deepStrictEqual(lastMsg(sent), { scanned: 0, found: 0, done: true, items: [], looking: '', error: true });
     assert.strictEqual(svc.status().scanning, false);
   } finally { clean(d, st); }
 });
@@ -309,4 +309,25 @@ test('a failed state write does not throw out of add() or findFromSettings()', a
     assert.deepStrictEqual(svc.status(), { ran: true, watching: true, scanning: false });
     await assert.doesNotReject(svc.findFromSettings());
   } finally { clean(d, st); }
+});
+
+test('progress says where it is looking, with the root and the folders under it, and done clears it', async () => {
+  const d = scratch(), st = scratch();
+  try {
+    for (let f = 0; f < 6; f++) for (let i = 0; i < 3; i++) touch(path.join(d, 'Artist', `Album ${f}`), `s${i}.mp3`);
+    touch(path.join(d, 'A', 'B', 'C', 'D', 'E'), 'deep.mp3');
+    const slow = async (p) => { await new Promise((r) => setTimeout(r, 40)); return tagged()(p); };
+    const { svc, sent } = make(d, st, { readInfo: slow, batchSize: 2 });
+    await svc.start();
+    const where = sent.map((s) => s.msg.looking).filter(Boolean);
+    const root = path.basename(d);
+    assert.ok(where.length >= 2, 'sent along the way, got ' + where.length);
+    assert.ok(where.every((w) => w.startsWith(root)), 'starts with the root\'s name: ' + where[0]);
+    assert.ok(where.some((w) => w.startsWith(root + ' › Artist › Album ')), 'the root and the folders under it: ' + [...new Set(where)].join(' | '));
+    assert.ok(!where.some((w) => w.includes(d)), 'never the full path');
+    assert.ok(where.every((w) => w.split(' › ').length <= 4), 'at most three folders under the root');
+    assert.ok(sent.slice(0, -1).some((s) => s.msg.done === false && s.msg.looking), 'sent in progress messages');
+    assert.strictEqual(lastMsg(sent).done, true);
+    assert.strictEqual(lastMsg(sent).looking, '', 'done clears it');
+  } finally { fs.rmSync(d, { recursive: true, force: true }); fs.rmSync(st, { recursive: true, force: true }); }
 });

@@ -14,14 +14,15 @@ function chunk(id, buf) {
   return Buffer.concat([h, buf, buf.length % 2 ? Buffer.alloc(1) : Buffer.alloc(0)]);
 }
 // A real WAV: 8-bit at a very low sample rate, so a three minute song is a few kilobytes. Tags go in a LIST INFO chunk.
-function wav({ seconds = 200, rate = 10, channels = 2, title, artist, album } = {}) {
+function wav({ seconds = 200, rate = 10, channels = 2, title, artist, album, id3 } = {}) {
   const data = Buffer.alloc(Math.round(seconds * rate) * channels, 128);
   const fmt = Buffer.alloc(16);
   fmt.writeUInt16LE(1, 0); fmt.writeUInt16LE(channels, 2); fmt.writeUInt32LE(rate, 4); fmt.writeUInt32LE(rate * channels, 8); fmt.writeUInt16LE(channels, 12); fmt.writeUInt16LE(8, 14);
   const tag = (id, v) => (v ? [chunk(id, Buffer.from(v + '\0', 'latin1'))] : []);
   const info = [...tag('INAM', title), ...tag('IART', artist), ...tag('IPRD', album)];
   const list = info.length ? [chunk('LIST', Buffer.concat([Buffer.from('INFO'), ...info]))] : [];
-  const body = Buffer.concat([Buffer.from('WAVE'), chunk('fmt ', fmt), ...list, chunk('data', data)]);
+  const tail = id3 ? [chunk('id3 ', id3)] : [];     // an ID3 tag inside the file: where a WAV keeps a cover
+  const body = Buffer.concat([Buffer.from('WAVE'), chunk('fmt ', fmt), ...list, chunk('data', data), ...tail]);
   const head = Buffer.alloc(8);
   head.write('RIFF', 0); head.writeUInt32LE(body.length, 4);
   return Buffer.concat([head, body]);
@@ -110,6 +111,34 @@ const growing = (count) => set(`growing-${count}`, (music) => {
   }
 });
 
+// A small solid PNG (plain node has no image encoder to hand), as the cover node-id3 embeds
+function png(r, g, b, size = 48) {
+  const zlib = require('zlib');
+  const crcT = Array.from({ length: 256 }, (_, n) => { let c = n; for (let k = 0; k < 8; k++) c = c & 1 ? 0xedb88320 ^ (c >>> 1) : c >>> 1; return c >>> 0; });
+  const crc = (buf) => { let c = 0xffffffff; for (const x of buf) c = crcT[(c ^ x) & 255] ^ (c >>> 8); return (c ^ 0xffffffff) >>> 0; };
+  const part = (type, data) => { const t = Buffer.concat([Buffer.from(type), data]), h = Buffer.alloc(4), f = Buffer.alloc(4); h.writeUInt32BE(data.length); f.writeUInt32BE(crc(t)); return Buffer.concat([h, t, f]); };
+  const head = Buffer.alloc(13);
+  head.writeUInt32BE(size, 0); head.writeUInt32BE(size, 4); head[8] = 8; head[9] = 2;
+  const row = Buffer.concat([Buffer.from([0]), Buffer.from(Array.from({ length: size }, (_, x) => [r, Math.min(255, g + x), b]).flat())]);
+  return Buffer.concat([Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]), part('IHDR', head), part('IDAT', zlib.deflateSync(Buffer.concat(Array(size).fill(row)))), part('IEND', Buffer.alloc(0))]);
+}
+const withCover = (rgb) => require('node-id3').create({ image: { mime: 'image/png', type: { id: 3 }, description: 'Cover', imageBuffer: png(...rgb) } });
+
+// Songs with real embedded covers: an album whose first two songs have one, a plain album, and a folder with one covered song
+const covers = () => set('covers', (music) => {
+  const album = (dir, name, artist, titles, art) => titles.forEach((title, i) => put(path.join(music, dir, `${String(i + 1).padStart(2, '0')} ${title}.wav`),
+    wav({ title, artist, album: name, seconds: 170 + i, id3: art[i] ? withCover(art[i]) : undefined })));
+  album('Covered', 'Paper Moons', 'Violet Hours', ['Cover One', 'Cover Two', 'Bare Three', 'Bare Four', 'Bare Five', 'Bare Six'], [[200, 60, 90], [60, 120, 210]]);
+  album('Plain', 'Glasshouse', 'Marlow', ['Plain A', 'Plain B', 'Plain C', 'Plain D'], []);
+  for (const n of ['Loose Covered', 'Loose Bare']) put(path.join(music, 'Loose', `${n}.wav`), wav({ id3: n === 'Loose Covered' ? withCover([40, 170, 110]) : undefined }));
+});
+
+// Songs that really play (a low rate, mono, but a rate a real decoder takes) and one that can't: for the preview buttons
+const playable = () => set('playable', (music, downloads) => {
+  ['Play A', 'Play B', 'Play C'].forEach((title, i) => put(path.join(music, 'Play Set', `0${i + 1} ${title}.wav`), wav({ title, artist: 'Tester', album: 'Play Set', seconds: 60, rate: 8000, channels: 1 })));
+  put(path.join(downloads, 'ding.ogg'), ogg(9));
+});
+
 // every file in a set, as the scan will see it
 const filesIn = (s) => fs.readdirSync(path.dirname(s.music), { recursive: true, withFileTypes: true })
   .filter((e) => e.isFile()).map((e) => path.join(e.parentPath, e.name));
@@ -135,4 +164,4 @@ const gallery = () => set('gallery', (music, downloads) => {
   put(path.join(downloads, 'Drum samples', 'snare 04.wav'), wav({ seconds: 2 }));
 });
 
-module.exports = { scratch, roots, small, none, onlyJunk, folders, oneBig, growing, gallery, filesIn };
+module.exports = { scratch, roots, small, none, onlyJunk, folders, oneBig, growing, gallery, covers, playable, filesIn };

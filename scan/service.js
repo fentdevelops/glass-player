@@ -11,6 +11,7 @@ const { readInfo: defaultReadInfo } = require('./info');
 
 const PROGRESS_EVERY_MS = 100;   // at most 10 progress messages a second
 const READ_AT_ONCE = 8;
+const WHERE_FOLDERS = 3;       // 'Music › Artist › Album': the root's name and at most this many folders under it
 const MAX_ADD = 100000;
 
 const yieldToLoop = () => new Promise((r) => setImmediate(r));
@@ -23,6 +24,7 @@ function cleanSet(v) {
   return out;
 }
 
+const baseOf = (p) => path.basename(p) || p;
 const folderKey = (p) => path.dirname(p).toLowerCase();
 
 function createScanService({ roots, musicRoot, statePath, send, resolve, toUrl, readInfo = defaultReadInfo, onScore, batchSize = 200 }) {
@@ -45,6 +47,17 @@ function createScanService({ roots, musicRoot, statePath, send, resolve, toUrl, 
     } catch { /* retry on the next save */ }
   }
 
+  // where a file is, for the window's 'Looking in' line: the root's name and the folders under it, not the full path
+  function whereIs(p) {
+    const dir = path.dirname(p);
+    for (const r of roots) {
+      const rel = path.relative(r, dir);
+      if (rel.startsWith('..') || path.isAbsolute(rel)) continue;
+      return [baseOf(r), ...rel.split(path.sep).filter(Boolean).slice(-WHERE_FOLDERS)].join(' › ');
+    }
+    return baseOf(dir);
+  }
+
   async function infoFor(p) {
     try { return { ...(await readInfo(p)), path: p }; } catch { return { path: p }; }
   }
@@ -52,11 +65,11 @@ function createScanService({ roots, musicRoot, statePath, send, resolve, toUrl, 
   async function scan(mine) {
     offered = new Set();
     const live = () => run && run.ctrl === mine && !mine.signal.aborted;
-    let scanned = 0, found = 0, pending = [], lastSent = 0;
+    let scanned = 0, found = 0, pending = [], lastSent = 0, looking = '';
 
     const flush = (done, error) => {
       if (!live()) return;
-      const msg = { scanned, found, done, items: pending };
+      const msg = { scanned, found, done, items: pending, looking: done ? '' : looking };
       if (error) msg.error = true;
       send('scan:progress', msg);
       pending = [];
@@ -77,6 +90,7 @@ function createScanService({ roots, musicRoot, statePath, send, resolve, toUrl, 
             folders.get(k).push(p);
           }
           scanned += paths.length;
+          if (paths.length) looking = whereIs(paths[paths.length - 1]);
           maybeFlush();
           await yieldToLoop();
         },
@@ -87,6 +101,7 @@ function createScanService({ roots, musicRoot, statePath, send, resolve, toUrl, 
         if (!live()) break;
         const isFresh = (p) => !state.seen[p] && !state.skipped[p];
         if (!files.some(isFresh)) continue;
+        looking = whereIs(files[0]);
         const infos = [];
         for (let i = 0; i < files.length && live(); i += READ_AT_ONCE) {
           infos.push(...await Promise.all(files.slice(i, i + READ_AT_ONCE).map(infoFor)));

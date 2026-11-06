@@ -1608,7 +1608,8 @@ html.intro-hide .ambient, html.intro-hide .body, html.intro-hide .gear { visibil
 .fr-item.out { opacity: 0; pointer-events: none; }
 @keyframes fr-in { from { opacity: 0; translate: 0 8px; } }
 .fr-group { grid-template-columns: calc(20px * var(--fr)) calc(44px * var(--fr)) minmax(0, 1fr) calc(16px * var(--fr)); gap: calc(12px * var(--fr)); padding: 0 calc(14px * var(--fr)) 0 calc(8px * var(--fr)); }
-.fr-row { grid-template-columns: calc(20px * var(--fr)) minmax(0, 1fr) auto; gap: calc(12px * var(--fr)); padding: 0 calc(14px * var(--fr)) 0 calc(64px * var(--fr)); }   /* its words line up under the group's */
+.fr-row { grid-template-columns: calc(20px * var(--fr)) calc(34px * var(--fr)) calc(28px * var(--fr)) minmax(0, 1fr) auto; gap: calc(12px * var(--fr)); padding: 0 calc(14px * var(--fr)) 0 calc(18px * var(--fr)); }   /* its words line up under the group's */
+.fr-row .fr-art { width: calc(34px * var(--fr)); height: calc(34px * var(--fr)); border-radius: calc(9px * var(--fr)); }
 /* a whole column of ticks is quieter than the group's own box, or the white squares are all you'd see */
 .fr-row .check input:checked + .box { background-color: rgba(255, 255, 255, .24); box-shadow: inset 0 0 0 1px rgba(255, 255, 255, .34); }
 .fr-row .check .box::after { border-color: #fff; }
@@ -1620,8 +1621,35 @@ html.intro-hide .ambient, html.intro-hide .body, html.intro-hide .gear { visibil
   display: grid; place-items: center; width: calc(44px * var(--fr)); height: calc(44px * var(--fr)); border-radius: calc(11px * var(--fr));
   background: center / cover var(--fill-2); box-shadow: inset 0 0 0 1px rgba(255, 255, 255, .2);
 }
+.fr-art { position: relative; overflow: hidden; }
+/* a real cover: laid over the placeholder, which stays until it's in; it fades in without moving anything */
+.fr-pic { position: absolute; inset: 0; background: center / cover var(--fill-2); border-radius: inherit; animation: fr-pic .5s var(--glide) backwards; }
+.fr-pic.still { animation: none; }
+@keyframes fr-pic { from { opacity: 0; } }
+.fr-art.has-pic svg { opacity: 0; }
 .fr-art svg { width: 46%; height: 46%; fill: none; stroke: #fff; stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; opacity: .8; }
 .fr-text { min-width: 0; }
+/* the preview button: always there, quiet until it's pointed at; the pause shows while its song plays */
+.fr-play { display: grid; place-items: center; width: calc(28px * var(--fr)); height: calc(28px * var(--fr)); border-radius: 50%; color: #fff; background: var(--fill-1); box-shadow: inset 0 0 0 1px rgba(255, 255, 255, .16); transition: background-color var(--t-hover) var(--glide), transform var(--t-hover) var(--glide), opacity .3s var(--glide); }
+.fr-play:hover { background: var(--fill-2); }
+.fr-play:active { transform: scale(.92); }
+.fr-play:focus-visible { outline: 2px solid #fff; outline-offset: 2px; }
+.fr-play svg { grid-area: 1 / 1; width: 46%; height: 46%; fill: currentColor; stroke: none; }
+.fr-play .fr-i-pause, .fr-row.playing .fr-play .fr-i-play { display: none; }
+.fr-row.playing .fr-play .fr-i-pause { display: block; }
+.fr-row.playing .fr-play { background: rgba(255, 255, 255, .3); }
+.fr-row.bad .fr-play { opacity: .3; cursor: default; }
+.fr-row.bad .fr-text small::after { content: " · Can't play"; }
+.fr-row.bad .fr-text small:empty::after { content: "Can't play"; }
+.fr-row.bad .fr-text small:empty { display: block; }
+/* still looking: a thin glass bar with a soft shimmer (the total isn't known), and where it is. Its room is always kept, so nothing moves when it goes */
+.fr-look { flex: none; height: calc(24px * var(--fr)); margin: calc(8px * var(--fr)) calc(4px * var(--fr)) calc(-4px * var(--fr)); opacity: 0; transition: opacity .6s var(--glide); }
+.fr-look.on { opacity: 1; }
+.fr-bar { display: block; position: relative; overflow: hidden; height: calc(3px * var(--fr)); border-radius: 3px; background: rgba(255, 255, 255, .14); box-shadow: inset 0 0 0 1px rgba(255, 255, 255, .06); }
+.fr-bar span { position: absolute; top: 0; bottom: 0; left: 0; width: 38%; border-radius: inherit; background: linear-gradient(90deg, transparent, rgba(255, 255, 255, .85), transparent); animation: fr-shimmer 1.5s cubic-bezier(.45, .05, .55, .95) infinite; }
+.fr-look.calm .fr-bar span { width: 100%; animation: none; opacity: .35; background: rgba(255, 255, 255, .6); }
+@keyframes fr-shimmer { from { transform: translateX(-100%); } to { transform: translateX(263%); } }
+.fr-where { display: block; margin-top: calc(5px * var(--fr)); font-size: calc(11.5px * var(--fr)); line-height: 1.3; color: rgba(255, 255, 255, .7); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .fr-text b, .fr-text small { display: block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .fr-group .fr-text b { font-size: calc(14.5px * var(--fr)); font-weight: 600; }
 .fr-row .fr-text b { font-size: calc(13.5px * var(--fr)); font-weight: 500; }

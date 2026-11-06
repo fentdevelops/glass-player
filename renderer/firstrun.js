@@ -3,10 +3,11 @@
 // intro's screens: big words on the intro's moving background, the list inside the intro's one glass shape. From Settings
 // it's a normal glass sheet. The list is the same both ways: one flat windowed list of group and song rows, so only what's in
 // sight is on the page however many songs there are.
-// Uses app.js globals: lib, esc, plural, fmt, gradFor, ICON, toast, api, openModal, modalClose, addFound, reduceMotion.
+// Uses app.js globals: lib, esc, plural, fmt, gradFor, cssUrl, ICON, toast, api, openModal, modalClose, addFound, reduceMotion.
 (() => {
   const scan = window.glass.scan;
   const FirstRun = (window.FirstRun = {});
+  FirstRun.cover = (p) => api.cover(p);      // one place that asks for a cover (the tests watch it)
 
   const OPEN_UP_TO = 12;     // this many groups or fewer start open
   const SONG_H = 44, GROUP_H = 62, GROUP_GAP = 4, JUNK_GAP = 14;
@@ -26,6 +27,8 @@
   const ICON_SEARCH = '<svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="7" /><path d="m20 20-3.5-3.5" /></svg>';
   const ICON_CHEV = '<svg class="fr-chev" viewBox="0 0 24 24"><path d="m6 9 6 6 6-6" /></svg>';
   const ICON_NOTE = '<svg class="fr-note" viewBox="0 0 24 24"><path d="M9 18V5l11-2v13" /><circle cx="6" cy="18" r="3" /><circle cx="17" cy="16" r="3" /></svg>';
+  const ICON_PLAY = '<svg class="fr-i-play" viewBox="0 0 24 24"><path d="M8 5.6v12.8a1 1 0 0 0 1.5.86l9.4-6.4a1 1 0 0 0 0-1.72L9.5 4.74A1 1 0 0 0 8 5.6Z" /></svg>';
+  const ICON_PAUSE = '<svg class="fr-i-pause" viewBox="0 0 24 24"><rect x="6.5" y="5" width="4" height="14" rx="1.2" /><rect x="13.5" y="5" width="4" height="14" rx="1.2" /></svg>';
   const STATUS = '<span class="fr-count"></span><span class="fr-rest"></span><span class="fr-also"></span>';
 
   // ---------- the running search for songs: listening starts before its window shows ----------
@@ -37,7 +40,7 @@
       items: [], paths: new Set(), hidden: 0, have: new Set([...lib.keys()].map((p) => p.toLowerCase())),
       groups: [], songGroups: 0, junk: 0, sorted: new Map(), dirty: false,
       opens: new Map(), shut: new Set(),   // groups opened or shut by hand, and those shut during a search
-      query: '', ticked: 0, ui: null,
+      query: '', ticked: 0, ui: null, looking: '',
       ix: GlassSearch.createIndex((it) => [it.title || it.name, it.artist || '', it.album || '', `${it.name} ${it.fb}`]),
     };
   }
@@ -54,6 +57,7 @@
       s.dirty = true;
     }
     s.done = !!m.done;
+    s.looking = s.done ? '' : m.looking || '';
     if (m.error) s.failed = true;
     s.ui?.soon();
   }
@@ -139,6 +143,7 @@
         <button type="button" class="btn ghost fr-all">Select all</button>
         <button type="button" class="btn ghost fr-none">Select none</button>
       </div>
+      <div class="fr-look"><span class="fr-bar"><span></span></span><span class="fr-where"></span></div>
       <div class="fr-wrap"><div class="fr-list"><div class="fr-space" role="list"></div></div><div class="fr-msg" hidden></div></div>`;
     const list = work.querySelector('.fr-list'), space = work.querySelector('.fr-space'), msg = work.querySelector('.fr-msg'), input = work.querySelector('input');
     const mounted = new Map();     // row key -> element on the page
@@ -174,8 +179,10 @@
         const it = r.it;
         n.className = 'fr-item fr-row';
         n.innerHTML = `<span class="check"><input type="checkbox" /><span class="box"></span></span>
+          <span class="fr-art">${ICON.note}</span>
+          <button type="button" class="fr-play" aria-label="Play a preview of ${esc(it.title || it.name)}">${ICON_PLAY}${ICON_PAUSE}</button>
           <span class="fr-text"><b>${esc(it.title || it.name)}</b><small>${esc(songSub(it, r.g))}</small></span>
-          <span class="fr-dur">${it.duration ? fmt(it.duration) : ''}</span>`;
+          <span class="fr-dur">${it.duration >= 1 ? fmt(it.duration) : ''}</span>`;
         n.title = it.path;
       } else {
         const g = r.g;
@@ -190,10 +197,115 @@
       n.setAttribute('role', 'listitem');
       return n;
     }
+    // ---- covers: only for rows on the page, four at a time, each file asked once for as long as the window is up ----
+    const covered = new Map();     // path -> cover url, or null for none
+    const asking = new Map();      // path -> the question being asked
+    const waiting = [];            // rows waiting for a turn: { n, paths }
+    let busy = 0, over = false;
+    function askCover(p) {
+      if (asking.has(p)) return asking.get(p);
+      const q = Promise.resolve().then(() => FirstRun.cover(p)).then((u) => (typeof u === 'string' && u ? u : null), () => null)
+        .then((u) => { covered.set(p, u); asking.delete(p); return u; });
+      asking.set(p, q);
+      return q;
+    }
+    const alive = (n) => !over && !n._gone;
+    function showCover(n, url, now) {
+      const art = n.querySelector('.fr-art');
+      if (!art || art.querySelector('.fr-pic')) return;
+      const pic = document.createElement('i');
+      pic.className = now || reduceMotion ? 'fr-pic still' : 'fr-pic';
+      pic.style.backgroundImage = cssUrl(url);
+      art.appendChild(pic);
+      art.classList.add('has-pic');
+    }
+    async function runCover(job) {
+      for (const p of job.paths) {
+        if (!alive(job.n)) return;
+        const url = covered.has(p) ? covered.get(p) : await askCover(p);
+        if (!alive(job.n)) return;
+        if (url) { showCover(job.n, url, false); return; }
+      }
+    }
+    function pump() {
+      while (busy < 4 && waiting.length) {
+        const job = waiting.shift();
+        if (!alive(job.n)) continue;      // scrolled away before its turn
+        busy++;
+        runCover(job).finally(() => { busy--; pump(); });
+      }
+    }
+    function wantCover(n, r) {
+      if (r.g.kind === 'junk' && !r.it) return;
+      if (!r.it && r.g.kind !== 'album') return;       // folders keep their icon
+      const paths = r.it ? [r.it.path] : r.g.items.slice(0, 3).map((it) => it.path);
+      for (const p of paths) {
+        if (!covered.has(p)) continue;
+        const u = covered.get(p);
+        if (u) { showCover(n, u, true); return; }
+      }
+      if (paths.every((p) => covered.has(p))) return;
+      waiting.push({ n, paths });
+      pump();
+    }
+    // ---- previews: one <audio> for the window; starting one stops any other ----
+    let audio = null, playing = null;
+    function syncPlay(n, it) {
+      const on = playing === it;
+      n.classList.toggle('playing', on);
+      n.classList.toggle('bad', !!it.bad);
+      const b = n.querySelector('.fr-play');
+      b.disabled = !!it.bad;
+      b.setAttribute('aria-pressed', on);
+      b.title = it.bad ? "This one won't play" : on ? 'Pause' : 'Play a preview';
+    }
+    const syncPlays = () => { for (const n of mounted.values()) if (n._row.it) syncPlay(n, n._row.it); };
+    function stopPreview() {
+      if (!playing) return;
+      playing = null;
+      try { audio.pause(); audio.removeAttribute('src'); audio.load(); } catch { /* nothing to stop */ }
+      syncPlays();
+    }
+    function failed(it) { if (playing === it) { it.bad = true; stopPreview(); } }
+    function preview(it) {
+      if (playing === it) { stopPreview(); return; }
+      stopPreview();
+      if (!audio) {
+        audio = FirstRun.audio = new Audio();
+        audio.preload = 'none';
+        audio.addEventListener('ended', stopPreview);
+        audio.addEventListener('error', () => failed(playing));
+      }
+      if (typeof deck !== 'undefined' && deck && !deck.paused) deck.pause();     // the main player is paused for good: it never resumes by itself
+      playing = it;
+      audio.src = it.url;
+      syncPlays();
+      let p;
+      try { p = audio.play(); } catch { failed(it); return; }
+      if (p) p.catch(() => failed(it));
+    }
+    space.addEventListener('click', (e) => {
+      const b = e.target.closest('.fr-play');
+      if (!b) return;
+      e.preventDefault();
+      e.stopPropagation();
+      const it = b.closest('.fr-item')?._row?.it;
+      if (it) preview(it);
+    });
+
+    // the bar and the line that say it is still looking, and where
+    const look = work.querySelector('.fr-look'), where = work.querySelector('.fr-where');
+    look.classList.toggle('calm', !!reduceMotion);
+    function paintLook() {
+      const on = !s.done;
+      look.classList.toggle('on', on);
+      if (on) where.textContent = s.looking ? `Looking in ${s.looking}` : 'Looking';     // as it fades the words stay
+    }
+
     // ticks and counts on a row that's on the page
     function sync(n, r) {
       const box = n.querySelector('input');
-      if (r.it) { if (box.checked !== r.it.sel) box.checked = r.it.sel; return; }
+      if (r.it) { if (box.checked !== r.it.sel) box.checked = r.it.sel; syncPlay(n, r.it); return; }
       const g = r.g;
       let on = 0;
       for (const it of g.shown) if (it.sel) on++;
@@ -223,6 +335,7 @@
             place(n, r);
             space.appendChild(n);
             mounted.set(r.key, n);
+            wantCover(n, r);
             if (animate && !reduceMotion && entering < MAX_ENTERING) { n.classList.add('enter'); n.style.setProperty('--d', `${entering++ * 22}ms`); }
           } else place(n, r);
           sync(n, r);
@@ -234,6 +347,7 @@
         const r = byKey?.get(k);
         if (r) { place(n, r); continue; }     // only moving out of sight: it glides with the others and goes at the next paint
         mounted.delete(k);
+        n._gone = true;
         if (animate && !reduceMotion) { n.classList.add('out'); setTimeout(() => n.remove(), 300); } else n.remove();
       }
     }
@@ -252,6 +366,7 @@
       const oldHeight = height;
       flatten();
       paintMessage();
+      paintLook();
       entering = 0;
       clearTimeout(settleT);
       if (before) {
@@ -300,6 +415,7 @@
       const n = e.target.closest('.fr-group');
       if (!n || e.target.closest('.check')) return;
       const g = n._row.g, open = isOpen(s, g);
+      if (open && playing && g.items.includes(playing)) stopPreview();      // its group is shutting
       if (s.query) { if (open) s.shut.add(g.key); else s.shut.delete(g.key); }
       else s.opens.set(g.key, !open);
       refresh();
@@ -344,7 +460,8 @@
         work.style.setProperty('--fr', f);
         refresh({ animate: false });
       },
-      stop() { clearTimeout(searchT); clearTimeout(settleT); sized.disconnect(); },
+      stop() { clearTimeout(searchT); clearTimeout(settleT); sized.disconnect(); over = true; waiting.length = 0; stopPreview(); FirstRun.audio = null; },
+      hush: stopPreview,
     };
   }
 
@@ -506,6 +623,7 @@
       async function press() {
         if (busy || closed) return;
         busy = true;
+        list.hush();
         go.style.pointerEvents = 'none';
         later.style.pointerEvents = 'none';
         const n = await (state === 'empty' ? addFolder(s) : addTicked(s)).catch((e) => { console.warn('Song finder:', e); return 0; });
@@ -573,6 +691,7 @@
             e.preventDefault();
             if (busy) return;
             busy = true;
+            list.hush();
             const n = await (state === 'empty' ? addFolder(s) : addTicked(s)).catch((err) => { console.warn('Song finder:', err); return 0; });
             busy = false;
             if (state === 'empty' && !n) return;

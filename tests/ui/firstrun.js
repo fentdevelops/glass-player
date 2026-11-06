@@ -618,6 +618,122 @@ const long = page(async (T) => {
   T.ok(performance.now() - t0 < 500, 'and quickly: ' + Math.round(performance.now() - t0) + ' ms');
 });
 
+// ---- real covers: on rows in sight only, four at a time, each asked for once ----
+const covers = page(async (T) => {
+  const calls = [], real = FirstRun.cover;
+  let now = 0, most = 0;
+  FirstRun.cover = async (p) => {
+    calls.push(p);
+    now++; most = Math.max(most, now);
+    await T.wait(150);       // slow enough that the calls overlap if they're allowed to
+    try { return await real(p); } finally { now--; }
+  };
+  await T.skip();
+  await T.ready();
+  const pic = (el) => el.querySelector('.fr-art .fr-pic');
+  const bg = (el) => (pic(el) ? pic(el).style.backgroundImage : '');
+  T.ok(T.row('Cover One') && T.row('Bare Three'), 'the songs are on the page');
+  await T.until(() => bg(T.row('Cover One').el), 'a cover arrives', 5000);
+  await T.wait(900);
+  T.ok(/^url\("file:/.test(bg(T.row('Cover One').el)), 'a song with a cover gets it as a file: image, got ' + bg(T.row('Cover One').el));
+  T.ok(/^url\("file:/.test(bg(T.row('Cover Two').el)), 'and so does the next, got ' + bg(T.row('Cover Two').el));
+  T.ok(bg(T.row('Cover One').el) !== bg(T.row('Cover Two').el), 'each its own');
+  const bare = T.row('Bare Three').el.querySelector('.fr-art');
+  T.ok(!pic(T.row('Bare Three').el) && bare.querySelector('svg') && !bare.classList.contains('has-pic'), 'a song without one keeps its placeholder');
+  T.ok(/^url\("file:/.test(bg(T.group('Paper Moons').el)), 'an album shows the cover of a song in it, got ' + bg(T.group('Paper Moons').el));
+  T.ok(!pic(T.group('Glasshouse').el) && T.group('Glasshouse').el.querySelector('.fr-art').style.backgroundImage, 'an album with no covers keeps its gradient');
+  T.ok(!pic(T.group('Loose').el) && T.group('Loose').el.querySelector('.fr-art svg'), 'a folder keeps its icon');
+  T.ok(/^url\("file:/.test(bg(T.row('Loose Covered').el)), 'but its covered song shows its own');
+  T.ok(+getComputedStyle(pic(T.row('Cover One').el)).opacity === 1, 'the cover has faded all the way in');
+  const art = T.box(T.row('Cover One').el.querySelector('.fr-art')), bareBox = T.box(bare);
+  T.ok(art.w === bareBox.w && art.h === bareBox.h && art.x === bareBox.x, 'the cover takes the placeholder\'s place exactly, ' + art.w + 'x' + art.h);
+  T.ok(most >= 2 && most <= 4, 'at most four at once, and more than one: ' + most);
+  T.ok(new Set(calls).size === calls.length, 'each file asked once, ' + calls.length + ' calls');
+  // away and back: no new calls, and the cover is there at once
+  const before = calls.length;
+  await T.search('zzzzzzqqqq');
+  await T.search('');
+  const back = T.row('Cover One');
+  T.ok(back && /^url\("file:/.test(bg(back.el)), 'back again with its cover straight away');
+  T.ok(pic(back.el).classList.contains('still'), 'with no fade to flicker');
+  await T.wait(400);
+  T.ok(calls.length === before, 'and nothing asked twice, ' + (calls.length - before) + ' new calls');
+});
+
+// ---- the bar and the line that say it is still looking, and where ----
+const looking = page(async (T) => {
+  const seen = [];
+  glass.scan.onProgress((m) => { if (m.looking) seen.push(m.looking); });
+  await T.skipAtOnce();
+  await T.until(() => T.$('.fr-where')?.textContent.startsWith('Looking in'), 'the line says where', 20000);
+  T.ok(T.state() === 'scanning', 'while it is still going');
+  const look = T.$('.fr-look');
+  T.ok(look.classList.contains('on') && +getComputedStyle(look).opacity > 0, 'the bar is showing');
+  const bar = T.box(T.$('.fr-bar')), list = T.box('.fr-list');
+  T.ok(bar.h > 1 && bar.h <= 6 && bar.w > 100, 'a thin bar, ' + bar.w + 'x' + bar.h);
+  T.ok(bar.b <= list.y, 'above the list, clear of it');
+  const line = T.$('.fr-where');
+  T.ok(/^Looking in Music( › [^›]+){0,3}$/.test(line.textContent), 'says the root and folders under it, got ' + line.textContent);
+  T.ok(!/[\\/:]/.test(line.textContent.replace('Looking in ', '')), 'not a full path');
+  T.ok(getComputedStyle(line).textOverflow === 'ellipsis', 'and cut off nicely when long');
+  T.ok(T.$('.fr-bar span').getAnimations().length > 0, 'the shimmer moves');
+  await T.until(() => T.state() === 'done', 'the scan finishes', 60000);
+  await T.wait(1000);
+  T.ok(!look.classList.contains('on') && +getComputedStyle(look).opacity === 0, 'when it is done the bar fades away');
+  T.ok(T.$('.intro-words p').textContent.includes('songs'), 'and the words say what was found: ' + T.$('.intro-words p').textContent);
+  T.ok(seen.length >= 2 && seen.every((w) => w.startsWith('Music')), 'it was sent along the way: ' + seen.length);
+});
+
+// ---- play on a row: one preview at a time, never touches a tick ----
+const previews = page(async (T) => {
+  await T.skip();
+  await T.ready();
+  const play = (t) => T.row(t).el.querySelector('.fr-play');
+  const playing = () => T.$$('.fr-row.playing').map((r) => r.querySelector('b').textContent);
+  T.ok(T.rows().length === 3 && T.rows().every((r) => r.el.querySelector('.fr-play')), 'every song row has a play button');
+  const order = ['.check', '.fr-art', '.fr-play', '.fr-text', '.fr-dur'].map((s) => T.box(T.row('Play A').el.querySelector(s)));
+  T.ok(order.every((b, i) => !i || (b.x >= order[i - 1].r - 0.5)), 'checkbox, cover, play, title, length in a row: ' + order.map((b) => Math.round(b.x)).join());
+  const ticks = T.addBtn().textContent, rows = T.rows().length;
+  play('Play A').click();
+  await T.wait(60);
+  T.ok(playing().join() === 'Play A', 'a click starts it, playing: ' + playing().join());
+  T.ok(FirstRun.audio && /^file:/.test(FirstRun.audio.src), 'through the one audio element, with the song\'s file url');
+  T.ok(T.row('Play A').box.checked && T.addBtn().textContent === ticks, 'it does not tick or untick the row');
+  T.ok(T.rows().length === rows && T.group('Play Set').el.classList.contains('open'), 'and opens or closes nothing');
+  const el = FirstRun.audio;
+  play('Play B').click();
+  await T.wait(60);
+  T.ok(playing().join() === 'Play B' && FirstRun.audio === el, 'a second one stops the first, playing: ' + playing().join());
+  play('Play B').click();
+  await T.wait(30);
+  T.ok(!playing().length && el.paused, 'clicking the playing one pauses it');
+  play('Play A').click();
+  await T.wait(30);
+  el.dispatchEvent(new Event('ended'));
+  await T.wait(30);
+  T.ok(!playing().length, 'when the song ends the icon clicks back');
+  play('Play A').click();
+  await T.wait(30);
+  T.group('Play Set').el.querySelector('.fr-text').click();
+  await T.wait(700);
+  T.ok(!playing().length && el.paused, 'shutting its group stops it');
+  T.group('Play Set').el.querySelector('.fr-text').click();
+  await T.wait(700);
+  // a file that can't play: a quiet state on its row, and the window carries on
+  await T.search('ding');
+  play('ding').click();
+  await T.until(() => T.row('ding').el.classList.contains('bad'), 'the row goes quiet', 4000);
+  T.ok(T.open() && !playing().length, 'a file that will not play leaves the window as it was');
+  T.ok(/play/i.test(T.row('ding').el.querySelector('.fr-play').title), 'and says so quietly: ' + T.row('ding').el.querySelector('.fr-play').title);
+  await T.search('');
+  play('Play C').click();
+  await T.wait(60);
+  T.ok(playing().join() === 'Play C', 'and another still plays');
+  T.$('.fr-later').click();
+  await T.ended('Not now');
+  T.ok(el.paused && !FirstRun.audio, 'closing the window stops it');
+});
+
 // ---- the glass: the one shape morphs into the panel from where it was, and later from the panel into the side panel ----
 const morphs = page(async (T) => {
   await T.until(() => T.heading() === 'Glassy', 'welcome');
@@ -813,6 +929,9 @@ module.exports = [
   { name: 'the count climbs, more than a dozen groups, responsive', vars: { total: 6000, each: 50 }, env: realFiles(() => Files.folders(120, 50)), page: climbs, timeout: 180000 },
   { name: 'Add while it is still looking', vars: { total: 6000 }, env: realFiles(() => Files.folders(120, 50)), page: addEarly, timeout: 180000 },
   { name: '2000 rows in one group stay smooth', env: realFiles(() => Files.oneBig(2000)), page: long, timeout: 180000 },
+  { name: 'real covers load for rows in sight, four at a time', env: realFiles(Files.covers), page: covers },
+  { name: 'a bar and a line say it is still looking, and where', env: realFiles(() => Files.folders(120, 50)), page: looking, timeout: 180000 },
+  { name: 'play buttons preview one song at a time', env: realFiles(Files.playable), page: previews },
   { name: 'the glass morphs in from the last screen and out to the panel', vars: { at: 4 }, env: small, page: morphs },
   { name: 'the glass morphs in from a Skip on the first screen', vars: { at: 0 }, env: small, page: morphs },
   { name: 'the glass morphs at 900x600', size: '900x600', vars: { at: 4 }, env: small, page: morphs },
