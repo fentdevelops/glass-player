@@ -244,9 +244,78 @@ const googleDenied = page(async (T) => {
   T.ok(!st.exists, 'nothing stored');
 });
 
+// ---- the whole first launch, songs added: when it's over the app takes clicks, side panel included ----
+const appTakesClicks = page(async (T) => {
+  await T.until(() => T.heading() === 'Glassy', 'the welcome screen');
+  await T.wait(1800);
+  T.$('.intro-skip').click();
+  await T.until(T.su, 'the sign-up screen');
+  await T.wait(1400);
+  T.$('.su-noacc').click();
+  await T.until(() => T.finder() && T.$('.intro-go') && /^Add \d/.test(T.$('.intro-go').textContent), 'the finder has songs to add', 30000);
+  await T.wait(1500);
+  T.$('.intro-go').click();
+  await T.until(() => !T.intro(), 'the intro ends', 15000);
+  await T.wait(600);
+  // a song with a cover plays, as it would for anyone: the panel still takes clicks after that
+  if (T.vars.play) {
+    playCollection([...lib.values()].filter((t) => /Cover One/.test(t.title || t.path)), 0);
+    await T.wait(T.vars.play);
+  }
+  // every part of the side panel is the panel's, not something lying on top of it
+  const side = T.box('.side');
+  for (let y = side.y + 10; y < side.b - 10; y += 40) for (let x = side.x + 10; x < side.r - 10; x += 60) {
+    const hit = document.elementFromPoint(x, y);
+    T.ok(hit?.closest('.side'), 'something lies over the side panel at ' + Math.round(x) + ',' + Math.round(y) + ': ' + (hit && (hit.id || hit.className || hit.tagName)));
+  }
+  // real presses on the panel: the same events a mouse sends, at the spot where it would be
+  const press = (e) => {
+    const r = e.getBoundingClientRect(), o = { bubbles: true, cancelable: true, clientX: r.left + r.width / 2, clientY: r.top + r.height / 2, button: 0, pointerId: 1, isPrimary: true };
+    const t = document.elementFromPoint(o.clientX, o.clientY);
+    t.dispatchEvent(new PointerEvent('pointerdown', o)); t.dispatchEvent(new MouseEvent('mousedown', o));
+    t.dispatchEvent(new PointerEvent('pointerup', o)); t.dispatchEvent(new MouseEvent('mouseup', o));
+    t.dispatchEvent(new MouseEvent('click', o));
+  };
+  const sideEl = T.$('.side');
+  // the tab called Search is the view called library, and the tab called Library is playlists
+  for (const [name, view] of [['Queue', 'queue'], ['Search', 'library'], ['Library', 'playlists'], ['Search', 'library']]) {
+    const tab = T.$$('.side button').find((b) => b.textContent.trim() === name && b.offsetWidth);
+    T.ok(tab, 'the ' + name + ' tab is there');
+    if (!tab) continue;
+    press(tab);
+    await T.wait(500);
+    T.ok(sideEl.dataset.view === view, 'pressing ' + name + ' opens it, got ' + sideEl.dataset.view);
+  }
+  // the app's main process answers too: it's the one that passes every click on to the page
+  let pingWorst = 0, pings = 0, pinging = true;
+  (async () => { while (pinging) { const t0 = performance.now(); await glass.localAccount.state(); pingWorst = Math.max(pingWorst, performance.now() - t0); pings++; await T.wait(50); } })();
+  // the app answers: nothing holds it up for long after the songs arrive
+  let worst = 0, last = performance.now();
+  const beat = setInterval(() => { const n = performance.now(); worst = Math.max(worst, n - last - 50); last = n; }, 50);
+  await T.wait(T.vars.watch || 0);
+  clearInterval(beat);
+  pinging = false;
+  const thumbs = [...lib.values()].filter((t) => t.thumb).length;
+  console.log('[main] worst answer ms ' + Math.round(pingWorst) + ' over ' + pings + ' pings; ' + thumbs + ' of ' + lib.size + ' songs have thumbnails');
+  T.ok(pingWorst < 400, 'the main process took ' + Math.round(pingWorst) + ' ms to answer');
+  console.log('[lag] worst stall ms ' + Math.round(worst));
+  T.ok(worst < 1000, 'the app stalled for ' + Math.round(worst) + ' ms');
+  T.ok(!document.documentElement.classList.contains('intro-on'), 'the intro let go of the app');
+  await T.until(() => T.$$('.side [data-view], .side button').length > 0, 'the side panel has controls');
+  for (const e of T.$$('.side button').filter((b) => b.offsetWidth).slice(0, 12)) {
+    const r = e.getBoundingClientRect(), hit = document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2);
+    T.ok(hit && (hit === e || e.contains(hit)), 'a side panel button takes clicks, got ' + (hit && (hit.id || hit.className)) + ' over ' + (e.id || e.className));
+    T.ok(getComputedStyle(e).pointerEvents !== 'none', 'and is not switched off: ' + (e.id || e.className));
+  }
+});
+
 module.exports = [
   { name: 'after the last intro screen: Continue without an account goes on, nothing stored', signup: true, env: small, page: skipping, timeout: 180000 },
   { name: 'sign up: checks, Coming soon, terms, username, Settings, sign out and in', signup: true, profile: 'acct', env: small, page: journey, timeout: 180000 },
+  { name: 'the whole first launch, songs added: the app takes clicks', signup: true, env: small, page: appTakesClicks, timeout: 120000 },
+  { name: 'a first launch with 1,000 songs: the app takes clicks and keeps answering', signup: true, env: () => ({ GLASS_SCAN_ROOTS: Files.roots(Files.oneBig(1000)) }), vars: { watch: 25000 }, page: appTakesClicks, timeout: 240000 },
+  { name: 'a first launch, then a song with a cover plays: the panel takes clicks', signup: true, env: () => ({ GLASS_SCAN_ROOTS: Files.roots(Files.covers()) }), vars: { play: 6000, watch: 2000 }, page: appTakesClicks },
+  { name: 'a first launch with 300 big covers: the window keeps answering', signup: true, env: () => ({ GLASS_SCAN_ROOTS: Files.roots(Files.heavy(300)) }), vars: { watch: 20000 }, page: appTakesClicks, timeout: 240000 },
   { name: 'Skip goes to the sign-up screen', signup: true, env: small, page: skipButton },
   { name: 'an existing user\'s normal launch shows none of it', signup: true, profile: 'acct', env: small, page: again },
   { name: 'Google (stand-in): terms first, then the browser, then the username; sign in later', signup: true, profile: 'google', env: () => ({ ...small(), GLASS_FAKE_GOOGLE: 'new' }), page: googleNew, timeout: 180000 },

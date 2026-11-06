@@ -104,6 +104,8 @@ function createWindow() {
   if (process.env.GLASS_SHOT) {
     win.webContents.on('console-message', (e) => { if (e.level !== 'verbose') console.log('[renderer]', e.message); });
   }
+  // Glassy Dev's click recorder (diag.js); the real app never loads it
+  if (isDevCopy || (process.env.GLASS_SHOT && process.env.GLASS_DIAG)) require('./diag').attach(win, path.join(app.getPath('userData'), 'diag.log'));
   win.loadFile(path.join(__dirname, 'renderer', 'index.html'));
   if (OFFSCREEN_TEST) win.webContents.setFrameRate(60);
   if (process.env.GLASS_SHOT) win.webContents.setAudioMuted(true);   // tests never make sound

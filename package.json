@@ -35,6 +35,7 @@
     "productName": "Glassy",
     "files": [
       "main.js",
+      "diag.js",
       "preload.js",
       "renderer/**/*",
       "scan/**/*",

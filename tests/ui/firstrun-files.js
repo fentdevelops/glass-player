@@ -139,6 +139,12 @@ const playable = () => set('playable', (music, downloads) => {
   put(path.join(downloads, 'ding.ogg'), ogg(9));
 });
 
+// Songs like a real collection's: every one has its own file and a big 3000 x 3000 cover to shrink
+const heavy = (count) => set(`heavy-${count}`, (music) => {
+  const tag = require('node-id3').create({ image: { mime: 'image/png', type: { id: 3 }, description: 'Cover', imageBuffer: png(120, 60, 90, 3000) } });
+  for (let s = 0; s < count; s++) put(path.join(music, 'Everything', `Heavy ${String(s + 1).padStart(4, '0')}.wav`), wav({ seconds: 120, title: `Heavy ${s + 1}`, artist: 'Tester', album: 'Heavy', id3: tag }));
+});
+
 // every file in a set, as the scan will see it
 const filesIn = (s) => fs.readdirSync(path.dirname(s.music), { recursive: true, withFileTypes: true })
   .filter((e) => e.isFile()).map((e) => path.join(e.parentPath, e.name));
@@ -164,4 +170,4 @@ const gallery = () => set('gallery', (music, downloads) => {
   put(path.join(downloads, 'Drum samples', 'snare 04.wav'), wav({ seconds: 2 }));
 });
 
-module.exports = { scratch, roots, small, none, onlyJunk, folders, oneBig, growing, gallery, covers, playable, filesIn };
+module.exports = { scratch, roots, small, none, onlyJunk, folders, oneBig, heavy, growing, gallery, covers, playable, filesIn };
