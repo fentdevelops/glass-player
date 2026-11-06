@@ -9,3 +9,5 @@ research_notes/
 reports/
 # the iPhone handoff describes the user and local paths: kept on this PC, not in the public repo
 docs/ios/
+# the owner's Google sign-in client: ships inside the app, but stays out of the public repo
+account/google-client.json
