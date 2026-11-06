@@ -23,6 +23,9 @@
     lyr: { x: 644.8, y: 140, w: 496, h: 520, r: 30 },
     eq: { x: 620, y: 250, w: 520.8, h: 300, r: 34 },
     col: { x: 720.8, y: 210, w: 420, h: 380, r: 91.2 },
+    // the song finder (firstrun.js): the list, and a lens when there's nothing to list
+    finder: { x: 566, y: 70, w: 575, h: 660, r: 30 },
+    finderEmpty: { x: 761, y: 245, w: 310, h: 310, r: 155 },
   };
   const STEPS = [
     { v: 'lens', center: true, h: 'Glassy', p: 'Your music, behind glass.', go: 'Get started' },
@@ -57,6 +60,7 @@
   let el = null, bg, cv, glass, words, hEl, pEl, go, skip, ticks, lyr, eq, tint;
   let k = 1, ox = 0, oy = 0;
   let step = -1, busy = false, leaving = false, inAccountStep = false, morph = null;
+  let finderDue = false, inFinder = false, finderPlace = null, finderStage = null;
   let timers = [], anims = [], ambRaf = 0, eqRaf = 0, lyT = 0, lyI = 0;
   const later = (fn, ms) => { timers.push(setTimeout(fn, ms)); };
   const clearTimers = () => { timers.forEach(clearTimeout); timers = []; };
@@ -174,7 +178,7 @@
       animateWord(e, [{ opacity: from }, { opacity: 0, ...rise(px) }], { duration, easing });
     }
   }
-  function setWords(s, first) {
+  function setWords(s, first, after) {
     const show = () => {
       words.classList.toggle('center', !!s.center);
       go.classList.toggle('center', !!s.center);
@@ -183,6 +187,7 @@
       animateWord(pEl, [{ opacity: 0, ...rise(22) }, { opacity: 1, ...still() }], { duration: 1000, delay: 110 });
       animateWord(go, [{ opacity: 0 }, { opacity: 1 }], { duration: 800, delay: first ? 900 : 260 });
       ticks.querySelectorAll('i').forEach((t, i) => t.classList.toggle('on', i <= step));
+      after?.();
     };
     if (first) return show();
     wordsOut(-12, 340, 'ease-in');
@@ -190,26 +195,29 @@
   }
 
   // ---------- moving through the screens ----------
+  // the shape goes to a new place and gets its new contents
+  function shapeTo(b, inside) {
+    if (!reduceMotion) { moveTo(b); inside(); return; }
+    // reduced motion: the shape crossfades instead, out where it is and in where it's going, with its new contents
+    const out = glass.animate([{ opacity: getComputedStyle(glass).opacity }, { opacity: 0 }], { duration: 260, easing: E, fill: 'forwards' });
+    later(() => {
+      put(b); Liquid.snap(glass); inside();
+      out.cancel();
+      glass.animate([{ opacity: 0 }, { opacity: 1 }], { duration: 420, easing: E });
+    }, 260);
+  }
   function goTo(n) {
     if (busy) return;
     busy = true; later(() => { busy = false; }, 600);
     step = n;
     const s = STEPS[n];
-    const inside = () => { showView(s.v); lyrOn(s.v === 'lyr'); eqOn(s.v === 'eq'); };
     setWords(s, false);
-    if (!reduceMotion) { moveTo(box(s.v)); inside(); return; }
-    // reduced motion: the shape crossfades instead, out where it is and in where it's going, with its new contents
-    const out = glass.animate([{ opacity: 1 }, { opacity: 0 }], { duration: 260, easing: E, fill: 'forwards' });
-    later(() => {
-      put(box(s.v)); Liquid.snap(glass); inside();
-      out.cancel();
-      glass.animate([{ opacity: 0 }, { opacity: 1 }], { duration: 420, easing: E });
-    }, 260);
+    shapeTo(box(s.v), () => { showView(s.v); lyrOn(s.v === 'lyr'); eqOn(s.v === 'eq'); });
   }
-  // the button: on to the next screen, or from the last one to the account step (while there is one) and into the app
+  // the button: on to the next screen, or from the last one to the account step (while there is one) and on
   async function forward() {
     if (busy) return;       // still moving to this screen: a double-click on the one before must not go past the last screen
-    if (step < 0 || leaving || inAccountStep) return;
+    if (step < 0 || leaving || inAccountStep || inFinder) return;
     if (step < STEPS.length - 1) return goTo(step + 1);
     if (Intro.accountStep) {
       inAccountStep = true;
@@ -217,8 +225,48 @@
       inAccountStep = false;
       if (!el) return;
     }
-    enter();
+    leave();
   }
+
+  // ---------- the song finder (firstrun.js) borrows the stage: the words, the button and the one glass shape ----------
+  // The last screen's button, Skip and Esc all come through here. Only a fresh install with an empty library has the window
+  // due, once; everyone else goes straight into the app.
+  async function leave() {
+    if (!el || leaving || inFinder) return;
+    if (!finderDue || !Intro.finderStep) return enter();
+    finderDue = false;
+    inFinder = true;
+    clearTimers();
+    busy = false;
+    // whatever the shape was caught doing (still arriving, part way through a crossfade) carries on from where it is
+    const now = getComputedStyle(glass), o = now.opacity, tf = now.transform;
+    glass.getAnimations().forEach((a) => { if (a !== morph && !(a instanceof CSSTransition)) a.cancel(); });
+    if (+o < 1 || tf !== 'none') glass.animate([{ opacity: o, ...(reduceMotion ? {} : { transform: tf }) }, { opacity: 1, ...still() }], { duration: 500, easing: E });
+    lyrOn(false); eqOn(false);
+    tint.style.opacity = 0;
+    go.style.pointerEvents = 'none';      // firstrun.js gives it back with its own words on it
+    skip.style.pointerEvents = 'none';
+    for (const e of [skip, ticks]) animateWord(e, [{ opacity: getComputedStyle(e).opacity }, { opacity: 0, ...rise(-14) }], { duration: reduceMotion ? 240 : 480 });
+    finderStage = {
+      root: el, glass, go, p: pEl,
+      say: (s, after) => setWords(s, false, after),
+      // to one of PLACES, and inside() once the shape has its new contents to show
+      shape(name, inside) { finderPlace = name; shapeTo(box(name), inside || (() => {})); },
+      show(node) {
+        const v = document.createElement('div');
+        v.className = 'intro-view'; v.dataset.v = 'finder';
+        v.appendChild(node);
+        glass.appendChild(v);
+        showView('finder');
+      },
+      box, scale: () => k,
+      onKey: null, onResize: null,      // firstrun.js fills these in
+    };
+    try { await Intro.finderStep(finderStage); } catch (e) { console.warn('Intro finder step:', e); }
+    inFinder = false; finderPlace = null; finderStage = null;
+    if (el) enter();
+  }
+
   function onSwatch(e) {
     const b = e.target.closest('[data-t]');
     if (!b) return;
@@ -229,15 +277,17 @@
     if (inAccountStep) return;    // its keyboard while it's up
     e.stopPropagation();          // the app's own shortcuts wait until the intro is over
     if (leaving) return;
+    if (inFinder) { finderStage?.onKey?.(e); return; }
     if (e.key === 'ArrowRight' && step >= 0 && step < STEPS.length - 1) goTo(step + 1);
     else if (e.key === 'ArrowLeft' && step > 0) goTo(step - 1);
-    else if (e.key === 'Escape') enter();
+    else if (e.key === 'Escape') leave();
   }
   function onResize() {
     measure();
     if (leaving) { if (!reduceMotion) { morph?.cancel(); morph = null; put(sideBox()); } return; }
     morph?.cancel(); morph = null;
-    put(box(step < 0 ? 'lens' : STEPS[step].v));    // the shape's own resize watcher fits its glass once this settles
+    put(box(finderPlace || (step < 0 ? 'lens' : STEPS[step].v)));    // the shape's own resize watcher fits its glass once this settles
+    if (inFinder) { finderStage?.onResize?.(); return; }
     if (step >= 0 && STEPS[step].v === 'lyr') lyrPaint();
     if (reduceMotion && step >= 0 && STEPS[step].v === 'eq') eqPaint(STILL_T);
   }
@@ -287,8 +337,10 @@
   // ---------- stop everything: nothing of it is left running or in the page ----------
   function finish() {
     wanted = false;
+    finderDue = false;
     page.classList.remove('intro-on', 'intro-hide');
     if (!el) return;
+    window.FirstRun?.abandon();      // a scan that was getting ready for it, or the window itself if it was up
     clearTimers();
     cancelAnimationFrame(ambRaf); cancelAnimationFrame(eqRaf); clearInterval(lyT);
     removeEventListener('resize', onResize);
@@ -317,7 +369,7 @@
     measure();
 
     go.addEventListener('click', forward);
-    skip.addEventListener('click', enter);
+    skip.addEventListener('click', leave);
     q('.intro-sw').addEventListener('click', onSwatch);
     addEventListener('resize', onResize);
     addEventListener('keydown', onKey, true);
@@ -344,6 +396,7 @@
 
   window.Intro = {
     accountStep: null,      // a later task's sign-up screen: runs after the last screen, before entering the app. May return a promise.
+    finderStep: null,       // firstrun.js, "Here's what we found": after any account step, before entering the app. Gets the stage, returns a promise.
     maybeShow() { if (wanted && !el) open(false); },
     replay() { if (!el) open(true); },
     // a song was opened: out of the way at once, and it still counts as not seen
@@ -351,9 +404,18 @@
     // app.js, once the saved library is in (and before any song opened from Explorer joins it): someone who already has
     // songs or playlists doesn't need this
     libraryLoaded() {
-      if (!isNew) return;
-      isNew = false;
-      if (wanted && (lib.size > 0 || S.playlists.length > 0)) { markSeen(); finish(); }
+      const empty = lib.size === 0 && S.playlists.length === 0;
+      if (isNew) {
+        isNew = false;
+        if (wanted && !empty) { markSeen(); finish(); }
+      }
+      // A first launch with nothing in the library: the song finder is due after this intro, and its scan starts now so the
+      // results are there when the intro reaches them. The scripts may not all be in yet at this point.
+      if (!wanted || !empty || leaving) return;
+      finderDue = true;
+      const ready = () => { if (finderDue) window.FirstRun?.prepare(); };
+      if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', ready, { once: true });
+      else ready();
     },
   };
   document.addEventListener('DOMContentLoaded', () => Intro.maybeShow());

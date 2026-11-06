@@ -662,6 +662,9 @@ body.playing .ibtn.play .i-pause { opacity: 1; transform: none; }
 .check input:checked + .box { background-color: #fff; }
 .check input:checked + .box::after { transform: translateY(-1px) rotate(-45deg) scale(1); }
 .check:active .box { transform: scale(.85, .75); }
+.check input:indeterminate + .box { background-color: #fff; }     /* partly ticked: a dash */
+.check input:indeterminate + .box::after { width: 10px; height: 0; border-left: 0; transform: scale(1); }
+.check input:focus-visible + .box { outline: 2px solid #fff; outline-offset: 2px; }
 .note { margin: 12px 0 4px; font-size: 12px; color: var(--ink-2); }
 .modal-actions { display: flex; align-items: center; gap: 8px; margin-top: 18px; }
 .modal-actions .grow { flex: 1; }
@@ -1532,11 +1535,13 @@ html.intro-hide .ambient, html.intro-hide .body, html.intro-hide .gear { visibil
 .intro-go {
   position: absolute; left: calc(var(--ox) + 99px * var(--k)); bottom: calc(var(--oy) + 64px * var(--k)); height: max(40px, calc(50px * var(--k))); padding: 0 calc(30px * var(--k)); border-radius: 999px;
   background: #fff; color: #17103f; font-weight: 600; font-size: max(13px, calc(15px * var(--k))); opacity: 0;
-  box-shadow: 0 14px 30px -14px rgba(8, 2, 40, .6); transition: transform .35s var(--intro-glide), box-shadow .35s var(--intro-glide);
+  box-shadow: 0 14px 30px -14px rgba(8, 2, 40, .6);
+  transition: transform .35s var(--intro-glide), box-shadow .35s var(--intro-glide), background-color .7s var(--intro-glide), color .7s var(--intro-glide);
 }
 .intro-go:hover { transform: scale(1.035); }
 .intro-go:active { transform: scale(.98); }
 .intro-go.center { left: 50%; translate: -50% 0; }
+.intro-go[disabled] { background-color: rgba(255, 255, 255, .14); color: rgba(255, 255, 255, .55); box-shadow: none; pointer-events: none; }
 .intro-skip { position: absolute; right: 30px; top: 50px; padding: 8px 12px; font-size: max(13.5px, calc(13.5px * var(--k))); color: var(--intro-ink2); opacity: 0; transition: color .35s; }
 .intro-skip:hover { color: #fff; }
 .intro-go:focus-visible, .intro-skip:focus-visible, .intro-sw button:focus-visible { outline: 2px solid #fff; outline-offset: 3px; }
@@ -1569,3 +1574,94 @@ html.intro-hide .ambient, html.intro-hide .body, html.intro-hide .gear { visibil
   .intro-tint { transition-duration: .5s !important; }   /* trying a colour is still a crossfade */
   .intro-view.on { transition-delay: 0s !important; }    /* contents arrive while the shape is unseen, then fade in with it */
 }
+
+/* ---------- "Here's what we found" (firstrun.js). Over the intro the list sits inside the one glass shape, with the words on
+   the background beside it; from Settings it's a sheet. --fr scales the list up with big windows, never down. ---------- */
+.fr-panel { position: absolute; inset: 0; background: rgba(24, 14, 62, .44); transition: background-color .7s var(--intro-glide, var(--glide)); }
+.fr-panel[data-state="empty"] { background: transparent; }
+.fr-work { --fr: 1; position: absolute; left: 0; top: 0; display: flex; flex-direction: column; padding: calc(20px * var(--fr)) calc(16px * var(--fr)) 0; }
+.fr-panel[data-state="empty"] .fr-work { display: none; }
+.fr-tools { flex: none; display: flex; align-items: center; gap: calc(2px * var(--fr)); padding: 0 calc(4px * var(--fr)); }
+.fr-search { flex: 1; min-width: 0; margin: 0 calc(6px * var(--fr)) 0 0; height: calc(38px * var(--fr)); border-radius: calc(13px * var(--fr)); }
+.fr-search svg { width: calc(15px * var(--fr)); height: calc(15px * var(--fr)); }
+.fr-search input { font-size: calc(13px * var(--fr)); }
+.fr-search input::placeholder { color: rgba(255, 255, 255, .62); }
+.fr-tools .btn { flex: none; height: calc(32px * var(--fr)); padding: 0 calc(10px * var(--fr)); font-size: calc(12.5px * var(--fr)); }
+.fr-wrap { position: relative; flex: 1; min-height: 0; margin-top: calc(10px * var(--fr)); }
+.fr-list {
+  position: absolute; inset: 0; overflow-y: auto; overflow-x: hidden; overscroll-behavior: contain; scrollbar-gutter: stable;   /* rows keep their width when a search shortens the list */
+  mask-image: linear-gradient(to bottom, transparent 0, #000 8px, #000 calc(100% - 30px), transparent 100%);
+}
+.fr-list::-webkit-scrollbar { width: 8px; }
+.fr-list::-webkit-scrollbar-thumb { background: rgba(255, 255, 255, .2); border-radius: 8px; border: 2px solid transparent; background-clip: padding-box; }
+.fr-space { position: relative; margin-bottom: 24px; }
+.fr-msg { position: absolute; left: 0; right: 0; top: 34%; padding: 0 24px; text-align: center; font-size: calc(13.5px * var(--fr)); color: rgba(255, 255, 255, .72); animation: rise-in .6s var(--glide) both; }
+
+/* a row: no boxes around anything, just a soft fill under the pointer. Rows glide when the list changes around them */
+.fr-item {
+  position: absolute; left: 0; right: 0; top: 0; display: grid; align-items: center; border-radius: calc(13px * var(--fr)); cursor: pointer;
+  transition: transform .5s var(--glide), background-color var(--t-hover) var(--glide), opacity .26s var(--glide);
+}
+.fr-space.still > .fr-item { transition-property: background-color, opacity; }
+.fr-item:hover { background-color: var(--fill-1); }
+.fr-item.enter { animation: fr-in .55s var(--glide) backwards; animation-delay: var(--d, 0ms); }
+.fr-item.out { opacity: 0; pointer-events: none; }
+@keyframes fr-in { from { opacity: 0; translate: 0 8px; } }
+.fr-group { grid-template-columns: calc(20px * var(--fr)) calc(44px * var(--fr)) minmax(0, 1fr) calc(16px * var(--fr)); gap: calc(12px * var(--fr)); padding: 0 calc(14px * var(--fr)) 0 calc(8px * var(--fr)); }
+.fr-row { grid-template-columns: calc(20px * var(--fr)) minmax(0, 1fr) auto; gap: calc(12px * var(--fr)); padding: 0 calc(14px * var(--fr)) 0 calc(64px * var(--fr)); }   /* its words line up under the group's */
+/* a whole column of ticks is quieter than the group's own box, or the white squares are all you'd see */
+.fr-row .check input:checked + .box { background-color: rgba(255, 255, 255, .24); box-shadow: inset 0 0 0 1px rgba(255, 255, 255, .34); }
+.fr-row .check .box::after { border-color: #fff; }
+.fr-item .check { margin: 0; }
+.fr-item .check .box { width: calc(20px * var(--fr)); height: calc(20px * var(--fr)); border-radius: calc(7px * var(--fr)); }
+.fr-item .check .box::after { width: calc(10px * var(--fr)); height: calc(6px * var(--fr)); border-width: calc(2px * var(--fr)); border-top-width: 0; border-right-width: 0; }
+.fr-item .check input:indeterminate + .box::after { height: 0; border-left-width: 0; }
+.fr-art {
+  display: grid; place-items: center; width: calc(44px * var(--fr)); height: calc(44px * var(--fr)); border-radius: calc(11px * var(--fr));
+  background: center / cover var(--fill-2); box-shadow: inset 0 0 0 1px rgba(255, 255, 255, .2);
+}
+.fr-art svg { width: 46%; height: 46%; fill: none; stroke: #fff; stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; opacity: .8; }
+.fr-text { min-width: 0; }
+.fr-text b, .fr-text small { display: block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.fr-group .fr-text b { font-size: calc(14.5px * var(--fr)); font-weight: 600; }
+.fr-row .fr-text b { font-size: calc(13.5px * var(--fr)); font-weight: 500; }
+.fr-text small { font-size: calc(12px * var(--fr)); color: rgba(255, 255, 255, .7); margin-top: 1px; }
+.fr-text small:empty { display: none; }
+.fr-dur { font-size: calc(12px * var(--fr)); color: rgba(255, 255, 255, .7); font-variant-numeric: tabular-nums; }
+.fr-toggle { display: grid; place-items: center; width: calc(16px * var(--fr)); height: calc(16px * var(--fr)); }
+.fr-toggle:focus-visible { outline: 2px solid #fff; outline-offset: 3px; border-radius: 4px; }
+.fr-chev { width: 100%; height: 100%; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; opacity: .65; transition: transform .6s var(--glide); }
+.fr-group.open .fr-chev { transform: rotate(180deg); }
+
+/* the words and the buttons beside the glass */
+.intro-go.fr-go { min-width: calc(190px * var(--k)); padding: 0 calc(22px * var(--k)); font-variant-numeric: tabular-nums; }
+#intro .fr-later {
+  position: absolute; bottom: calc(var(--oy) + 64px * var(--k)); height: max(40px, calc(50px * var(--k))); padding: 0 calc(12px * var(--k)); border-radius: 999px;
+  font-size: max(13px, calc(15px * var(--k))); color: var(--intro-ink2); opacity: 0;
+  transition: color .35s var(--intro-glide), left .5s var(--intro-glide);
+}
+#intro .fr-later:hover { color: #fff; }
+#intro .fr-later:focus-visible { outline: 2px solid #fff; outline-offset: 3px; }
+.fr-status { font-variant-numeric: tabular-nums; }
+.intro-words .fr-status { display: block; min-height: 3em; }    /* two lines' room, so the heading above it never shifts as the words change */
+.intro-words .fr-also { display: block; }
+.fr-sheet .fr-also { display: none; }
+.fr-count { font-weight: 600; color: #fff; }
+
+/* nothing found: the lens, with a note in it */
+.fr-empty { position: absolute; inset: 0; display: none; align-items: center; justify-content: center; flex-direction: column; }
+.fr-panel[data-state="empty"] .fr-empty { display: flex; animation: rise-in .9s var(--glide) both; }
+.fr-note { width: 38%; height: 38%; fill: none; stroke: #fff; stroke-width: 1.5; stroke-linecap: round; stroke-linejoin: round; filter: drop-shadow(0 8px 16px rgba(28, 11, 77, .4)); }
+
+/* from Settings: the same list on a normal glass sheet */
+.fr-sheet { width: min(680px, calc(100vw - 48px)); height: min(700px, calc(100vh - 48px)); display: flex; flex-direction: column; overflow: hidden; }
+.fr-sheet .modal-head { flex: none; margin-bottom: 12px; }
+.fr-sheet .fr-status { font-size: 12.5px; color: var(--ink-2); white-space: nowrap; }
+.fr-sheet .fr-count { color: #fff; }
+.fr-sheet .fr-panel { position: relative; inset: auto; flex: 1; min-height: 0; background: none; margin: 0 -8px; }
+.fr-sheet .fr-work { inset: 0; width: auto; height: auto; padding: 0 8px; }
+.fr-sheet .fr-tools { padding: 0; }
+.fr-sheet .modal-actions { flex: none; margin-top: 12px; }
+.fr-sheet .fr-empty { padding: 0 40px; gap: 14px; text-align: center; }
+.fr-sheet .fr-note { width: 54px; height: 54px; opacity: .8; }
+.fr-sheet .fr-empty p { margin: 0; max-width: 34em; font-size: 13.5px; line-height: 1.5; color: var(--ink-2); }

@@ -171,6 +171,8 @@ ipcMain.handle('open-files', async () => {
   return r.canceled ? [] : resolvePaths(r.filePaths);
 });
 ipcMain.handle('open-folder', async () => {
+  // tests: GLASS_FOLDER_PICK stands in for the folder dialog
+  if (process.env.GLASS_SHOT && process.env.GLASS_FOLDER_PICK) return resolvePaths([process.env.GLASS_FOLDER_PICK]);
   const r = await dialog.showOpenDialog(win, { properties: ['openDirectory', 'multiSelections'] });
   return r.canceled ? [] : resolvePaths(r.filePaths);
 });
@@ -764,12 +766,14 @@ async function checkUpdates(manual = false) {
   } catch (e) { sendUpdate({ state: 'error', message: String((e && e.message) || e).split('\n')[0].slice(0, 160) }); }
 }
 // ---- song finder (scan/service.js): scans Music and Downloads, scores each file, streams results to the window ----
-// Tests: with GLASS_SHOT, GLASS_SCAN_ROOTS (";"-separated, first one counts as the Music folder) replaces the real folders.
+// Tests: with GLASS_SHOT only GLASS_SCAN_ROOTS (";"-separated, first one counts as the Music folder) is scanned, so no test
+// run can ever reach the real folders, not even one that doesn't set it (a fresh install starts this scan by itself).
 let scanService = null;
 function scan() {
   if (scanService) return scanService;
-  const testRoots = process.env.GLASS_SHOT && process.env.GLASS_SCAN_ROOTS ? process.env.GLASS_SCAN_ROOTS.split(';').filter(Boolean) : null;
-  const roots = testRoots || [app.getPath('music'), app.getPath('downloads')];
+  const roots = process.env.GLASS_SHOT
+    ? String(process.env.GLASS_SCAN_ROOTS || '').split(';').filter(Boolean)
+    : [app.getPath('music'), app.getPath('downloads')];
   scanService = require('./scan/service').createScanService({
     roots,
     musicRoot: roots[0],

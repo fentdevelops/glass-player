@@ -19,7 +19,10 @@ const COMMON = `
   T.appIsBack = async (what) => {
     const cs = (s) => getComputedStyle(document.querySelector(s));
     T.ok(!T.shown(), what + ': overlay removed');
-    await new Promise(requestAnimationFrame);    // under reduced motion the app gives every property a tiny transition: one frame
+    // under reduced motion the app gives every property a tiny transition. It can start on the first frame after the
+    // intro goes, still showing the old value, and is over by the next: so two frames
+    await new Promise(requestAnimationFrame);
+    await new Promise(requestAnimationFrame);
     T.ok(!document.querySelector('[class*="intro-"]'), what + ': no intro element left');
     T.ok(!document.documentElement.className.includes('intro'), what + ': no intro class left on the page');
     T.ok(cs('.app').zIndex === '2', what + ': app back at its own layer, got ' + cs('.app').zIndex);
@@ -38,7 +41,9 @@ const COMMON = `
     T.ok(hit && hit.closest('#dock'), what + ': the dock takes clicks, got ' + (hit && (hit.id || hit.className)));
   };
 `;
-const page = (fn) => `async (T) => { ${COMMON} await (${fn})(T); }`;
+// These runs are about the intro itself. The song finder that follows it on a fresh install has its own tests (firstrun.js),
+// and no scan here can reach a real folder: main.js scans only GLASS_SCAN_ROOTS in test runs.
+const page = (fn) => `async (T) => { ${COMMON} Intro.finderStep = null; await (${fn})(T); }`;
 
 const WELCOME = 'Glassy';
 const HEADINGS = [WELCOME, 'Everything you already have.', 'Lyrics that follow along.', 'Sound you can shape.', 'Make it yours.'];

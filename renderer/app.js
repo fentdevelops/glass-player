@@ -745,6 +745,19 @@ function addTracks(infos, { playFirst = false } = {}) {
   save();
   if (fresh.length > 1) toast(`Added ${plural(fresh.length, 'song')}`);
 }
+// Songs from the song finder (firstrun.js): into the library, as Add a folder does. Nothing starts playing, nobody asked for
+// that: with nothing on, the first song is only cued up so the stage has something on it.
+function addFound(infos) {
+  if (!infos.length) return;
+  const tracks = infos.map(trackFor);
+  libChanged();
+  if (!current()) {
+    const at = S.queue.indexOf(tracks[0]);
+    play(at >= 0 ? at : S.queue.push(tracks[0]) - 1, false);
+  }
+  save();
+  if (S.view !== 'library') setView('library');
+}
 function addToQueue(tracks) {
   const inQ = new Set(S.queue);
   const fresh = tracks.filter((t) => !inQ.has(t));
@@ -1950,8 +1963,12 @@ window.addEventListener('blur', closeMenu);
 
 // ---------- modals ----------
 const modalRoot = $('#modalRoot');
-let modalClose = null;
-function openModal(html, { onSubmit, onMount } = {}) {
+let modalClose = null, modalGone = null;
+// onClose runs once the sheet has gone, however it went (closed, or replaced by another sheet)
+function openModal(html, { onSubmit, onMount, onClose } = {}) {
+  modalGone?.();
+  const gone = () => { if (modalGone === gone) modalGone = null; const f = onClose; onClose = null; f?.(); };
+  modalGone = gone;
   modalRoot.innerHTML = `<div class="backdrop"></div><form class="modal glass" autocomplete="off">${html}</form>`;
   modalRoot.hidden = false;
   const form = $('.modal', modalRoot), bd = $('.backdrop', modalRoot);
@@ -1966,6 +1983,7 @@ function openModal(html, { onSubmit, onMount } = {}) {
     modalRoot.hidden = true;
     modalRoot.innerHTML = '';
     modalClose = null;
+    gone();
   };
   modalClose = close;
   bd.addEventListener('click', close);

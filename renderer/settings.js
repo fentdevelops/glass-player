@@ -1,6 +1,6 @@
 'use strict';
 // Settings (gear, top left). Top to bottom: Glass (glow, darkness, tint colour, background), Sound (bass, treble,
-// a draggable EQ curve, reverb), Playback, Updates, and What's new at the bottom.
+// a draggable EQ curve, reverb), Playback, Library, Updates, and What's new at the bottom.
 // Speed lives in the dock now (next to Lyrics); the library reloads itself; updates install themselves.
 (() => {
   const sys = window.glass.system;
@@ -178,6 +178,9 @@
       <div class="set-sec"><h4>Glass</h4>${glassHTML()}</div>
       <div class="set-sec"><h4>Sound</h4>${soundHTML()}</div>
       <div class="set-sec"><h4>Playback</h4>${playbackHTML()}</div>
+      <div class="set-sec"><h4>Library</h4>
+        <div class="set-row"><div><b>Your music folders</b><span>Look through Music and Downloads for songs that aren't in your library yet</span></div>
+          <button type="button" class="btn" data-find-songs>Find songs on this PC</button></div></div>
       <div class="set-sec"><h4>Updates</h4>
         <div class="set-row"><div><b>Glassy ${esc(window.Updates?.state().version || '')}</b><span data-upd>${esc(window.Updates ? Updates.label() : 'Glass updates itself')}</span></div>
           <button type="button" class="btn" data-upd-btn>Check</button></div></div>
@@ -209,6 +212,7 @@
           if (Updates.stale()) Updates.check();
         } else updBtn.hidden = true;
         form.querySelector('[data-replay-intro]').addEventListener('click', async () => { await modalClose?.(); Intro.replay(); });
+        form.querySelector('[data-find-songs]').addEventListener('click', async () => { await modalClose?.(); FirstRun.open({ auto: false }); });
       },
       onSubmit() { save(); },
     });
