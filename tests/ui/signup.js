@@ -60,7 +60,8 @@ const skipping = page(async (T) => {
   T.ok(T.$('.su-h').textContent === 'Sign up to Glassy' && T.$('.su-kick').textContent === 'Start your journey', 'the words, got ' + T.$('.su-h').textContent);
   T.ok(T.$('.su-honest')?.textContent === 'For now, your account stays on this computer.', 'the honesty line is there');
   T.ok(T.$('.su-creds .su-hint-t').textContent === 'At least 15 characters', 'the hint');
-  T.ok(T.$$('.su-way').length === 2 && T.$$('.su-way').map((b) => b.textContent).join() === 'Apple,Google', 'only Apple and Google buttons');
+  T.ok(T.$$('.su-way').map((b) => b.textContent).join() === 'Google', 'Google is the only provider button');
+  T.ok(Math.abs(T.box('.su-way').w - T.box('.su-soc').w) < 2, 'the one button fills the row, got ' + Math.round(T.box('.su-way').w));
   // the logo and links sit below the 44 px title bar, and the bar still takes clicks
   for (const s of ['.su-logo', '.su-stage', '.su-noacc', '.su-have']) {
     const b = T.box(s);
@@ -77,17 +78,10 @@ const skipping = page(async (T) => {
   T.ok(!st.exists && !st.signedIn, 'nothing stored: ' + JSON.stringify(st));
 });
 
-// ---- the whole way: checks, Apple, terms, username, Settings, sign out, sign in ----
+// ---- the whole way: checks, terms, username, Settings, sign out, sign in ----
 const journey = page(async (T) => {
   await T.toScreen();
   const sheetOn = () => !!T.$('.su-sheet.on');
-
-  // Apple: a note, and nothing else
-  T.$('[data-way="Apple"]').click();
-  await T.wait(500);
-  T.ok(T.$('.su-soon').textContent === 'Coming soon', 'Apple says Coming soon, got ' + T.$('.su-soon').textContent);
-  T.ok(+getComputedStyle(T.$('.su-soon')).opacity > 0.5, 'and the note shows');
-  T.ok(!sheetOn() && T.$('.su').dataset.mode === 'signup' && T.$('.su-creds').hidden === false, 'Apple opens no terms and changes nothing');
 
   T.ok(T.$('.su-f legend').textContent === 'Email or phone number' && T.$('.su-em').placeholder === 'you@example.com', 'the first field takes either, with an email as the example');
   T.ok(T.$('.su-sheet').inert, 'the shut terms cannot be reached by keyboard');
