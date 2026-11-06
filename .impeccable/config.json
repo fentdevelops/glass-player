@@ -20,6 +20,15 @@
         ],
         "createdAt": "2026-11-04T05:59:47.636Z",
         "reason": "Claude: false positive. The only hit (.ghead, styles.css ~L1169) is border-top: 22px solid transparent with background-clip: padding-box, an invisible spacer that makes room above each album header in the virtual list (fixed row heights), not a visible accent border. Checked with impeccable detect 2026-11-04."
+      },
+      {
+        "rule": "dark-glow",
+        "value": "*",
+        "files": [
+          "docs/superpowers/mockups/intro-preview.html"
+        ],
+        "createdAt": "2026-11-06T01:08:56.232Z",
+        "reason": "Claude's call: the flagged shadows are dark neutral elevation (#080228) under glass, and the soft glow on the sung lyric line and sound curve matches the shipped app's own style. Preview file only."
       }
     ]
   }
