@@ -14,10 +14,10 @@ const eb = path.join(root, 'node_modules', '.bin', process.platform === 'win32' 
 execFileSync(eb, [
   '--win', 'portable', '--publish', 'never',
   '-c.directories.output=dist-dev',
-  '-c.productName=Glassy Dev',
+  '"-c.productName=Glassy Dev"',
   '-c.appId=com.glass.player.dev',
   '-c.win.icon=build/icon-dev.png',
-  '-c.extraMetadata.productName=Glassy Dev',
+  '"-c.extraMetadata.productName=Glassy Dev"',
   '-c.extraMetadata.glassyChannel=dev',
 ], { cwd: root, stdio: 'inherit', shell: process.platform === 'win32' });
 
