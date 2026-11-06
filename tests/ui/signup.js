@@ -1,0 +1,171 @@
+'use strict';
+// The sign-up screen. Run: node scripts/ui-test.js tests/ui/signup.js
+// Everything runs inside the real app, off-screen and muted, on fresh data folders. The only folders scanned are scratch
+// ones from firstrun-files.js, passed in through GLASS_SCAN_ROOTS. Runs that share a profile are one install, launched again.
+const Files = require('./firstrun-files');
+
+const COMMON = `
+  T.$$ = (s) => [...document.querySelectorAll(s)];
+  T.intro = () => !!document.querySelector('#intro');
+  T.heading = () => T.$('.intro-words h1')?.textContent;
+  T.su = () => T.$('.su');
+  T.finder = () => !!T.$('.fr-panel');
+  T.hint = () => T.$('.su-creds .su-hint-t')?.textContent || '';
+  T.type = (sel, v) => { const i = T.$(sel); i.value = v; i.dispatchEvent(new Event('input', { bubbles: true })); };
+  T.send = () => T.$('.su-form').requestSubmit();
+  T.walkIntro = async () => {
+    await T.until(() => T.heading() === 'Glassy', 'the welcome screen');
+    await T.wait(700);
+    for (let i = 0; i < 4; i++) { T.$('.intro-go').click(); await T.wait(700); }
+    T.$('.intro-go').click();
+  };
+  T.toScreen = async () => {
+    await T.walkIntro();
+    await T.until(T.su, 'the sign-up screen');
+    await T.wait(1400);       // it has glided in
+  };
+  T.openSettings = async () => { Settings.open(); await T.until(() => T.$('[data-account] h4'), 'Settings opens'); await T.wait(300); };
+  T.account = () => T.$('[data-account]')?.textContent || '';
+  // past the song finder, with nothing added
+  T.pastFinder = async () => {
+    await T.until(() => T.finder() && T.$('.fr-later'), 'the song finder opens', 20000);
+    await T.wait(1500);
+    T.$('.fr-later').click();
+    await T.until(() => !T.intro(), 'the intro ends', 9000);
+    await T.wait(300);
+  };
+`;
+const page = (fn) => `async (T) => { ${COMMON} await (${fn})(T); }`;
+const small = () => ({ GLASS_SCAN_ROOTS: Files.roots(Files.small()) });
+
+// ---- the screen is after the last intro screen and before the finder; Continue without an account writes nothing ----
+const skipping = page(async (T) => {
+  T.ok(typeof Intro.accountStep === 'function', 'signup.js fills the intro\'s account slot');
+  await T.walkIntro();
+  await T.until(T.su, 'the sign-up screen after the last intro screen');
+  await T.wait(1400);
+  T.ok(T.intro() && !T.finder(), 'still in the intro, and the song finder has not started yet');
+  T.ok(T.$('.su-h').textContent === 'Sign up to Glassy' && T.$('.su-kick').textContent === 'Start your journey', 'the words, got ' + T.$('.su-h').textContent);
+  T.ok(T.$('.su-honest')?.textContent === 'For now, your account stays on this computer.', 'the honesty line is there');
+  T.ok(T.$('.su-creds .su-hint-t').textContent === 'At least 15 characters', 'the hint');
+  T.ok(T.$$('.su-way').length === 4, 'four icon buttons');
+  // the logo and links sit below the 44 px title bar, and the bar still takes clicks
+  for (const s of ['.su-logo', '.su-stage', '.su-noacc', '.su-have']) {
+    const b = T.box(s);
+    T.ok(b.y >= 44 && T.inWindow(b), s + ' is below the title bar and inside the window, got y ' + Math.round(b.y));
+  }
+  const lg = T.box('.intro-glass');
+  T.ok(lg.w < 60 && lg.x < 100 && lg.y >= 44, 'the intro\'s glass shrank into the logo, got ' + JSON.stringify(lg));
+  const bar = document.elementFromPoint(innerWidth - 20, 22);
+  T.ok(bar && bar.closest('.titlebar'), 'the title bar is on top and takes clicks, got ' + (bar && (bar.id || bar.className)));
+  T.$('.su-noacc').click();
+  await T.until(T.finder, 'Continue without an account goes on to the song finder', 20000);
+  T.ok(!T.su(), 'the sign-up screen is gone');
+  const st = await glass.localAccount.state();
+  T.ok(!st.exists && !st.signedIn, 'nothing stored: ' + JSON.stringify(st));
+});
+
+// ---- the whole way: checks, Apple, terms, username, Settings, sign out, sign in ----
+const journey = page(async (T) => {
+  await T.toScreen();
+  const sheetOn = () => !!T.$('.su-sheet.on');
+
+  // Apple: a note, and nothing else
+  T.$('[data-way="Apple"]').click();
+  await T.wait(500);
+  T.ok(T.$('.su-soon').textContent === 'Coming soon', 'Apple says Coming soon, got ' + T.$('.su-soon').textContent);
+  T.ok(+getComputedStyle(T.$('.su-soon')).opacity > 0.5, 'and the note shows');
+  T.ok(!sheetOn() && T.$('.su').dataset.mode === 'signup' && T.$('.su-creds').hidden === false, 'Apple opens no terms and changes nothing');
+
+  // checks come first
+  T.type('.su-em', 'nope');
+  T.type('.su-pw', 'a'.repeat(15));
+  T.send();
+  await T.wait(200);
+  T.ok(/valid email/.test(T.hint()) && !sheetOn(), 'a bad email says so and opens no terms, got ' + T.hint());
+  T.type('.su-em', 'me@example.com');
+  T.type('.su-pw', 'a'.repeat(14));
+  T.send();
+  await T.wait(200);
+  T.ok(/15 characters/.test(T.hint()) && T.$('.su-creds .su-hint-t').classList.contains('bad'), '14 characters shows the hint, got ' + T.hint());
+  T.ok(!sheetOn(), '14 characters does not open the terms');
+
+  // terms: I agree stays off until the end
+  T.type('.su-pw', 'correct horse battery staple');
+  T.send();
+  await T.until(sheetOn, 'the terms open');
+  await T.wait(900);
+  const agree = T.$('.su-agree'), terms = T.$('.su-terms');
+  T.ok(terms.scrollHeight > terms.clientHeight + 40, 'the terms are longer than the window on them');
+  T.ok(agree.disabled && agree.textContent === 'Scroll to the end', 'I agree is off at the start, got ' + agree.textContent);
+  T.ok(/That's the end\./.test(terms.textContent) && /in one file on this computer/.test(terms.textContent), 'the real terms are there');
+  terms.scrollTop = 60;
+  await T.wait(200);
+  T.ok(agree.disabled, 'still off part way down');
+  agree.click();
+  await T.wait(200);
+  T.ok(T.$('.su-name').hidden, 'a click while it is off does nothing');
+  terms.scrollTop = terms.scrollHeight;
+  await T.wait(300);
+  T.ok(!agree.disabled && agree.textContent === 'I agree', 'I agree lights up at the end, got ' + agree.textContent);
+  agree.click();
+
+  // username, with a live check
+  await T.until(() => !T.$('.su-name').hidden, 'the username step');
+  await T.wait(700);
+  const nh = () => T.$('.su-name-hint .su-hint-t');
+  T.type('.su-un', 'Fent');
+  T.ok(T.$('.su-un').value === 'fent' && nh().classList.contains('good'), 'capitals become lowercase and it looks good, got ' + T.$('.su-un').value);
+  T.type('.su-un', 'admin');
+  T.ok(nh().classList.contains('bad'), 'admin is refused live, got ' + nh().textContent);
+  T.type('.su-un', 'a b');
+  T.ok(nh().classList.contains('bad'), 'a space is refused live');
+  T.type('.su-un', 'Fent');
+  T.send();
+  await T.until(() => !T.su(), 'the screen finishes');
+  await T.pastFinder();
+
+  // Settings shows the account
+  await T.openSettings();
+  T.ok(T.$('.set-scroll .set-sec h4').textContent === 'Account', 'Account is the top section');
+  T.ok(T.$('[data-acct-name]')?.textContent === 'fent', 'Settings shows fent, got ' + T.account());
+  T.ok(/Saved on this computer/.test(T.account()) && T.$('[data-acct-out]'), 'it says Saved on this computer and has Sign out');
+  T.ok(!/example\.com|battery/.test(document.body.innerHTML), 'no email or password in the page');
+
+  // sign out, then back in
+  T.$('[data-acct-out]').click();
+  await T.until(() => T.$('[data-acct-in]'), 'Sign out leaves a Sign in button');
+  T.ok(!T.$('[data-acct-name]'), 'the username is gone');
+  T.$('[data-acct-in]').click();
+  await T.until(() => T.$('.su-overlay .su'), 'the screen opens over the app');
+  await T.wait(1000);
+  T.ok(T.$('.su').dataset.mode === 'signin', 'it opens as Sign in once an account exists');
+  const ob = T.box('.su-overlay');
+  T.ok(ob.y === 44 && ob.w === innerWidth, 'the overlay starts under the title bar, got y ' + ob.y);
+  T.type('.su-em', 'me@example.com');
+  T.type('.su-pw', 'wrong wrong wrong wrong');
+  T.send();
+  await T.until(() => /doesn't match/.test(T.hint()), 'a wrong password says so');
+  T.ok(T.hint() === "That email or password doesn't match." && !sheetOn(), 'the message, and no terms, got ' + T.hint());
+  T.type('.su-pw', 'correct horse battery staple');
+  T.send();
+  await T.until(() => !T.$('.su-overlay'), 'the right password signs in');
+  await T.until(() => T.$('[data-acct-name]'), 'Settings comes back signed in');
+  T.ok(T.$('[data-acct-name]').textContent === 'fent', 'signed in as fent again');
+});
+
+// ---- the same install, launched again: none of this ----
+const again = page(async (T) => {
+  await T.until(() => typeof loaded !== 'undefined' && loaded, 'the library loads');
+  await T.wait(1200);
+  T.ok(!T.intro() && !T.su() && !T.$('.su-overlay'), 'a normal launch shows no intro and no sign-up screen');
+  T.ok(!document.documentElement.className.includes('intro'), 'no intro class on the page');
+  await T.openSettings();
+  T.ok(T.$('[data-acct-name]')?.textContent === 'fent', 'still signed in as fent, got ' + T.account());
+});
+
+module.exports = [
+  { name: 'after the last intro screen: Continue without an account goes on, nothing stored', signup: true, env: small, page: skipping, timeout: 180000 },
+  { name: 'sign up: checks, Coming soon, terms, username, Settings, sign out and in', signup: true, profile: 'acct', env: small, page: journey, timeout: 180000 },
+  { name: 'an existing user\'s normal launch shows none of it', signup: true, profile: 'acct', env: small, page: again },
+];

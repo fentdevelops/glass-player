@@ -60,6 +60,13 @@ contextBridge.exposeInMainWorld('glass', {
     status: () => ipcRenderer.invoke('scan:status'),
     onProgress: (cb) => ipcRenderer.on('scan:progress', (_e, m) => cb(m)),
   },
+  localAccount: {
+    state: () => ipcRenderer.invoke('localAccount:state'),
+    create: (email, password, username) => ipcRenderer.invoke('localAccount:create', email, password, username),
+    signIn: (email, password) => ipcRenderer.invoke('localAccount:signIn', email, password),
+    signOut: () => ipcRenderer.invoke('localAccount:signOut'),
+    remove: () => ipcRenderer.invoke('localAccount:remove'),
+  },
   updates: {
     state: () => ipcRenderer.invoke('update:state'),
     check: () => ipcRenderer.invoke('update:check'),

@@ -55,7 +55,7 @@ const newInstall = page(async (T) => {
   T.ok(T.shown(), 'new install: the intro shows');
   const script = document.head.querySelector('script[src="intro.js"]');
   T.ok(script, 'the decision is made from <head>, before anything in <body> can paint');
-  T.ok(window.Intro && Intro.accountStep === null, 'Intro.accountStep is an empty slot');
+  T.ok(window.Intro && typeof Intro.accountStep === 'function', 'Intro.accountStep is filled by signup.js');
   T.ok(localStorage.getItem('glass.introSeen') === null, 'not marked seen yet');
   const root = T.$('#intro');
   if (!root) return;

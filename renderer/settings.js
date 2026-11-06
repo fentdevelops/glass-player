@@ -171,10 +171,41 @@
     paintWall();
   }
 
+  // ---- Account: signed out, a Sign in button; signed in, the username and a Sign out. The account is one file on this computer. ----
+  const REMOVE_NOTE = 'Deletes only the account on this computer. Your music and library stay.';
+  function accountHTML(a) {
+    const remove = `<div class="set-row" data-acct-rm-row><div><b>Remove this account</b><span>${REMOVE_NOTE}</span></div>
+      <button type="button" class="btn ghost" data-acct-rm>Remove this account</button></div>`;
+    if (a.signedIn) {
+      return `<div class="set-row"><div><b data-acct-name>${esc(a.username)}</b><span>Saved on this computer</span></div>
+        <button type="button" class="btn" data-acct-out>Sign out</button></div>${remove}`;
+    }
+    return `<div class="set-row"><div><b>Not signed in</b><span>${a.exists ? 'An account is saved on this computer' : 'An account is optional. Glassy works the same without one.'}</span></div>
+      <button type="button" class="btn" data-acct-in>Sign in</button></div>${a.exists ? remove : ''}`;
+  }
+  function mountAccount(form) {
+    const sec = form.querySelector('[data-account]');
+    const paint = () => { if (sec.isConnected) sec.innerHTML = `<h4>Account</h4>${accountHTML(Signup.cached())}`; };
+    paint();
+    Signup.refresh().then(paint);
+    sec.addEventListener('click', async (e) => {
+      const b = e.target.closest('button');
+      if (!b) return;
+      if (b.hasAttribute('data-acct-in')) { await modalClose?.(); await Signup.open(); Settings.open(); }
+      else if (b.hasAttribute('data-acct-out')) { await Signup.signOut(); paint(); }
+      else if (b.hasAttribute('data-acct-rm')) {
+        b.closest('[data-acct-rm-row]').innerHTML = `<div><b>Remove this account?</b><span>${REMOVE_NOTE}</span></div>
+          <span class="set-grow"></span><button type="button" class="btn danger" data-acct-rm-yes>Remove</button><button type="button" class="btn ghost" data-acct-rm-no>Keep it</button>`;
+      } else if (b.hasAttribute('data-acct-rm-yes')) { await Signup.remove(); paint(); }
+      else if (b.hasAttribute('data-acct-rm-no')) paint();
+    });
+  }
+
   Settings.open = (opt = {}) => {
     openModal(`
       <div class="modal-head"><h3 class="modal-title">Settings</h3></div>
       <div class="set-scroll">
+      <div class="set-sec" data-account></div>
       <div class="set-sec"><h4>Glass</h4>${glassHTML()}</div>
       <div class="set-sec"><h4>Sound</h4>${soundHTML()}</div>
       <div class="set-sec"><h4>Playback</h4>${playbackHTML()}</div>
@@ -196,6 +227,7 @@
           const sc = form.querySelector('.set-scroll'), n = form.querySelector('[data-news]');
           if (sc && n) sc.scrollTo({ top: sc.scrollTop + n.getBoundingClientRect().top - sc.getBoundingClientRect().top - 6, behavior: 'smooth' });
         }, 380);
+        mountAccount(form);
         mountGlass(form);
         mountAudio(form);
         const updLine = form.querySelector('[data-upd]'), updBtn = form.querySelector('[data-upd-btn]');

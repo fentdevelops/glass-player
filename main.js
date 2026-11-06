@@ -790,6 +790,20 @@ ipcMain.handle('scan:stop', (e) => { if (fromWindow(e)) scan().stop(); return tr
 ipcMain.handle('scan:add', (e, paths, skipped) => (fromWindow(e) ? scan().add(paths, skipped) : []));
 ipcMain.handle('scan:find', (e) => { if (!fromWindow(e)) return false; scan().findFromSettings().catch(() => {}); return true; });
 ipcMain.handle('scan:status', (e) => (fromWindow(e) ? scan().status() : null));
+// ---- the account on this computer (account/local.js): a file in the data folder, no network code anywhere ----
+// GLASS_NO_SIGNUP (tests only, with GLASS_SHOT) tells the intro to skip its sign-up screen.
+let accountStore = null;
+const account = () => accountStore || (accountStore = require('./account/local').createAccountStore(ud('local-account.json')));
+const isText = (v, max) => typeof v === 'string' && v.length <= max;
+const NO_ACCOUNT = { ok: false, error: 'invalid' };
+ipcMain.handle('localAccount:state', (e) => {
+  if (!fromWindow(e)) return { exists: false, signedIn: false, username: '' };
+  return { ...account().state(), skipScreen: !!(process.env.GLASS_SHOT && process.env.GLASS_NO_SIGNUP) };
+});
+ipcMain.handle('localAccount:create', (e, email, password, username) => (fromWindow(e) && isText(email, 256) && isText(password, 256) && isText(username, 64) ? account().create(email, password, username) : NO_ACCOUNT));
+ipcMain.handle('localAccount:signIn', (e, email, password) => (fromWindow(e) && isText(email, 256) && isText(password, 256) ? account().signIn(email, password) : { ok: false, error: 'mismatch' }));
+ipcMain.handle('localAccount:signOut', (e) => (fromWindow(e) ? account().signOut() : NO_ACCOUNT));
+ipcMain.handle('localAccount:remove', (e) => (fromWindow(e) ? account().remove() : NO_ACCOUNT));
 
 ipcMain.handle('update:state', () => updateState);
 ipcMain.handle('update:check', () => checkUpdates(true));

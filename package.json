@@ -36,7 +36,8 @@
       "main.js",
       "preload.js",
       "renderer/**/*",
-      "scan/**/*"
+      "scan/**/*",
+      "account/**/*"
     ],
     "win": {
       "target": [

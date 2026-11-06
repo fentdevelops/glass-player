@@ -1665,3 +1665,83 @@ html.intro-hide .ambient, html.intro-hide .body, html.intro-hide .gear { visibil
 .fr-sheet .fr-empty { padding: 0 40px; gap: 14px; text-align: center; }
 .fr-sheet .fr-note { width: 54px; height: 54px; opacity: .8; }
 .fr-sheet .fr-empty p { margin: 0; max-width: 34em; font-size: 13.5px; line-height: 1.5; color: var(--ink-2); }
+
+/* ---------- sign-up screen (signup.js). Its look comes from docs/superpowers/mockups/intro-preview.html.
+   Inside the intro it fills the window under the 44 px title bar; from Settings it is a full-window overlay below it. ---------- */
+.su-overlay { position: fixed; inset: 44px 0 0 0; z-index: 85; overflow: hidden; background: #0d0726;
+  background-image: radial-gradient(60% 70% at 24% 28%, rgba(124, 59, 224, .34), transparent 70%), radial-gradient(50% 60% at 80% 72%, rgba(242, 88, 156, .22), transparent 70%), radial-gradient(40% 50% at 8% 96%, rgba(74, 47, 208, .3), transparent 70%); }
+.su {
+  --su-top: 0px; --su-s: 1; --glide: cubic-bezier(.42, .02, .2, 1); --ink2: rgba(255, 255, 255, .68);
+  position: absolute; inset: 0; color: #fff; font-family: "Segoe UI Variable Display", "Segoe UI", system-ui, sans-serif; -webkit-font-smoothing: antialiased;
+}
+.su-intro { --su-top: 44px; }
+:where(.su) button { font: inherit; color: inherit; border: 0; background: none; cursor: pointer; }
+.su-mark { position: absolute; left: 28px; top: calc(var(--su-top) + 12px); width: 44px; height: 44px; border-radius: 22px; display: grid; place-items: center;
+  background: linear-gradient(160deg, rgba(255, 255, 255, .2), rgba(255, 255, 255, .07) 42%, rgba(255, 255, 255, .12)); box-shadow: inset 0 0 0 1px rgba(255, 255, 255, .2), inset 3px 4px 10px -4px rgba(255, 255, 255, .6); }
+.su-mark svg { width: 15px; height: 15px; margin-left: 2px; fill: #fff; }
+.su-intro .su-mark { display: none; }
+.su-logo { position: absolute; left: 80px; top: calc(var(--su-top) + 20px); font-size: 21px; font-weight: 600; letter-spacing: -.01em; }
+.su-close { position: absolute; right: 22px; top: calc(var(--su-top) + 14px); width: 40px; height: 40px; border-radius: 50%; display: grid; place-items: center; transition: background-color .35s var(--glide); }
+.su-close:hover { background: rgba(255, 255, 255, .12); }
+.su-close svg { width: 20px; height: 20px; fill: none; stroke: #fff; stroke-width: 1.8; stroke-linecap: round; }
+.su-intro .su-close, .su-over .su-noacc { display: none; }
+
+.su-stage { position: absolute; left: 50%; top: calc(50% + var(--su-top) / 2); width: 410px; margin-left: -205px; transform: translateY(-50%) scale(var(--su-s)); }
+.su-kick { margin: 0 0 8px; font-size: 15px; color: var(--ink2); }
+.su-h { margin: 0 0 28px; font-size: 36px; line-height: 1.08; font-weight: 600; letter-spacing: -.022em; }
+.su-f { display: flex; align-items: center; gap: 10px; margin: 0 0 18px; padding: 0 14px 4px; height: 60px; border: 1.2px solid rgba(255, 255, 255, .32); border-radius: 14px; background: rgba(255, 255, 255, .07); min-width: 0; transition: border-color .4s var(--glide), background-color .4s var(--glide); }
+.su-f:hover { border-color: rgba(255, 255, 255, .5); }
+.su-f:focus-within { border-color: #fff; background: rgba(255, 255, 255, .12); }
+.su-f legend { padding: 0 6px; margin-left: -2px; font-size: 12.5px; color: rgba(255, 255, 255, .78); transition: color .4s var(--glide); }
+.su-f:focus-within legend { color: #fff; }
+.su-f input { flex: 1; min-width: 0; height: 100%; border: 0; outline: 0; background: none; color: #fff; font: 15.5px "Segoe UI Variable Display", "Segoe UI", system-ui, sans-serif; }
+.su-f input::placeholder { color: rgba(255, 255, 255, .42); }
+.su-f svg { flex: none; width: 20px; height: 20px; fill: none; stroke: rgba(255, 255, 255, .62); stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; }
+.su-eye { display: grid; place-items: center; } .su-eye:hover svg { stroke: #fff; }
+.su-hint { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; min-height: 18px; margin: -10px 2px 12px; font-size: 12.5px; color: rgba(255, 255, 255, .62); }
+.su-hint-t { flex: 1; min-width: 0; transition: color .4s var(--glide); }
+.su-hint-t.bad { color: #ffd6d6; }
+.su-hint-t.good { color: #bff5e6; }
+.su-forgot { flex: none; font-size: 12.5px; color: #fff; white-space: nowrap; }
+.su-forgot[hidden], .su-creds[hidden], .su-name[hidden] { display: none; }
+.su-main { display: block; width: 100%; height: 52px; border-radius: 14px; background: #fff; color: #17103f; font-weight: 600; font-size: 15.5px; box-shadow: 0 14px 30px -14px rgba(8, 2, 40, .6); transition: transform .35s var(--glide); }
+.su-main:hover { transform: scale(1.015); } .su-main:active { transform: scale(.985); }
+.su-or { display: flex; align-items: center; gap: 14px; margin: 24px 0 16px; font-size: 13px; color: var(--ink2); }
+.su-or::before, .su-or::after { content: ""; flex: 1; height: 1px; background: rgba(255, 255, 255, .2); }
+.su-soc { display: grid; grid-template-columns: repeat(4, 1fr); gap: 11px; }
+.su-way { height: 56px; border-radius: 14px; display: grid; place-items: center; transition: transform .4s var(--glide);
+  background: linear-gradient(160deg, rgba(255, 255, 255, .2), rgba(255, 255, 255, .07) 42%, rgba(255, 255, 255, .12));
+  -webkit-backdrop-filter: blur(14px) saturate(1.5) brightness(1.18); backdrop-filter: blur(14px) saturate(1.5) brightness(1.18);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, .2), inset 3px 4px 10px -4px rgba(255, 255, 255, .6), inset -3px -4px 12px -6px rgba(255, 255, 255, .3), 0 14px 30px -18px rgba(8, 2, 40, .7); }
+.su-way:hover { transform: translateY(-2px); }
+.su-way svg { width: 23px; height: 23px; fill: none; stroke: #fff; stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; }
+.su-soon { min-height: 18px; margin-top: 10px; text-align: center; font-size: 12.5px; color: #fff; opacity: 0; transition: opacity .4s var(--glide); }
+.su-soon.on { opacity: 1; }
+.su-honest { margin: 2px 0 0; text-align: center; font-size: 12px; color: rgba(255, 255, 255, .55); }
+.su-name .su-hint { margin-top: -6px; }
+
+.su-have, .su-noacc { position: absolute; bottom: 30px; font-size: 14.5px; color: var(--ink2); transition: opacity .4s var(--glide); }
+.su-have { left: 32px; } .su-have button { color: #fff; font-weight: 600; margin-left: 3px; }
+.su-have.gone { opacity: 0; pointer-events: none; }
+.su-noacc { right: 32px; color: #fff; font-weight: 500; transition: transform .35s var(--glide); } .su-noacc:hover { transform: translateX(3px); }
+.su button:focus-visible { outline: 2px solid #fff; outline-offset: 3px; }
+
+.su-scrim { position: absolute; inset: 0; background: rgba(9, 4, 30, .4); opacity: 0; pointer-events: none; transition: opacity .6s var(--glide); z-index: 4; }
+.su-scrim.on { opacity: 1; pointer-events: auto; }
+.su-sheet { position: absolute; left: 50%; top: calc(50% + var(--su-top) / 2); width: min(560px, calc(100% - 40px)); height: min(520px, calc(100% - var(--su-top) - 40px)); transform: translate(-50%, -50%);
+  border-radius: 30px; padding: 30px 32px; display: flex; flex-direction: column; z-index: 5; opacity: 0; pointer-events: none; overflow: hidden; background: rgba(32, 20, 76, .55);
+  -webkit-backdrop-filter: var(--lg, blur(14px)) saturate(1.5) brightness(1.18); backdrop-filter: var(--lg, blur(14px)) saturate(1.5) brightness(1.18);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, .2), inset 3px 4px 10px -4px rgba(255, 255, 255, .6), inset -3px -4px 12px -6px rgba(255, 255, 255, .3), 0 40px 90px -36px rgba(8, 2, 40, .75); transition: opacity .5s var(--glide); }
+.su-sheet.on { opacity: 1; pointer-events: auto; }
+.su-sheet h2 { margin: 0 0 14px; font-size: 26px; font-weight: 600; letter-spacing: -.015em; }
+.su-terms { flex: 1; min-height: 0; overflow-y: auto; font-size: 14.5px; line-height: 1.62; color: rgba(255, 255, 255, .82); outline: 0; padding-bottom: 36px;
+  -webkit-mask-image: linear-gradient(#000 calc(100% - 40px), transparent); mask-image: linear-gradient(#000 calc(100% - 40px), transparent); }
+.su-terms::-webkit-scrollbar { width: 6px; } .su-terms::-webkit-scrollbar-thumb { background: rgba(255, 255, 255, .25); border-radius: 6px; }
+.su-terms h3 { margin: 18px 0 4px; font-size: 14.5px; color: #fff; font-weight: 600; }
+.su-agree { flex: none; margin-top: 14px; height: 48px; border-radius: 24px; background: rgba(255, 255, 255, .14); color: rgba(255, 255, 255, .55); font-weight: 600; font-size: 15px; pointer-events: none;
+  transition: background-color .7s var(--glide), color .7s var(--glide), transform .3s var(--glide); }
+.su-agree.ready { background: #fff; color: #17103f; pointer-events: auto; } .su-agree.ready:hover { transform: scale(1.02); }
+@media (prefers-reduced-motion: reduce) { .su, .su * { transition-duration: .01s !important; } }
+
+/* Settings > Account */
+.set-sec .btn.danger { color: #ffd6d6; }

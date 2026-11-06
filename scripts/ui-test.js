@@ -9,6 +9,7 @@
 //   songs: 1            how many generated test songs to open on launch, as if opened from Explorer
 //   library(song)       returns a library.json to seed the data folder with before launch; song is a generated song's path
 //   args: [...]         extra command line arguments
+//   signup: true        keep the sign-up screen (every other run gets GLASS_NO_SIGNUP=1 and goes straight past it)
 //   env()               returns extra environment variables for the run (GLASS_SCAN_ROOTS, say), just before it launches
 // --shots saves a picture of each run's last moment. Every data folder is a fresh one under the system temp folder.
 const { spawn } = require('child_process');
@@ -65,6 +66,7 @@ function launch(run, i) {
     if (run.library) fs.writeFileSync(path.join(data, 'library.json'), JSON.stringify(run.library(testSong())));
     const shot = shotsDir ? path.join(shotsDir, `${run.name.replace(/[^\w-]+/g, '_')}.png`) : path.join(tmp, `run${i}.png`);
     const env = { ...process.env, GLASS_USERDATA: data, GLASS_SHOT: shot, GLASS_SIZE: run.size || '1240x800', GLASS_SHOT_DELAY: '30', GLASS_EVAL: wrap(run) };
+    if (!run.signup) env.GLASS_NO_SIGNUP = '1';      // the sign-up screen is only there for runs that ask (signup: true)
     if (run.env) Object.assign(env, run.env());
     delete env.GLASS_SCREEN;
     delete env.ELECTRON_RUN_AS_NODE;

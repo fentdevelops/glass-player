@@ -60,7 +60,7 @@
   let el = null, bg, cv, glass, words, hEl, pEl, go, skip, ticks, lyr, eq, tint;
   let k = 1, ox = 0, oy = 0;
   let step = -1, busy = false, leaving = false, inAccountStep = false, morph = null;
-  let finderDue = false, inFinder = false, finderPlace = null, finderStage = null;
+  let finderDue = false, inFinder = false, finderPlace = null, finderStage = null, accountStage = null;
   let timers = [], anims = [], ambRaf = 0, eqRaf = 0, lyT = 0, lyI = 0;
   const later = (fn, ms) => { timers.push(setTimeout(fn, ms)); };
   const clearTimers = () => { timers.forEach(clearTimeout); timers = []; };
@@ -221,11 +221,33 @@
     if (step < STEPS.length - 1) return goTo(step + 1);
     if (Intro.accountStep) {
       inAccountStep = true;
-      try { await Intro.accountStep(); } catch (e) { console.warn('Intro account step:', e); }
-      inAccountStep = false;
+      try {
+        // begin() takes the stage over (the words go, the shape becomes the logo): the step calls it only if it has a screen to show.
+        // A step with nothing to show returns at once, and then going on takes no extra turn.
+        const r = Intro.accountStep({ begin: () => (accountStage = accountStageNow()) });
+        if (r && typeof r.then === 'function') await r;
+      } catch (e) { console.warn('Intro account step:', e); }
+      inAccountStep = false; accountStage = null;
       if (!el) return;
     }
     leave();
+  }
+
+  // ---------- the sign-up screen (signup.js) borrows the stage: the words go, the one glass shape becomes the logo ----------
+  // Its layer sits inside the intro, above the background. shape() takes a box in window pixels.
+  function accountStageNow() {
+    clearTimers();
+    busy = false;
+    lyrOn(false); eqOn(false);
+    tint.style.opacity = 0;
+    for (const e of [go, skip]) e.style.pointerEvents = 'none';
+    for (const e of [hEl, pEl, go, skip, ticks]) animateWord(e, [{ opacity: getComputedStyle(e).opacity }, { opacity: 0, ...rise(-12) }], { duration: reduceMotion ? 240 : 340, easing: 'ease-in' });
+    return {
+      root: el, glass,
+      shape(b, inside) { shapeTo(b, inside || (() => {})); showView('lens'); },
+      put,
+      onResize: null,      // signup.js fills this in
+    };
   }
 
   // ---------- the song finder (firstrun.js) borrows the stage: the words, the button and the one glass shape ----------
@@ -286,6 +308,7 @@
     measure();
     if (leaving) { if (!reduceMotion) { morph?.cancel(); morph = null; put(sideBox()); } return; }
     morph?.cancel(); morph = null;
+    if (inAccountStep) { accountStage?.onResize?.(); return; }
     put(box(finderPlace || (step < 0 ? 'lens' : STEPS[step].v)));    // the shape's own resize watcher fits its glass once this settles
     if (inFinder) { finderStage?.onResize?.(); return; }
     if (step >= 0 && STEPS[step].v === 'lyr') lyrPaint();
@@ -340,6 +363,7 @@
     finderDue = false;
     page.classList.remove('intro-on', 'intro-hide');
     if (!el) return;
+    window.Signup?.abort();          // the sign-up screen, if it was the one showing
     window.FirstRun?.abandon();      // a scan that was getting ready for it, or the window itself if it was up
     clearTimers();
     cancelAnimationFrame(ambRaf); cancelAnimationFrame(eqRaf); clearInterval(lyT);
@@ -395,7 +419,7 @@
   }
 
   window.Intro = {
-    accountStep: null,      // a later task's sign-up screen: runs after the last screen, before entering the app. May return a promise.
+    accountStep: null,      // signup.js, the sign-up screen: runs after the last screen, before the song finder. Gets { begin() }, which hands it the stage; may return a promise.
     finderStep: null,       // firstrun.js, "Here's what we found": after any account step, before entering the app. Gets the stage, returns a promise.
     maybeShow() { if (wanted && !el) open(false); },
     replay() { if (!el) open(true); },
