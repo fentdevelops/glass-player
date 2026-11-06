@@ -105,7 +105,9 @@ function scoreFile(f) {
   // neighbours
   if (hasAlbum && f.albumNeighbours >= ALBUM_NEIGHBOURS) add(POINTS.album3);
 
-  const ticked = score >= THRESHOLD;
+  // Hard rule: a known length under 15 s is never ticked, whatever else the file has going for it.
+  const tooShortForSong = typeof f.duration === 'number' && f.duration > 0 && f.duration < VERY_SHORT_SECONDS;
+  const ticked = score >= THRESHOLD && !tooShortForSong;
   let reason = null;
   if (!ticked) {
     against.sort((a, b) => (b.named - a.named) || (a.pts - b.pts));

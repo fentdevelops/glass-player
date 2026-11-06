@@ -92,3 +92,10 @@ test('sfx folder and alarm names say sound effect', () => {
   assert(!r.ticked);
   assert.match(r.reason, /sound effect/);
 });
+
+test('under 15 seconds is never ticked, whatever the tags, album or folder', () => {
+  const r = scoreFile({ path: 'C:/m/a.mp3', duration: 10, title: 'T', artist: 'A', album: 'B', albumNeighbours: 9, inMusicFolder: true });
+  assert(!r.ticked);
+  assert.match(r.reason, /10 seconds/);
+  assert(scoreFile({ path: 'C:/m/a.mp3', duration: 16, title: 'T', artist: 'A', album: 'B', inMusicFolder: true }).ticked);
+});
