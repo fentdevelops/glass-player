@@ -247,8 +247,8 @@
   const pause = (ms) => new Promise((r) => setTimeout(r, ms));
   // focus only follows the song for someone on the keyboard: a mouse click shouldn't leave an outline on the next row
   let usingKeys = false;
-  addEventListener('keydown', (e) => { if (e.key === 'Tab' || e.key.startsWith('Arrow')) usingKeys = true; }, true);
-  addEventListener('pointerdown', () => { usingKeys = false; }, true);
+  addEventListener('keydown', (e) => { if (e.key === 'Tab' || e.key.startsWith('Arrow')) { usingKeys = true; document.body.classList.add('using-keys'); } }, true);
+  addEventListener('pointerdown', () => { usingKeys = false; document.body.classList.remove('using-keys'); }, true);
   // The glass glides from the colour it is to the one you picked, and out of colour altogether when you pick none.
   let tintRgb = null, tintA = 0, tintTrip = 0;
   function shiftTint(value) {
@@ -432,8 +432,8 @@
   }
 
   // ---------- volume: starts well below full, and remembers where you left it ----------
-  let vol = .4;
-  try { const v = parseFloat(localStorage.getItem('glassy.demoVolume')); if (v >= 0 && v <= 1) vol = v; } catch { /* no storage here */ }
+  let vol = .16;
+  try { const v = parseFloat(localStorage.getItem('glassy.volume')); if (v >= 0 && v <= 1) vol = v; } catch { /* no storage here */ }
 
   // ---------- the music: made here with Web Audio, so it's nobody's song ----------
   let ctx = null, out = null, dimLP = null, eqs = [], verbGain = null, verb = null, dry = null, an = null, hatBuf = null, data = null;
@@ -687,7 +687,7 @@
   volEl.addEventListener('input', () => {
     vol = volEl.value / 100;
     paintVol();
-    try { localStorage.setItem('glassy.demoVolume', String(vol)); } catch { /* it just won't be remembered */ }
+    try { localStorage.setItem('glassy.volume', String(vol)); } catch { /* it just won't be remembered */ }
     wantSound();      // moving the volume means you want to hear it
   });
   const track = $('.d-track');

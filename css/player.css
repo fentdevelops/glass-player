@@ -238,6 +238,8 @@ html:not(.js) .pin > .hero { position: static; padding-top: 90px; }
 .d-mute.lit { background: #fff !important; color: var(--night) !important; }
 
 .gp :focus-visible { outline: 2px solid #fff; outline-offset: 2px; }
+/* a slider always counts as focused once it's touched: its outline is only for someone on the keyboard */
+body:not(.using-keys) .gp input[type="range"]:focus-visible, body:not(.using-keys) .gp [role="slider"]:focus-visible { outline: none; }
 
 /* when the player's away, a small mute button stays */
 .mini-mute { position: fixed; right: 22px; bottom: 20px; z-index: 7; width: 44px; height: 44px; display: grid; place-items: center; padding: 0; border-radius: 50%; color: #fff; cursor: pointer; border: 1px solid rgba(255, 255, 255, .36); background: rgba(40, 24, 90, .55); box-shadow: 0 10px 26px rgba(13, 7, 38, .4), inset 0 1px 0 rgba(255, 255, 255, .4); opacity: 0; visibility: hidden; pointer-events: none; transform: translateY(10px); transition: opacity .4s, visibility .4s, transform .5s var(--glide), background-color .25s; }
