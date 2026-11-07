@@ -196,7 +196,7 @@
     const items = SONGS.map((s, i) => [s, i]);
     const shown = view === 'queue' ? [...items.slice(cur), ...items.slice(0, cur)] : items.filter(([s]) => !q || `${s.title} ${s.artist} ${s.album}`.toLowerCase().includes(q));
     if (view === 'search' && q) {
-      const found = appleFound.map((a) => `<button type="button" class="d-artist" data-artist="${a.artistId}"><b>${esc(a.artistName)}</b><small>${esc(a.primaryGenreName || 'Artist')}</small></button>`).join('');
+      const found = appleFound.map((a) => artistRow(a, 'data-artist')).join('');
       const head = appleBusy ? '<p class="d-none">Looking on Apple Music</p>' : appleFailed ? '<p class="d-none">Apple Music isn\'t answering. Try again in a moment.</p>' : found ? `<p class="d-sub">Artists on Apple Music</p>${found}` : '';
       list.innerHTML = head + (shown.length ? `${found ? '<p class="d-sub">Already here</p>' : ''}${shown.map(([s, i]) => row(s, i)).join('')}` : head ? '' : '<p class="d-none">Nothing by that name.</p>');
       return;
@@ -206,12 +206,40 @@
   // ---------- any artist: pick one, then their top songs or an album. 30-second previews from Apple Music. ----------
   // The browser asks Apple directly. There's no account or key, and only what's typed in the box is sent.
   const ITUNES = 'https://itunes.apple.com';
+  let waitingForArtist = false;      // picked on the way in: silence until their songs are here, not a moment of something else
   let appleFound = [], appleBusy = false, appleFailed = false, appleAsk = 0, appleTimer = 0, appleNow = null, demoSongs = null;
   const itunes = async (path, params) => {
     const r = await fetch(`${ITUNES}/${path}?${new URLSearchParams(params)}`);
     if (!r.ok) throw new Error('Apple Music said no');
     return (await r.json()).results || [];
   };
+  // Apple has no artist photos here, so an artist's icon is one of their album covers. All of them are asked for in one request: Apple allows about 20 a minute.
+  const artistIcons = new Map(), artistSearches = new Map();
+  const searchArtists = (term) => {
+    const key = term.toLowerCase();
+    if (!artistSearches.has(key)) {
+      const asking = itunes('search', { term, entity: 'musicArtist', limit: 5 });
+      asking.catch(() => artistSearches.delete(key));
+      artistSearches.set(key, asking);
+    }
+    return artistSearches.get(key);
+  };
+  async function loadIcons(rows) {
+    const ids = rows.map((a) => a.artistId).filter((id) => !artistIcons.has(id));
+    if (!ids.length) return false;
+    ids.forEach((id) => artistIcons.set(id, ''));
+    const found = await itunes('lookup', { id: ids.join(','), entity: 'album', limit: 3 }).catch(() => []);
+    // each artist comes back followed by their albums, and an album can be credited to someone else, so it's the order that says whose it is
+    let any = false, whose = null;
+    for (const a of found) {
+      if (a.wrapperType === 'artist') { whose = a.artistId; continue; }
+      const id = whose ?? a.artistId;
+      if (a.wrapperType === 'collection' && a.artworkUrl100 && !artistIcons.get(id)) { artistIcons.set(id, String(a.artworkUrl100).replace('100x100', '120x120')); any = true; }
+    }
+    return any;
+  }
+  const artistFace = (a) => { const url = artistIcons.get(a.artistId); return `<span class="d-face" aria-hidden="true">${url ? `<img src="${esc(url)}" alt="">` : esc(String(a.artistName).trim()[0] || '').toUpperCase()}</span>`; };
+  const artistRow = (a, attr) => `<button type="button" class="d-artist" ${attr}="${a.artistId}">${artistFace(a)}<span><b>${esc(a.artistName)}</b><small>${esc(a.primaryGenreName || 'Artist')}</small></span></button>`;
   function searchApple(text) {
     clearTimeout(appleTimer);
     const me = ++appleAsk, term = text.trim();
@@ -219,11 +247,12 @@
     if (!appleBusy) return;
     appleTimer = setTimeout(async () => {
       let rows = [], failed = false;
-      try { rows = await itunes('search', { term, entity: 'musicArtist', limit: 5 }); } catch { failed = true; }
+      try { rows = await searchArtists(term); } catch { failed = true; }
       if (me !== appleAsk) return;
       appleBusy = false; appleFailed = failed; appleFound = rows;
       if (view === 'search') paintList();
-    }, 320);
+      if (await loadIcons(rows) && me === appleAsk && view === 'search') paintList();
+    }, 400);
   }
   const songsFrom = (rows) => rows.filter((t) => t.wrapperType === 'track' && t.kind === 'song' && t.previewUrl);
   // Apple's list mixes in songs they only feature on: their own come first, and the same song on two records shows once
@@ -249,7 +278,7 @@
         byName.set(name, a); ALBUMS.push(a);
       }
       const a = byName.get(name);
-      SONGS.push({ title: censor(t.trackName), secs: 30, artist: t.artistName, album: name, art: a.art, a, seed: i + 1, clip: true, apple: true, link: t.trackViewUrl, q: '30s', lyricsAsked: true, lyricsDone: true, versions: { m4a: t.previewUrl, mp3: t.previewUrl, wav: t.previewUrl }, start: 0 });
+      SONGS.push({ title: censor(t.trackName), secs: 30, artist: t.artistName, album: name, art: a.art, a, seed: i + 1, clip: true, apple: true, link: t.trackViewUrl, q: '30s', real: { title: String(t.trackName).replace(/\s*[([]feat\.?[^)\]]*[)\]]/i, ''), artist: t.artistName, album: t.collectionName || '', full: (t.trackTimeMillis || 0) / 1000 }, versions: { m4a: t.previewUrl, mp3: t.previewUrl, wav: t.previewUrl }, start: 0 });
     });
     userPaused = false;
     cur = 0; pos = 0; query = ''; appleFound = []; $('.d-find').value = '';
@@ -317,7 +346,7 @@
     const s = song(), hadFocus = usingKeys && !!document.activeElement?.closest?.('.d-list');
     $('.d-cover').style.background = s.art;
     $('.d-dk-art').style.background = s.art;
-    $('.d-credit').textContent = s.apple ? 'Preview provided courtesy of iTunes' : s.clip ? `All rights reserved to ${s.artist}` : 'Made up for this demo';
+    $('.d-credit').textContent = s.apple ? 'Preview courtesy of iTunes. Lyric timing is approximate.' : s.clip ? `All rights reserved to ${s.artist}` : 'Made up for this demo';
     const badge = $('.d-cover-badge');
     badge.hidden = !s.apple;
     if (s.apple) badge.href = s.link || 'https://music.apple.com/';
@@ -333,6 +362,23 @@
   // Lyrics never show a bad word in full: first and last letter, stars between. Runs on every line before it's stored.
   const ROUGH = /\b\w*(?:n+[i1!]+gg+\w*|f+u+c+k+\w*|f+[*]?ck\w*|sh+[i1!]+t+\w*|b+[i1!]+t+c+h+\w*|c+u+n+t+\w*|p+u+s+s+y+|p+u+s+s+i+e+s+|m+o+t+h+[ae]+\w*f+\w*)|\b(?:ass|asses|asshole\w*|dumbass|badass|hoe|hoes|ho|dick|dicks|cock|cocks|whore\w*|slut\w*|fag|fags|faggot\w*|bastard\w*|damn|goddamn|retard\w*|thot|thots|tit|tits|titties)\b/gi;
   const censor = (line) => String(line).replace(ROUGH, (w) => (w.length < 3 ? `${w[0]}*` : w[0] + '*'.repeat(w.length - 2) + w[w.length - 1]));
+  // Apple doesn't say which 30 seconds a preview is, and previews usually sit around the hook. So this starts at the first time the most repeated line comes round.
+  // It's a good guess and no more, which is why the player says the timing is approximate.
+  function guessPreviewStart(text, full, secs) {
+    const seen = new Map();
+    for (const row of text.split('\n')) {
+      const m = /^\[(\d+):(\d+(?:\.\d+)?)\](.*)$/.exec(row.trim());
+      if (!m) continue;
+      const words = m[3].trim().toLowerCase().replace(/[^\p{L}\p{N} ]/gu, '');
+      if (!words) continue;
+      if (!seen.has(words)) seen.set(words, { n: 0, t: +m[1] * 60 + +m[2] });
+      seen.get(words).n++;
+    }
+    let hook = null;
+    for (const v of seen.values()) if (v.n > 1 && (!hook || v.n > hook.n)) hook = v;
+    const start = hook ? hook.t - 2 : (full || 180) * .3;
+    return Math.max(0, Math.min(start, Math.max(0, (full || 180) - secs)));
+  }
   // Synced lyrics for a real song come from LRCLIB when it's played, the same as the app, moved to fit the preview
   function fetchLyrics(s) {
     if (s.lyricsAsked) return;
@@ -343,6 +389,7 @@
       .then((text) => text || fetch(`https://lrclib.net/api/search?${new URLSearchParams({ track_name: s.real.title, artist_name: s.real.artist })}`).then((r) => (r.ok ? r.json() : [])).then((rows) => lrc(rows.find((x) => x.syncedLyrics))))
       .then((text) => {
         if (!text) { s.lines = null; return; }
+        if (s.apple) s.start = guessPreviewStart(text, s.real.full, s.secs);
         const lines = [];
         for (const row of text.split('\n')) {
           const m = /^\[(\d+):(\d+(?:\.\d+)?)\](.*)$/.exec(row.trim());
@@ -362,7 +409,7 @@
     box.innerHTML = rows.map((w, i) => `<button type="button" data-l="${i}">${esc(w)}</button>`).join('');
     box.style.transform = '';
     none.hidden = rows.length > 0;
-    none.textContent = s.apple ? 'Lyrics stay with the full song. Glassy shows them when you play your own copy.' : s.lyricsDone ? 'No synced lyrics found for this part of the song.' : 'Looking for the lyrics.';
+    none.textContent = s.lyricsDone ? 'No synced lyrics found for this part of the song.' : 'Looking for the lyrics.';
     lastLine = -1;
   }
   const setField = (k, v) => { $(`.d-e-${k}`).textContent = v; };
@@ -737,7 +784,7 @@
     if (!ctx) return;
     // faint and muffled at both ends: the first screen, and the bottom of whatever page you're on
     const near = stage ? clamp(f / 1.1) * (1 - clamp(f - 5)) : .62 * (1 - pageEnd);
-    const gain = soundOn && playing ? vol * mix(.3, 1, near) : 0;
+    const gain = soundOn && playing && !waitingForArtist ? vol * mix(.3, 1, near) : 0;
     if (Math.abs(gain - gainNow) > .002) { gainNow = gain; out.gain.setTargetAtTime(gain, ctx.currentTime, .09); }
     // off in another tab or window it goes muffled, and comes back when you do. It never gets clearer than it already was.
     const cut = tabAway ? Math.min(500, 500 * 40 ** (stage ? near : .8 * (1 - pageEnd))) : 500 * 40 ** (stage ? near : .8 * (1 - pageEnd));
@@ -1594,12 +1641,12 @@
       if (term.length < 2) { closeResults(); return; }
       findTimer = setTimeout(async () => {
         let rows = [], failed = false;
-        try { rows = await itunes('search', { term, entity: 'musicArtist', limit: 5 }); } catch { failed = true; }
+        try { rows = await searchArtists(term); } catch { failed = true; }
         if (me !== findAsk || !g.isConnected) return;
-        results.innerHTML = failed ? '<p>Apple Music isn\'t answering. You can still go in without it.</p>' : rows.length ? rows.map((a) => `<button type="button" data-id="${a.artistId}"><b>${esc(a.artistName)}</b><small>${esc(a.primaryGenreName || 'Artist')}</small></button>`).join('') : '<p>Nobody by that name.</p>';
-        results.hidden = false;
-        rows.forEach((a) => artistData(a.artistId).catch(() => {}));      // ready the moment one's picked
-      }, 300);
+        const paint = () => { results.innerHTML = failed ? '<p>Apple Music isn\'t answering. You can still go in without it.</p>' : rows.length ? rows.map((a) => artistRow(a, 'data-id')).join('') : '<p>Nobody by that name.</p>'; results.hidden = false; };
+        paint();
+        if (await loadIcons(rows) && me === findAsk && g.isConnected) paint();
+      }, 400);
     });
     find.addEventListener('keydown', (e) => {
       if (e.key !== 'Enter') return;
@@ -1609,7 +1656,7 @@
     });
     results.addEventListener('click', (e) => { const b = e.target.closest('button'); if (b) pickIt(+b.dataset.id, b.querySelector('b').textContent); });
     const leave = (withSound) => {
-      if (withSound) { startMusic(); if (picked) pickArtist(picked.id, picked.name); } else { declined = true; body.classList.add('music-on'); }
+      if (withSound) { if (picked) waitingForArtist = true; startMusic(); if (picked) pickArtist(picked.id, picked.name).finally(() => { waitingForArtist = false; }); } else { declined = true; body.classList.add('music-on'); }
       heroUntil = performance.now() + 1600;
       hide.forEach((e) => { e.inert = false; });
       body.classList.remove('gate-up');

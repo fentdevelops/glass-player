@@ -124,7 +124,10 @@ html:not(.js) .pin > .hero { position: static; padding-top: 90px; }
 .d-apple-link { display: block; justify-self: start; line-height: 0; }
 .d-apple-link img { display: block; width: 125px; height: 42px; }
 .d-apple-back { justify-self: start; font-size: 12.5px !important; color: rgba(255, 255, 255, .86) !important; text-decoration: underline !important; text-underline-offset: 2px; }
-.d-artist { display: grid; width: 100%; padding: 8px 10px !important; border-radius: 12px; text-align: left; transition: background-color .2s; }
+.d-artist { display: grid; grid-template-columns: 44px 1fr; align-items: center; gap: 12px; width: 100%; padding: 7px 10px !important; border-radius: 12px; text-align: left; transition: background-color .2s; }
+.d-artist > span:last-child { display: grid; min-width: 0; }
+.d-face { display: grid; place-items: center; width: 44px; height: 44px; border-radius: 50%; overflow: hidden; font-size: 18px; font-weight: 600; color: #fff; background: linear-gradient(140deg, #4aa8ff, #7a3be0 55%, #f2589c); box-shadow: inset 0 0 0 1px rgba(255, 255, 255, .26); }
+.d-face img { display: block; width: 100%; height: 100%; object-fit: cover; }
 .d-artist:hover { background: rgba(255, 255, 255, .13) !important; }
 .d-artist b { font-weight: 600; font-size: 15px; }
 .d-artist small { font-size: 12.5px; color: rgba(255, 255, 255, .72); }
@@ -353,7 +356,7 @@ body.glass-gpu .gate-card { background: none; box-shadow: 0 40px 100px rgba(13, 
 .gate-find input:focus { border-color: #fff; background: rgba(13, 7, 38, .48); }
 .gate-results { position: absolute; left: 0; right: 0; top: calc(100% + 6px); z-index: 5; padding: 6px; display: grid; gap: 2px; border-radius: 16px; text-align: left; background: #24124f; box-shadow: 0 24px 60px rgba(13, 7, 38, .65), inset 0 0 0 1px rgba(255, 255, 255, .26); }
 .gate-results[hidden] { display: none; }
-.gate-results button { display: grid; width: 100%; padding: 9px 12px; border: 0; border-radius: 11px; font: inherit; color: #fff; text-align: left; background: none; cursor: pointer; }
+.gate-results button { width: 100%; padding: 8px 10px; border: 0; border-radius: 11px; font: inherit; color: #fff; text-align: left; background: none; cursor: pointer; }
 .gate-results button:hover, .gate-results button:focus-visible { background: rgba(255, 255, 255, .14); }
 .gate-results b { font-size: 15.5px; font-weight: 600; }
 .gate-results small { font-size: 12.5px; color: rgba(255, 255, 255, .72); }
