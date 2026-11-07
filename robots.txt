@@ -1,0 +1,3 @@
+User-agent: *
+Allow: /
+Sitemap: https://fentdevelops.github.io/glass-player/sitemap.xml
