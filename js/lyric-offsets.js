@@ -1,2 +1,2 @@
-// Written by scripts/lyric-offsets.py: Apple's song and album ids, and the second the 30-second preview starts at. Only numbers.
-window.LYRIC_OFFSETS = {"songs":{},"albums":{},"exact":{"1440887343":45.0}};
+// Written by scripts/lyric-offsets.py and scripts/exact-offsets.py: Apple's song and album ids, and the second the 30-second preview starts at. Only numbers.
+window.LYRIC_OFFSETS = {"songs":{},"albums":{},"exact":{"1440887343":45.0},"exactSongs":{"1363308560":93.99,"1729919657":93.99,"1550878103":93.99,"1550875234":93.99,"1363310482":93.99,"1482217453":48.0,"1440842700":44.98,"1440870375":44.98,"1677005489":44.98,"1550878097":44.98,"1440841384":47.0,"1444879255":47.01,"1440843496":47.0,"1440838708":153.0}};

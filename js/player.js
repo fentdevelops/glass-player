@@ -369,7 +369,7 @@
   const censor = (line) => String(line).replace(ROUGH, (w) => (w.length < 3 ? `${w[0]}*` : w[0] + '*'.repeat(w.length - 2) + w[w.length - 1]));
   // Where a preview sits in its song is different from album to album, and Apple doesn't say. scripts/lyric-offsets.py measures it.
   // A line only lights up when it's been measured for this song or its album. Everything else gets the words to read, with no lit line, so it can never be wrong.
-  const measuredStart = (s) => { const m = window.LYRIC_OFFSETS; return m?.exact?.[s.albumId] ?? m?.songs?.[s.appleId] ?? m?.albums?.[s.albumId] ?? null; };
+  const measuredStart = (s) => { const m = window.LYRIC_OFFSETS; return m?.exactSongs?.[s.appleId] ?? m?.exact?.[s.albumId] ?? m?.songs?.[s.appleId] ?? m?.albums?.[s.albumId] ?? null; };
   // Synced lyrics for a real song come from LRCLIB when it's played, the same as the app, moved to fit the preview
   function fetchLyrics(s) {
     if (s.lyricsAsked) return;
