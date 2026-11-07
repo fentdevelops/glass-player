@@ -1402,6 +1402,7 @@
   function entrance() {
     // every time the site is opened or reloaded; moving between its pages doesn't count
     body.classList.add('gate-up');
+    document.documentElement.classList.remove('opening');
     const hide = [$('main'), $('.top'), $('.foot'), scene, $('.skip'), miniMute];
     hide.forEach((e) => { e.inert = true; });
     const g = document.createElement('div');
