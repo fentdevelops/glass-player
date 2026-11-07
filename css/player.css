@@ -115,11 +115,28 @@ html:not(.js) .pin > .hero { position: static; padding-top: 90px; }
 .d-find:focus { border-color: rgba(255, 255, 255, .7); }
 .d-find[hidden] { display: none; }
 /* any artist, from Apple Music */
-.d-apple { margin: 0 4px 8px; display: grid; gap: 7px; }
+.d-apple { position: relative; z-index: 10 !important; margin: 0 4px 8px; display: grid; gap: 7px; }
 .d-apple[hidden], .d-apple-back[hidden] { display: none; }
-.d-albpick { display: grid; gap: 3px; font-size: 12px; color: rgba(255, 255, 255, .76); }
-.d-albsel { width: 100%; height: 40px; border-radius: 12px; padding: 0 12px; font: inherit; font-size: 14px; font-weight: 600; color: #fff; background: rgba(13, 7, 38, .4); border: 1px solid rgba(255, 255, 255, .34); cursor: pointer; }
-.d-albsel option { color: #fff; background: #24124f; }
+.d-albpick { position: relative; z-index: 8; display: grid; gap: 3px; }
+.d-alblabel { font-size: 12px; color: rgba(255, 255, 255, .76); }
+.d-albbtn { display: flex !important; align-items: center; justify-content: space-between; gap: 10px; width: 100%; height: 42px; padding: 0 12px 0 14px !important; border-radius: 13px; background: rgba(255, 255, 255, .1) !important; box-shadow: inset 0 0 0 1px rgba(255, 255, 255, .34), inset 0 1px 0 rgba(255, 255, 255, .4); transition: background-color .2s; }
+.d-albbtn:hover { background: rgba(255, 255, 255, .17) !important; }
+.d-albbtn b { min-width: 0; overflow: hidden; font-size: 14px; font-weight: 600; white-space: nowrap; text-overflow: ellipsis; }
+.d-albbtn svg { flex: none; width: 18px; height: 18px; fill: none; stroke: #fff; stroke-width: 2.2; stroke-linecap: round; stroke-linejoin: round; transition: transform .25s var(--glide); }
+.d-albbtn[aria-expanded="true"] svg { transform: rotate(180deg); }
+/* the dropdowns: glass, not the browser's own list. Without the real glass they're plain and dark. */
+.d-albmenu { position: absolute; left: 0; right: 0; top: calc(100% + 6px); z-index: 9; height: min(380px, 56vh); overflow: hidden; border-radius: 18px; background: #24124f; box-shadow: 0 26px 60px rgba(13, 7, 38, .55), inset 0 0 0 1px rgba(255, 255, 255, .34), inset 0 1px 0 rgba(255, 255, 255, .55); animation: drop-in .3s var(--glide) both; }
+.d-albmenu[hidden] { display: none; }
+@keyframes drop-in { from { opacity: 0; transform: translateY(-6px) scale(.98); } }
+.d-albmenu canvas, .gate-results canvas { position: absolute; inset: 0; z-index: 0; display: block; width: 100%; height: 100%; pointer-events: none; border-radius: inherit; }
+body.glass-gpu .d-albmenu, body.glass-gpu .gate-results { background: none; }
+.d-albscroll { position: relative; z-index: 1; height: 100%; overflow-y: auto; padding: 6px; scrollbar-width: thin; scrollbar-color: rgba(255, 255, 255, .4) transparent; }
+.d-albhead { margin: 10px 10px 4px; font-size: 12px; font-weight: 600; color: rgba(255, 255, 255, .72); }
+.d-albitem { display: grid; width: 100%; padding: 8px 10px !important; border-radius: 11px; text-align: left; transition: background-color .18s; }
+.d-albitem:hover, .d-albitem:focus-visible { background: rgba(255, 255, 255, .16) !important; }
+.d-albitem.on { background: rgba(255, 255, 255, .24) !important; }
+.d-albitem b { font-size: 14px; font-weight: 600; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.d-albitem small { font-size: 12px; color: rgba(255, 255, 255, .72); }
 .d-apple-note { font-size: 12px; line-height: 1.35; color: rgba(255, 255, 255, .76); }
 .d-apple-link { display: block; justify-self: start; line-height: 0; }
 .d-apple-link img { display: block; width: 125px; height: 42px; }
@@ -157,9 +174,11 @@ html:not(.js) .pin > .hero { position: static; padding-top: 90px; }
 .p-lyr { width: 540px; height: 470px; padding: 0 26px; }
 /* the clip reaches past the words, so the bright line's glow fades out instead of being cut in a straight line */
 .d-ly { position: relative; height: 100%; margin-inline: -20px; overflow: clip; -webkit-mask-image: linear-gradient(transparent, #000 22%, #000 78%, transparent); mask-image: linear-gradient(transparent, #000 22%, #000 78%, transparent); }
-.d-ly-in { position: absolute; left: 20px; right: 20px; top: 0; transition: transform .9s var(--glide); }
-.d-ly-in button { display: block; width: 100%; text-align: left; padding: 8px 0; font-size: 29px; line-height: 1.16; font-weight: 700; letter-spacing: -.012em; color: rgba(255, 255, 255, .42); transition: color .5s, transform .6s var(--glide); transform-origin: left center; }
+.d-ly-in { position: absolute; left: 20px; right: 20px; top: 0; transition: transform .45s var(--glide); }
+.d-ly-in button { display: block; width: 100%; text-align: left; padding: 8px 0; font-size: 29px; line-height: 1.16; font-weight: 700; letter-spacing: -.012em; color: rgba(255, 255, 255, .42); transition: color .22s, transform .3s var(--glide); transform-origin: left center; }
 .d-ly-in button:hover { color: rgba(255, 255, 255, .7); }
+.d-ly-in.plain { transition: none; }
+.d-ly-plain { padding: 6px 0; font-size: 25px; line-height: 1.18; font-weight: 700; letter-spacing: -.012em; color: rgba(255, 255, 255, .82); }
 .d-ly-in button.near { color: rgba(255, 255, 255, .58); }
 .d-ly-in button.on { color: #fff; transform: scale(1.05); text-shadow: 0 0 26px rgba(255, 255, 255, .4); }
 .d-ly-none { position: absolute; left: 20px; right: 20px; top: 50%; transform: translateY(-50%); font-size: 22px; font-weight: 600; line-height: 1.3; color: rgba(255, 255, 255, .86); }
@@ -356,6 +375,8 @@ body.glass-gpu .gate-card { background: none; box-shadow: 0 40px 100px rgba(13, 
 .gate-find input:focus { border-color: #fff; background: rgba(13, 7, 38, .48); }
 .gate-results { position: absolute; left: 0; right: 0; top: calc(100% + 6px); z-index: 5; padding: 6px; display: grid; gap: 2px; border-radius: 16px; text-align: left; background: #24124f; box-shadow: 0 24px 60px rgba(13, 7, 38, .65), inset 0 0 0 1px rgba(255, 255, 255, .26); }
 .gate-results[hidden] { display: none; }
+.gate-results > :not(canvas) { position: relative; z-index: 1; }
+.gate-results { overflow: hidden; }
 .gate-results button { width: 100%; padding: 8px 10px; border: 0; border-radius: 11px; font: inherit; color: #fff; text-align: left; background: none; cursor: pointer; }
 .gate-results button:hover, .gate-results button:focus-visible { background: rgba(255, 255, 255, .14); }
 .gate-results b { font-size: 15.5px; font-weight: 600; }
