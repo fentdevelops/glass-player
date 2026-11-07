@@ -306,7 +306,8 @@
       if (e.pointerType === 'touch') return;
       const h = hero.getBoundingClientRect(), w = lens.offsetWidth, t = lens.offsetHeight;
       const dx = e.clientX - (h.left + home.x + w / 2), dy = e.clientY - (h.top + home.y + t / 2);
-      if (Math.abs(dx) > w / 2 || Math.abs(dy) > t / 2) return release();
+      // nothing behind the entrance reacts: the word isn't showing yet
+      if (document.body.classList.contains('gate-up') || Math.abs(dx) > w / 2 || Math.abs(dy) > t / 2) return release();
       lens.classList.add('on');
       if (still) return;
       const d = Math.hypot(dx, dy), r = MAX * Math.tanh(d / 260);
