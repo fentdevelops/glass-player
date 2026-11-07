@@ -72,13 +72,13 @@
         <button type="button" data-view="library" role="tab">Library</button>
       </div>
       <h3 class="d-side-h"></h3>
-      <input class="d-find" type="text" placeholder="Search any artist" aria-label="Search any artist" spellcheck="false">
+      <input class="d-find" type="text" placeholder="Search these songs" aria-label="Search these songs" spellcheck="false">
       <div class="d-apple" hidden>
-        <div class="d-albpick"><span class="d-alblabel">Playing</span><button type="button" class="d-albbtn" aria-haspopup="listbox" aria-expanded="false"><b></b><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9.500l6 6 6-6"/></svg></button><div class="d-albmenu" hidden><div class="d-albscroll" role="listbox" aria-label="Top songs or an album"></div></div></div>
         <p class="d-apple-note">30-second previews provided courtesy of iTunes.</p>
         <a class="d-apple-link" target="_blank" rel="noopener" aria-label="Listen on Apple Music"><img src="https://tools.applemediaservices.com/api/badges/listen-on-apple-music/badge/en-us?size=250x83" alt="Listen on Apple Music" width="125" height="42" loading="lazy" referrerpolicy="no-referrer"></a>
         <button type="button" class="d-apple-back">Back to the demo songs</button>
       </div>
+      <button type="button" class="d-apple-go" hidden>Play real songs from Apple Music</button>
       <div class="d-list"></div>
     </section>
     <section class="gp p-lyr" data-p="lyr" aria-label="Lyrics">
@@ -195,78 +195,39 @@
     const q = query.trim().toLowerCase();
     const items = SONGS.map((s, i) => [s, i]);
     const shown = view === 'queue' ? [...items.slice(cur), ...items.slice(0, cur)] : items.filter(([s]) => !q || `${s.title} ${s.artist} ${s.album}`.toLowerCase().includes(q));
-    if (view === 'search' && q) {
-      const found = appleFound.map((a) => artistRow(a, 'data-artist')).join('');
-      const head = appleBusy ? '<p class="d-none">Looking on Apple Music</p>' : appleFailed ? '<p class="d-none">Apple Music isn\'t answering. Try again in a moment.</p>' : found ? `<p class="d-sub">Artists on Apple Music</p>${found}` : '';
-      list.innerHTML = head + (shown.length ? `${found ? '<p class="d-sub">Already here</p>' : ''}${shown.map(([s, i]) => row(s, i)).join('')}` : head ? '' : '<p class="d-none">Nothing by that name.</p>');
+    if (view === 'search' && (appleBusy || appleFailed)) {
+      list.innerHTML = appleBusy ? '<p class="d-none">Getting the songs from Apple Music</p>' : '<p class="d-none">Apple Music isn\'t answering. Try again in a moment.</p>';
       return;
     }
     list.innerHTML = shown.length ? shown.map(([s, i]) => row(s, i)).join('') : '<p class="d-none">No songs match that.</p>';
   }
-  // ---------- any artist: pick one, then their top songs or an album. 30-second previews from Apple Music. ----------
-  // The browser asks Apple directly. There's no account or key, and only what's typed in the box is sent.
+  // ---------- real songs: a short list, as 30-second previews from Apple Music ----------
+  // Only songs whose preview has been matched against the full song are here, so every one gets lyrics lit on time.
+  // They're Apple's song ids (the numbers are in lyric-offsets.js too). The browser asks Apple for the rest. There's no account or key.
+  const PICKS = ['1363308560', '1482217453', '1440842700', '1440870375', '1440841384', '1440838708'];
   const ITUNES = 'https://itunes.apple.com';
-  let waitingForArtist = false;      // picked on the way in: silence until their songs are here, not a moment of something else
-  let appleChoice = 'top', appleFound = [], appleBusy = false, appleFailed = false, appleAsk = 0, appleTimer = 0, appleNow = null, demoSongs = null;
+  let waitingForArtist = false;      // a song picked on the way in: silence until it's here, not a moment of something else
+  let appleBusy = false, appleFailed = false, demoSongs = null, picksAsked = null;
   const itunes = async (path, params) => {
     const r = await fetch(`${ITUNES}/${path}?${new URLSearchParams(params)}`);
     if (!r.ok) throw new Error('Apple Music said no');
     return (await r.json()).results || [];
   };
-  // Apple has no artist photos here, so an artist's icon is one of their album covers. All of them are asked for in one request: Apple allows about 20 a minute.
-  const artistIcons = new Map(), artistSearches = new Map();
-  const searchArtists = (term) => {
-    const key = term.toLowerCase();
-    if (!artistSearches.has(key)) {
-      const asking = itunes('search', { term, entity: 'musicArtist', limit: 5 });
-      asking.catch(() => artistSearches.delete(key));
-      artistSearches.set(key, asking);
-    }
-    return artistSearches.get(key);
-  };
-  async function loadIcons(rows) {
-    const ids = rows.map((a) => a.artistId).filter((id) => !artistIcons.has(id));
-    if (!ids.length) return false;
-    ids.forEach((id) => artistIcons.set(id, ''));
-    const found = await itunes('lookup', { id: ids.join(','), entity: 'album', limit: 3 }).catch(() => []);
-    // each artist comes back followed by their albums, and an album can be credited to someone else, so it's the order that says whose it is
-    let any = false, whose = null;
-    for (const a of found) {
-      if (a.wrapperType === 'artist') { whose = a.artistId; continue; }
-      const id = whose ?? a.artistId;
-      if (a.wrapperType === 'collection' && a.artworkUrl100 && !artistIcons.get(id)) { artistIcons.set(id, String(a.artworkUrl100).replace('100x100', '120x120')); any = true; }
-    }
-    return any;
-  }
-  const artistFace = (a) => { const url = artistIcons.get(a.artistId); return `<span class="d-face" aria-hidden="true">${url ? `<img src="${esc(url)}" alt="">` : esc(String(a.artistName).trim()[0] || '').toUpperCase()}</span>`; };
-  const artistRow = (a, attr) => `<button type="button" class="d-artist" ${attr}="${a.artistId}">${artistFace(a)}<span><b>${esc(a.artistName)}</b><small>${esc(a.primaryGenreName || 'Artist')}</small></span></button>`;
-  function searchApple(text) {
-    clearTimeout(appleTimer);
-    const me = ++appleAsk, term = text.trim();
-    appleFound = []; appleFailed = false; appleBusy = term.length >= 2;
-    if (!appleBusy) return;
-    appleTimer = setTimeout(async () => {
-      let rows = [], failed = false;
-      try { rows = await searchArtists(term); } catch { failed = true; }
-      if (me !== appleAsk) return;
-      appleBusy = false; appleFailed = failed; appleFound = rows;
-      if (view === 'search') paintList();
-      if (await loadIcons(rows) && me === appleAsk && view === 'search') paintList();
-    }, 400);
-  }
   const songsFrom = (rows) => rows.filter((t) => t.wrapperType === 'track' && t.kind === 'song' && t.previewUrl);
-  // Apple's list mixes in songs they only feature on: their own come first, and the same song on two records shows once
-  function topSongs(rows, name) {
-    const own = (t) => String(t.artistName).toLowerCase() === String(name).toLowerCase(), seen = new Set();
-    return [...songsFrom(rows).filter(own), ...songsFrom(rows).filter((t) => !own(t))].filter((t) => {
-      const key = String(t.trackName).toLowerCase().replace(/\s*[([].*$/, '');
-      if (seen.has(key)) return false;
-      seen.add(key);
-      return true;
-    }).slice(0, 25);
+  // one request for all of them, in the order above
+  function loadPicks() {
+    if (!picksAsked) {
+      picksAsked = itunes('lookup', { id: PICKS.join(',') }).then((rows) => {
+        const got = songsFrom(rows);
+        return PICKS.map((id) => got.find((t) => String(t.trackId) === id)).filter(Boolean);
+      });
+      picksAsked.catch(() => { picksAsked = null; });
+    }
+    return picksAsked;
   }
+  const pickCover = (t) => String(t.artworkUrl100 || '').replace('100x100', '120x120');
   // puts these songs in the player, in place of what was there. The demo songs wait to come back.
-  function playApple(rows) {
+  function playApple(rows, start = 0) {
     if (!rows.length) return false;
     demoSongs ||= { albums: [...ALBUMS], songs: [...SONGS] };
     ALBUMS.length = 0; SONGS.length = 0;
@@ -281,71 +242,34 @@
       SONGS.push({ title: censor(t.trackName), secs: 30, artist: t.artistName, album: name, art: a.art, a, seed: i + 1, clip: true, apple: true, link: t.trackViewUrl, q: '30s', appleId: String(t.trackId), albumId: String(t.collectionId), real: { title: String(t.trackName).replace(/\s*[([]feat\.?[^)\]]*[)\]]/i, ''), artist: t.artistName, album: t.collectionName || '', full: (t.trackTimeMillis || 0) / 1000 }, versions: { m4a: t.previewUrl, mp3: t.previewUrl, wav: t.previewUrl }, start: 0 });
     });
     userPaused = false;
-    cur = 0; pos = 0; query = ''; appleFound = []; $('.d-find').value = '';
+    cur = clamp(start, 0, SONGS.length - 1); pos = 0; query = ''; $('.d-find').value = '';
     wantSound();
-    go(0);
+    go(cur);
     if (note) note.textContent = 'This is a working demo. These are 30-second previews, provided courtesy of iTunes.';
     return true;
   }
-  const artistAsked = new Map();
-  function artistData(id) {
-    if (!artistAsked.has(id)) {
-      const asking = Promise.all([itunes('lookup', { id, entity: 'song', limit: 60 }), itunes('lookup', { id, entity: 'album', limit: 60 })]);
-      asking.catch(() => artistAsked.delete(id));
-      artistAsked.set(id, asking);
-    }
-    return artistAsked.get(id);
-  }
-  async function pickArtist(id, name) {
-    appleNow = { id, name, albums: [] };
+  async function playPicks(start = 0) {
     appleBusy = true; appleFailed = false; paintList();
-    try {
-      const [tops, albums] = await artistData(id);
-      if (appleNow?.id !== id) return;
-      const seen = new Set();
-      appleNow.albums = albums.filter((a) => a.wrapperType === 'collection' && a.collectionId).map((a) => {
-        const single = /\s-\s(Single|EP)$/i.test(a.collectionName) || (a.trackCount || 9) < 4;
-        return { id: a.collectionId, name: a.collectionName.replace(/\s-\s(Single|EP)$/i, ''), year: String(a.releaseDate || '').slice(0, 4), single, own: a.artistId === id };
-      }).filter((a) => { const key = a.name.toLowerCase().replace(/\s*[([].*$/, ''); if (seen.has(key)) return false; seen.add(key); return true; });
-      appleChoice = 'top';
-      appleBusy = false;
-      if (!playApple(topSongs(tops, name))) { appleFailed = true; appleNow = null; }
-    } catch { appleBusy = false; appleFailed = true; appleNow = null; }
-    paintList();
-  }
-  async function pickAlbum(value) {
-    if (!appleNow) return;
-    const asked = value;
-    appleChoice = value;
-    appleBusy = true; appleFailed = false;
-    try {
-      const rows = value === 'top' ? topSongs((await artistData(appleNow.id))[0], appleNow.name) : songsFrom(await itunes('lookup', { id: value, entity: 'song' }));
-      if (appleChoice === asked) playApple(rows);
-    } catch { appleFailed = true; }
+    let rows = null;
+    try { rows = await loadPicks(); } catch { /* said below */ }
     appleBusy = false;
+    if (!rows || !playApple(rows, start)) appleFailed = true;
     paintList();
   }
   function backToDemo() {
     if (!demoSongs) return;
     ALBUMS.length = 0; SONGS.length = 0;
     ALBUMS.push(...demoSongs.albums); SONGS.push(...demoSongs.songs);
-    demoSongs = null; appleNow = null; appleFound = []; query = ''; $('.d-find').value = '';
+    demoSongs = null; query = ''; $('.d-find').value = '';
     cur = 0; pos = 0;
     if (note && noteText) note.textContent = noteText;
     go(0);
   }
   function paintApple() {
-    const box = $('.d-apple'), on = view === 'search' && !!appleNow;
-    box.hidden = !on;
-    if (!on) return;
-    const list = $('.d-albscroll');
-    const item = (value, label, sub) => `<button type="button" role="option" class="d-albitem${String(appleChoice) === String(value) ? ' on' : ''}" data-alb="${value}" aria-selected="${String(appleChoice) === String(value)}"><b>${esc(censor(label))}</b>${sub ? `<small>${esc(sub)}</small>` : ''}</button>`;
-    const albums = appleNow.albums.filter((a) => !a.single), singles = appleNow.albums.filter((a) => a.single);
-    list.innerHTML = item('top', 'Top songs', appleNow.name) + (albums.length ? `<p class="d-albhead">Albums</p>${albums.map((a) => item(a.id, a.name, a.year)).join('')}` : '') + (singles.length ? `<p class="d-albhead">Singles</p>${singles.map((a) => item(a.id, a.name, a.year)).join('')}` : '');
-    const chosen = appleNow.albums.find((a) => String(a.id) === String(appleChoice));
-    $('.d-albbtn b').textContent = censor(chosen ? chosen.name : `${appleNow.name}: top songs`);
-    $('.d-apple-link').href = song().link || 'https://music.apple.com/';
-    $('.d-apple-back').hidden = !demoSongs;
+    const on = view === 'search' && !!demoSongs;
+    $('.d-apple').hidden = !on;
+    $('.d-apple-go').hidden = view !== 'search' || !!demoSongs;
+    if (on) $('.d-apple-link').href = song().link || 'https://music.apple.com/';
   }
   function paintSong() {
     const s = song(), hadFocus = usingKeys && !!document.activeElement?.closest?.('.d-list');
@@ -864,9 +788,7 @@
   scene.addEventListener('click', (e) => {
     const b = e.target.closest('button');
     if (!b) return;
-    if (b.matches('.d-albbtn')) { const m = $('.d-albmenu'); m.hidden = !m.hidden; b.setAttribute('aria-expanded', String(!m.hidden)); return; }
-    if (b.dataset.alb) { closeAlbMenu(); pickAlbum(b.dataset.alb === 'top' ? 'top' : b.dataset.alb); return; }
-    if (b.dataset.artist) { const n = b.querySelector('b').textContent; pickArtist(+b.dataset.artist, n); return; }
+    if (b.matches('.d-apple-go')) { playPicks(0); return; }
     if (b.matches('.d-apple-back')) { backToDemo(); return; }
     if (b.dataset.view) { view = b.dataset.view; paintList(); if (view === 'search') $('.d-find').focus({ preventScroll: true }); return; }
     if (b.dataset.i != null) { userPaused = false; wantSound(); go(+b.dataset.i); return; }
@@ -890,10 +812,7 @@
     if (b.matches('.d-fix')) runEdit(false);
   });
   const pills = (b) => $$('button', b.parentElement).forEach((o) => o.classList.toggle('on', o === b));
-  $('.d-find').addEventListener('input', (e) => { query = e.target.value; searchApple(query); paintList(); });
-  const closeAlbMenu = () => { $('.d-albmenu').hidden = true; $('.d-albbtn').setAttribute('aria-expanded', 'false'); };
-  addEventListener('pointerdown', (e) => { if (!$('.d-albmenu').hidden && !e.target.closest('.d-albpick')) closeAlbMenu(); }, true);
-  addEventListener('keydown', (e) => { if (e.key === 'Escape' && !$('.d-albmenu').hidden) closeAlbMenu(); });
+  $('.d-find').addEventListener('input', (e) => { query = e.target.value; paintList(); });
   miniMute.addEventListener('click', toggleMute);
   const volEl = $('.d-vol');
   const paintVol = () => { volEl.value = Math.round(vol * 100); volEl.style.setProperty('--v', `${vol * 100}%`); };
@@ -1175,8 +1094,7 @@
     const layer = glassLayer, d = layer.scale();
     try {
       const art = P.art, artShown = art.style.visibility !== 'hidden' && +art.dataset.o > .35;
-      const drops = [['albmenu', $('.d-albmenu')], ['gateresults', $('.gate-results')]].filter(([, el]) => el && !el.hidden && el.offsetParent);
-      for (const [name, el] of [...Object.entries(P), ...drops]) {
+      for (const [name, el] of Object.entries(P)) {
         if (el.style.visibility === 'hidden' || (P[name] && +el.dataset.o < .02)) continue;
         const w = el.offsetWidth, h = el.offsetHeight, cw = Math.max(2, Math.round(w * d)), ch = Math.max(2, Math.round(h * d));
         let g = panelGlass[name] || makePanelGlass(name, el, layer);
@@ -1361,7 +1279,6 @@
   const gateUp = () => body.classList.contains('gate-up');
   // A song list that's been opened on purpose scrolls first, then the page takes over at its end. The queue on the home page doesn't get in the way.
   Smooth.listScrolls = (target, by) => {
-    if (target.closest?.('.d-albmenu')) return true;      // the album list scrolls by itself
     const list = target.closest && target.closest('.d-list');
     if (!list || (stage && view === 'queue') || list.scrollHeight <= list.clientHeight + 1) return false;
     return by > 0 ? list.scrollTop + list.clientHeight < list.scrollHeight - 1 : list.scrollTop > 0;
@@ -1630,43 +1547,26 @@
     g.innerHTML = `<div class="gate-card">
       <svg class="gate-phones" viewBox="0 0 48 48" aria-hidden="true"><path d="M8 30v-6a16 16 0 0 1 32 0v6"/><rect x="5" y="27" width="9" height="15" rx="4.500"/><rect x="34" y="27" width="9" height="15" rx="4.500"/></svg>
       <h2>Best with the music on</h2>
-      <p>Search an artist you like and their music plays along as you scroll.</p>
+      <p>Pick a song and it plays along as you scroll, lyrics and all.</p>
       <div class="gate-bars" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div>
       <div class="gate-find">
-        <input type="text" placeholder="Search an artist you like" aria-label="Search an artist you like" spellcheck="false" autocomplete="off">
-        <div class="gate-results" hidden></div>
+        <div class="gate-results" role="list" aria-label="Songs"><p>Getting the songs from Apple Music</p></div>
       </div>
       <p class="gate-credit">30-second previews provided courtesy of iTunes.</p>
       <button type="button" class="gate-quiet">Continue without music</button>
     </div>`;
     body.appendChild(g);
-    // The way in: pick an artist, and you're in with their music playing
-    const find = $('.gate-find input', g), results = $('.gate-results', g);
-    let picked = null, findAsk = 0, findTimer = 0;
-    const closeResults = () => { results.hidden = true; };
-    const pickIt = (id, name) => { picked = { id, name }; closeResults(); leave(true); };
-    find.addEventListener('input', () => {
-      clearTimeout(findTimer);
-      const me = ++findAsk, term = find.value.trim();
-      if (term.length < 2) { closeResults(); return; }
-      findTimer = setTimeout(async () => {
-        let rows = [], failed = false;
-        try { rows = await searchArtists(term); } catch { failed = true; }
-        if (me !== findAsk || !g.isConnected) return;
-        const paint = () => { const keep = results.querySelector('canvas'); results.innerHTML = failed ? '<p>Apple Music isn\'t answering. You can still go in without it.</p>' : rows.length ? rows.map((a) => artistRow(a, 'data-id')).join('') : '<p>Nobody by that name.</p>'; if (keep) results.prepend(keep); results.hidden = false; };
-        paint();
-        if (await loadIcons(rows) && me === findAsk && g.isConnected) paint();
-      }, 400);
-    });
-    find.addEventListener('keydown', (e) => {
-      if (e.key !== 'Enter') return;
-      e.preventDefault();
-      const first = results.querySelector('button');
-      if (first) pickIt(+first.dataset.id, first.querySelector('b').textContent);
-    });
-    results.addEventListener('click', (e) => { const b = e.target.closest('button'); if (b) pickIt(+b.dataset.id, b.querySelector('b').textContent); });
+    // The way in: pick a song, and you're in with it playing
+    const results = $('.gate-results', g);
+    let picked = null;
+    const paint = (html) => { const keep = results.querySelector('canvas'); results.innerHTML = html; if (keep) results.prepend(keep); };
+    loadPicks().then((rows) => {
+      if (!g.isConnected) return;
+      paint(rows.length ? rows.map((t, i) => `<button type="button" class="d-artist" role="listitem" data-k="${i}"><span class="d-face" aria-hidden="true"><img src="${esc(pickCover(t))}" alt=""></span><span><b>${esc(censor(t.trackName))}</b><small>${esc(t.artistName)}</small></span></button>`).join('') : '<p>Apple Music isn\'t answering. You can still go in without it.</p>');
+    }, () => { if (g.isConnected) paint('<p>Apple Music isn\'t answering. You can still go in without it.</p>'); });
+    results.addEventListener('click', (e) => { const b = e.target.closest('button'); if (b) { picked = +b.dataset.k; leave(true); } });
     const leave = (withSound) => {
-      if (withSound) { if (picked) waitingForArtist = true; startMusic(); if (picked) pickArtist(picked.id, picked.name).finally(() => { waitingForArtist = false; }); } else { declined = true; body.classList.add('music-on'); }
+      if (withSound) { if (picked != null) waitingForArtist = true; startMusic(); if (picked != null) playPicks(picked).finally(() => { waitingForArtist = false; }); } else { declined = true; body.classList.add('music-on'); }
       heroUntil = performance.now() + 1600;
       hide.forEach((e) => { e.inert = false; });
       body.classList.remove('gate-up');
@@ -1677,7 +1577,7 @@
     const esc2 = (e) => { if (e.key === 'Escape') leave(false); };
     addEventListener('keydown', esc2, true);
     $('.gate-quiet', g).addEventListener('click', () => leave(false));
-    if (matchMedia('(pointer: coarse)').matches) g.focus({ preventScroll: true }); else find.focus({ preventScroll: true });      // ready to type, without a phone's keyboard jumping up
+    g.focus({ preventScroll: true });
     enterWithMusic = () => leave(true);
   }
 
