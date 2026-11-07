@@ -62,6 +62,7 @@
   scene.innerHTML = `
     <section class="gp p-art" data-p="art" aria-label="Now playing">
       <button type="button" class="d-cover" aria-label="Play or pause"></button>
+      <a class="d-cover-badge" target="_blank" rel="noopener" aria-label="Listen on Apple Music" hidden><img src="https://tools.applemediaservices.com/api/badges/listen-on-apple-music/badge/en-us?size=250x83" alt="Listen on Apple Music" width="125" height="42" loading="lazy" referrerpolicy="no-referrer"></a>
       <div class="d-now"><b class="d-t"></b><span class="d-s"></span><small class="d-credit"></small></div>
     </section>
     <section class="gp p-side" data-p="side" aria-label="Songs">
@@ -71,7 +72,13 @@
         <button type="button" data-view="library" role="tab">Library</button>
       </div>
       <h3 class="d-side-h"></h3>
-      <input class="d-find" type="text" placeholder="Search songs, artists, albums" aria-label="Search songs" spellcheck="false">
+      <input class="d-find" type="text" placeholder="Search any artist" aria-label="Search any artist" spellcheck="false">
+      <div class="d-apple" hidden>
+        <label class="d-albpick"><span>Playing</span><select class="d-albsel" aria-label="Choose top songs or an album"></select></label>
+        <p class="d-apple-note">30-second previews provided courtesy of iTunes.</p>
+        <a class="d-apple-link" target="_blank" rel="noopener" aria-label="Listen on Apple Music"><img src="https://tools.applemediaservices.com/api/badges/listen-on-apple-music/badge/en-us?size=250x83" alt="Listen on Apple Music" width="125" height="42" loading="lazy" referrerpolicy="no-referrer"></a>
+        <button type="button" class="d-apple-back">Back to the demo songs</button>
+      </div>
       <div class="d-list"></div>
     </section>
     <section class="gp p-lyr" data-p="lyr" aria-label="Lyrics">
@@ -179,6 +186,7 @@
     $$('[data-view]', scene).forEach((b) => { b.classList.toggle('on', b.dataset.view === view); b.setAttribute('aria-selected', String(b.dataset.view === view)); });
     $('.d-side-h').textContent = view === 'queue' ? 'Queue' : view === 'search' ? 'Search' : 'Library';
     $('.d-find').hidden = view !== 'search';
+    paintApple();
     const row = (s, i) => `<button type="button" class="d-row${i === cur ? ' on' : ''}" data-i="${i}"><span class="d-th" style="background:${s.art}">${i === cur ? '<em class="d-eqb"><i></i><i></i><i></i></em>' : ''}</span><span class="d-rt"><b>${esc(s.title)}</b><small>${esc(byline(s))}</small></span><span class="d-q">${s.q || 'CD'}</span><span class="d-len">${fmt(s.secs)}</span></button>`;
     if (view === 'library') {
       list.innerHTML = `<div class="d-albums">${ALBUMS.map((a) => `<button type="button" class="d-alb" data-i="${SONGS.findIndex((s) => s.a === a)}"><span style="background:${a.art}"></span><b>${esc(a.album)}</b><small>${esc(a.artist)}</small></button>`).join('')}</div><p class="d-sub">All songs</p>${SONGS.map(row).join('')}`;
@@ -187,13 +195,132 @@
     const q = query.trim().toLowerCase();
     const items = SONGS.map((s, i) => [s, i]);
     const shown = view === 'queue' ? [...items.slice(cur), ...items.slice(0, cur)] : items.filter(([s]) => !q || `${s.title} ${s.artist} ${s.album}`.toLowerCase().includes(q));
+    if (view === 'search' && q) {
+      const found = appleFound.map((a) => `<button type="button" class="d-artist" data-artist="${a.artistId}"><b>${esc(a.artistName)}</b><small>${esc(a.primaryGenreName || 'Artist')}</small></button>`).join('');
+      const head = appleBusy ? '<p class="d-none">Looking on Apple Music</p>' : appleFailed ? '<p class="d-none">Apple Music isn\'t answering. Try again in a moment.</p>' : found ? `<p class="d-sub">Artists on Apple Music</p>${found}` : '';
+      list.innerHTML = head + (shown.length ? `${found ? '<p class="d-sub">Already here</p>' : ''}${shown.map(([s, i]) => row(s, i)).join('')}` : head ? '' : '<p class="d-none">Nothing by that name.</p>');
+      return;
+    }
     list.innerHTML = shown.length ? shown.map(([s, i]) => row(s, i)).join('') : '<p class="d-none">No songs match that.</p>';
+  }
+  // ---------- any artist: pick one, then their top songs or an album. 30-second previews from Apple Music. ----------
+  // The browser asks Apple directly. There's no account or key, and only what's typed in the box is sent.
+  const ITUNES = 'https://itunes.apple.com';
+  let appleFound = [], appleBusy = false, appleFailed = false, appleAsk = 0, appleTimer = 0, appleNow = null, demoSongs = null;
+  const itunes = async (path, params) => {
+    const r = await fetch(`${ITUNES}/${path}?${new URLSearchParams(params)}`);
+    if (!r.ok) throw new Error('Apple Music said no');
+    return (await r.json()).results || [];
+  };
+  function searchApple(text) {
+    clearTimeout(appleTimer);
+    const me = ++appleAsk, term = text.trim();
+    appleFound = []; appleFailed = false; appleBusy = term.length >= 2;
+    if (!appleBusy) return;
+    appleTimer = setTimeout(async () => {
+      let rows = [], failed = false;
+      try { rows = await itunes('search', { term, entity: 'musicArtist', limit: 5 }); } catch { failed = true; }
+      if (me !== appleAsk) return;
+      appleBusy = false; appleFailed = failed; appleFound = rows;
+      if (view === 'search') paintList();
+    }, 320);
+  }
+  const songsFrom = (rows) => rows.filter((t) => t.wrapperType === 'track' && t.kind === 'song' && t.previewUrl);
+  // Apple's list mixes in songs they only feature on: their own come first, and the same song on two records shows once
+  function topSongs(rows, name) {
+    const own = (t) => String(t.artistName).toLowerCase() === String(name).toLowerCase(), seen = new Set();
+    return [...songsFrom(rows).filter(own), ...songsFrom(rows).filter((t) => !own(t))].filter((t) => {
+      const key = String(t.trackName).toLowerCase().replace(/\s*[([].*$/, '');
+      if (seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    }).slice(0, 25);
+  }
+  // puts these songs in the player, in place of what was there. The demo songs wait to come back.
+  function playApple(rows) {
+    if (!rows.length) return false;
+    demoSongs ||= { albums: [...ALBUMS], songs: [...SONGS] };
+    ALBUMS.length = 0; SONGS.length = 0;
+    const byName = new Map();
+    rows.forEach((t, i) => {
+      const name = t.collectionName || t.artistName;
+      if (!byName.has(name)) {
+        const a = { album: name, artist: t.artistName, key: 'a', root: 45, bpm: 130, prog: [0, 5, 3, 4], songs: [], art: `center / cover no-repeat url('${String(t.artworkUrl100).replace('100x100', '600x600')}')` };
+        byName.set(name, a); ALBUMS.push(a);
+      }
+      const a = byName.get(name);
+      SONGS.push({ title: censor(t.trackName), secs: 30, artist: t.artistName, album: name, art: a.art, a, seed: i + 1, clip: true, apple: true, link: t.trackViewUrl, q: '30s', lyricsAsked: true, lyricsDone: true, versions: { m4a: t.previewUrl, mp3: t.previewUrl, wav: t.previewUrl }, start: 0 });
+    });
+    userPaused = false;
+    cur = 0; pos = 0; query = ''; appleFound = []; $('.d-find').value = '';
+    wantSound();
+    go(0);
+    if (note) note.textContent = 'This is a working demo. These are 30-second previews, provided courtesy of iTunes.';
+    return true;
+  }
+  const artistAsked = new Map();
+  function artistData(id) {
+    if (!artistAsked.has(id)) {
+      const asking = Promise.all([itunes('lookup', { id, entity: 'song', limit: 60 }), itunes('lookup', { id, entity: 'album', limit: 60 })]);
+      asking.catch(() => artistAsked.delete(id));
+      artistAsked.set(id, asking);
+    }
+    return artistAsked.get(id);
+  }
+  async function pickArtist(id, name) {
+    appleNow = { id, name, albums: [] };
+    appleBusy = true; appleFailed = false; paintList();
+    try {
+      const [tops, albums] = await artistData(id);
+      if (appleNow?.id !== id) return;
+      appleNow.albums = albums.filter((a) => a.wrapperType === 'collection' && a.collectionId).map((a) => ({ id: a.collectionId, name: a.collectionName, year: String(a.releaseDate || '').slice(0, 4) }));
+      appleBusy = false;
+      if (!playApple(topSongs(tops, name))) { appleFailed = true; appleNow = null; }
+    } catch { appleBusy = false; appleFailed = true; appleNow = null; }
+    paintList();
+  }
+  async function pickAlbum(value) {
+    if (!appleNow) return;
+    const asked = value;
+    appleBusy = true; appleFailed = false;
+    try {
+      const rows = value === 'top' ? topSongs((await artistData(appleNow.id))[0], appleNow.name) : songsFrom(await itunes('lookup', { id: value, entity: 'song' }));
+      if ($('.d-albsel').value === asked) playApple(rows);
+    } catch { appleFailed = true; }
+    appleBusy = false;
+    paintList();
+  }
+  function backToDemo() {
+    if (!demoSongs) return;
+    ALBUMS.length = 0; SONGS.length = 0;
+    ALBUMS.push(...demoSongs.albums); SONGS.push(...demoSongs.songs);
+    demoSongs = null; appleNow = null; appleFound = []; query = ''; $('.d-find').value = '';
+    cur = 0; pos = 0;
+    if (note && noteText) note.textContent = noteText;
+    go(0);
+  }
+  function paintApple() {
+    const box = $('.d-apple'), on = view === 'search' && !!appleNow;
+    box.hidden = !on;
+    if (!on) return;
+    const sel = $('.d-albsel'), want = sel.dataset.who !== String(appleNow.id) || sel.options.length !== appleNow.albums.length + 1;
+    if (want) {
+      const was = sel.value;
+      sel.innerHTML = `<option value="top">${esc(appleNow.name)}: top songs</option>${appleNow.albums.map((a) => `<option value="${a.id}">${esc(censor(a.name))}${a.year ? ` (${a.year})` : ''}</option>`).join('')}`;
+      sel.dataset.who = appleNow.id;
+      if ([...sel.options].some((o) => o.value === was)) sel.value = was;
+    }
+    $('.d-apple-link').href = song().link || 'https://music.apple.com/';
+    $('.d-apple-back').hidden = !demoSongs;
   }
   function paintSong() {
     const s = song(), hadFocus = usingKeys && !!document.activeElement?.closest?.('.d-list');
     $('.d-cover').style.background = s.art;
     $('.d-dk-art').style.background = s.art;
-    $('.d-credit').textContent = s.clip ? `All rights reserved to ${s.artist}` : 'Made up for this demo';
+    $('.d-credit').textContent = s.apple ? 'Preview provided courtesy of iTunes' : s.clip ? `All rights reserved to ${s.artist}` : 'Made up for this demo';
+    const badge = $('.d-cover-badge');
+    badge.hidden = !s.apple;
+    if (s.apple) badge.href = s.link || 'https://music.apple.com/';
     $$('.d-t', scene).forEach((e) => { e.textContent = s.title; });
     $$('.d-s', scene).forEach((e) => { e.textContent = byline(s); });
     $('.d-end').textContent = fmt(s.secs);
@@ -235,7 +362,7 @@
     box.innerHTML = rows.map((w, i) => `<button type="button" data-l="${i}">${esc(w)}</button>`).join('');
     box.style.transform = '';
     none.hidden = rows.length > 0;
-    none.textContent = s.lyricsDone ? 'No synced lyrics found for this part of the song.' : 'Looking for the lyrics.';
+    none.textContent = s.apple ? 'Lyrics stay with the full song. Glassy shows them when you play your own copy.' : s.lyricsDone ? 'No synced lyrics found for this part of the song.' : 'Looking for the lyrics.';
     lastLine = -1;
   }
   const setField = (k, v) => { $(`.d-e-${k}`).textContent = v; };
@@ -533,7 +660,7 @@
   let wanted = 0, fetching = false;
   function wantMore(room) { wanted = Math.max(wanted, (room + 1) * 3); pump(); }
   async function pump() {
-    if (fetching || !SONGS[0]?.versions) return;
+    if (fetching || !SONGS[0]?.versions || SONGS[0].apple) return;      // Apple's previews load when they're played
     const limit = connection && connection.saveData ? 2 : wanted;
     const order = SONGS.map((_, i) => SONGS[(cur + 1 + i) % SONGS.length]).filter((sg) => !fetched.has(sg));
     if (!order.length || fetched.size >= limit) return;
@@ -548,6 +675,7 @@
     stopClip();
     const sg = song(), id = ++clipTry;
     if (!ctx || !sg.clip || !soundOn || !playing) return;
+    if (sg.apple) { streamPreview(sg, id); return; }
     let buf;
     try { buf = await loadClip(sg); } catch { buffers.delete(sg); return; }
     if (id !== clipTry || song() !== sg || !soundOn || !playing) return;
@@ -562,6 +690,35 @@
     src.start(now, s, left);
     clipSrc = src; clipGain = g;
     loadClip(SONGS[(cur + 1) % SONGS.length]).catch(() => {});      // the next one is ready when this one ends
+  }
+  // Apple's previews are only ever streamed: nothing is downloaded or kept, and each plays through the same sound chain as everything else.
+  function streamPreview(sg, id) {
+    const el = new Audio();
+    el.crossOrigin = 'anonymous';
+    el.preload = 'auto';
+    el.src = sg.versions.m4a;
+    const node = ctx.createMediaElementSource(el), g = ctx.createGain();
+    node.connect(g); g.connect(into());
+    const now = ctx.currentTime;
+    g.gain.setValueAtTime(.0001, now);
+    clipGain = g;
+    clipSrc = { stop: () => setTimeout(() => { el.pause(); el.removeAttribute('src'); el.load(); node.disconnect(); g.disconnect(); }, 320) };
+    const ours = () => id === clipTry && song() === sg;
+    el.addEventListener('loadedmetadata', () => {
+      if (!ours()) return;
+      if (el.duration && Math.abs(el.duration - sg.secs) > .05) { sg.secs = el.duration; $('.d-end').textContent = fmt(sg.secs); }
+      if (pos > .1 && pos < el.duration) el.currentTime = pos;
+    }, { once: true });
+    el.addEventListener('playing', () => {
+      if (!ours()) return;
+      t0 = ctx.currentTime - el.currentTime;      // the clock follows the stream, however long it took to start
+      g.gain.cancelScheduledValues(ctx.currentTime);
+      g.gain.setTargetAtTime(1, ctx.currentTime, .25);
+    });
+    el.addEventListener('timeupdate', () => {
+      if (ours() && el.duration && el.duration - el.currentTime < FADE_OUT && !el.fading) { el.fading = true; g.gain.setTargetAtTime(.0001, ctx.currentTime, .8); }
+    });
+    el.play().catch(() => {});
   }
   function resync() {
     if (!ctx) return;
@@ -657,6 +814,8 @@
   scene.addEventListener('click', (e) => {
     const b = e.target.closest('button');
     if (!b) return;
+    if (b.dataset.artist) { const n = b.querySelector('b').textContent; pickArtist(+b.dataset.artist, n); return; }
+    if (b.matches('.d-apple-back')) { backToDemo(); return; }
     if (b.dataset.view) { view = b.dataset.view; paintList(); if (view === 'search') $('.d-find').focus({ preventScroll: true }); return; }
     if (b.dataset.i != null) { userPaused = false; wantSound(); go(+b.dataset.i); return; }
     if (b.dataset.l != null) { wantSound(); pos = song().lines ? song().lines[+b.dataset.l].t : +b.dataset.l * lineLen(); resync(); return; }
@@ -679,7 +838,8 @@
     if (b.matches('.d-fix')) runEdit(false);
   });
   const pills = (b) => $$('button', b.parentElement).forEach((o) => o.classList.toggle('on', o === b));
-  $('.d-find').addEventListener('input', (e) => { query = e.target.value; paintList(); });
+  $('.d-find').addEventListener('input', (e) => { query = e.target.value; searchApple(query); paintList(); });
+  $('.d-albsel').addEventListener('change', (e) => pickAlbum(e.target.value));
   miniMute.addEventListener('click', toggleMute);
   const volEl = $('.d-vol');
   const paintVol = () => { volEl.value = Math.round(vol * 100); volEl.style.setProperty('--v', `${vol * 100}%`); };
@@ -857,7 +1017,7 @@
   let wallUrl = '', wallMix = 0, glassLayer = null, heroUntil = 0, extraY = -1, holding = false;
   const backImages = new Map(), panelRadius = {};
   function backImage(url) {
-    if (!backImages.has(url)) { const img = new Image(); img.onload = () => glassLayer?.touch(); img.src = url; backImages.set(url, img); }
+    if (!backImages.has(url)) { const img = new Image(); img.crossOrigin = 'anonymous'; img.onload = () => glassLayer?.touch(); img.src = url; backImages.set(url, img); }
     const img = backImages.get(url);
     return img.complete && img.naturalWidth ? img : null;
   }
@@ -1030,7 +1190,7 @@
     scene.addEventListener('pointerdown', (e) => {
       if (e.pointerType !== 'mouse' || e.button !== 0) return;
       const el = e.target.closest('.gp');
-      if (!el || e.target.closest('.d-eq, .d-track, input')) return;
+      if (!el || e.target.closest('.d-eq, .d-track, input, select, a')) return;
       tug = { name: el.dataset.p, x: e.clientX, y: e.clientY, moved: false };
       topPanel = tug.name;      // the one you're holding comes to the front, and stays there until you hold another
     });
@@ -1399,6 +1559,7 @@
   }
 
   // ---------- the entrance: what's new, a word about the songs, and the click browsers need before any sound ----------
+  let enterWithMusic = null;      // the checks in tests/site go in this way, with the music that's here
   function entrance() {
     // every time the site is opened or reloaded; moving between its pages doesn't count
     body.classList.add('gate-up');
@@ -1412,14 +1573,43 @@
     g.innerHTML = `<div class="gate-card">
       <svg class="gate-phones" viewBox="0 0 48 48" aria-hidden="true"><path d="M8 30v-6a16 16 0 0 1 32 0v6"/><rect x="5" y="27" width="9" height="15" rx="4.500"/><rect x="34" y="27" width="9" height="15" rx="4.500"/></svg>
       <h2>Best with the music on</h2>
-      <p>Headphones if you've got them. It plays along as you scroll.</p>
+      <p>Search an artist you like and their music plays along as you scroll.</p>
       <div class="gate-bars" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div>
-      <button type="button" class="btn main gate-go"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5.200c0-1 1.100-1.600 2-1.100l10 6.800c.8.500.8 1.700 0 2.200l-10 6.800c-.9.500-2-.1-2-1.100z"/></svg>Play with music</button>
+      <div class="gate-find">
+        <input type="text" placeholder="Search an artist you like" aria-label="Search an artist you like" spellcheck="false" autocomplete="off">
+        <div class="gate-results" hidden></div>
+      </div>
+      <p class="gate-credit">30-second previews provided courtesy of iTunes.</p>
       <button type="button" class="gate-quiet">Continue without music</button>
     </div>`;
     body.appendChild(g);
+    // The way in: pick an artist, and you're in with their music playing
+    const find = $('.gate-find input', g), results = $('.gate-results', g);
+    let picked = null, findAsk = 0, findTimer = 0;
+    const closeResults = () => { results.hidden = true; results.innerHTML = ''; };
+    const pickIt = (id, name) => { picked = { id, name }; closeResults(); leave(true); };
+    find.addEventListener('input', () => {
+      clearTimeout(findTimer);
+      const me = ++findAsk, term = find.value.trim();
+      if (term.length < 2) { closeResults(); return; }
+      findTimer = setTimeout(async () => {
+        let rows = [], failed = false;
+        try { rows = await itunes('search', { term, entity: 'musicArtist', limit: 5 }); } catch { failed = true; }
+        if (me !== findAsk || !g.isConnected) return;
+        results.innerHTML = failed ? '<p>Apple Music isn\'t answering. You can still go in without it.</p>' : rows.length ? rows.map((a) => `<button type="button" data-id="${a.artistId}"><b>${esc(a.artistName)}</b><small>${esc(a.primaryGenreName || 'Artist')}</small></button>`).join('') : '<p>Nobody by that name.</p>';
+        results.hidden = false;
+        rows.forEach((a) => artistData(a.artistId).catch(() => {}));      // ready the moment one's picked
+      }, 300);
+    });
+    find.addEventListener('keydown', (e) => {
+      if (e.key !== 'Enter') return;
+      e.preventDefault();
+      const first = results.querySelector('button');
+      if (first) pickIt(+first.dataset.id, first.querySelector('b').textContent);
+    });
+    results.addEventListener('click', (e) => { const b = e.target.closest('button'); if (b) pickIt(+b.dataset.id, b.querySelector('b').textContent); });
     const leave = (withSound) => {
-      if (withSound) startMusic(); else { declined = true; body.classList.add('music-on'); }
+      if (withSound) { startMusic(); if (picked) pickArtist(picked.id, picked.name); } else { declined = true; body.classList.add('music-on'); }
       heroUntil = performance.now() + 1600;
       hide.forEach((e) => { e.inert = false; });
       body.classList.remove('gate-up');
@@ -1429,9 +1619,9 @@
     };
     const esc2 = (e) => { if (e.key === 'Escape') leave(false); };
     addEventListener('keydown', esc2, true);
-    $('.gate-go', g).addEventListener('click', () => leave(true));
     $('.gate-quiet', g).addEventListener('click', () => leave(false));
-    g.focus({ preventScroll: true });      // Tab goes straight to the choices, with no ring round them until it does
+    if (matchMedia('(pointer: coarse)').matches) g.focus({ preventScroll: true }); else find.focus({ preventScroll: true });      // ready to type, without a phone's keyboard jumping up
+    enterWithMusic = () => leave(true);
   }
 
   // ---------- each page: find its parts, and send the panels to their new places ----------
@@ -1568,7 +1758,7 @@
 
   // ---------- go ----------
   // the tour's app uses censor; the tests in tests/site read the rest
-  window.glassyTest = { censor, pulls, level: () => (out ? out.gain.value : null), cutoff: () => (dimLP ? dimLP.frequency.value : null), state: () => ({ version: SONGS[0]?.versions ? versionNow() : null, fetched: fetched.size, songs: SONGS.length, narrow, rails: railPx > 0, playing, soundOn, pos, cur, ctx: ctx && ctx.state, title: song().title, editTitle: editSong && editSong.title, f, lite }) };
+  window.glassyTest = { enter: () => enterWithMusic?.(), censor, pulls, level: () => (out ? out.gain.value : null), cutoff: () => (dimLP ? dimLP.frequency.value : null), state: () => ({ version: SONGS[0]?.versions ? versionNow() : null, fetched: fetched.size, songs: SONGS.length, narrow, rails: railPx > 0, playing, soundOn, pos, cur, ctx: ctx && ctx.state, title: song().title, editTitle: editSong && editSong.title, f, lite }) };
   bindPage(true);
   paintSong(); paintPlay(); drawEq();
   entrance();
