@@ -1,0 +1,654 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<style>html,body{margin:0;height:100%}[hidden]{display:none!important}</style>
+<title>Plinko Parlor</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,800&family=DM+Mono:wght@400;500&family=Instrument+Sans:wght@400;500;600&display=swap">
+<style>
+/* Layout: controls left, the peg board centre stage, session ledger right; stacks board-first on phones.
+   One committed look: a night-fair parlor, indigo dusk with a brass ball and slots that run cool to hot. */
+:root {
+  color-scheme: dark;
+  --bg: #12102a;
+  --bg-glow: #2a2466;
+  --panel: #1c1942;
+  --panel-2: #262258;
+  --line: rgba(190, 180, 255, 0.16);
+  --ink: #f4f0ff;
+  --muted: #a9a2d0;
+  --peg: #d9d2ff;
+  --gold: #ffc857;
+  --gold-deep: #e39a1c;
+  --teal: #39d5c3;
+  --rose: #ff5c8a;
+  --good: #63e6a5;
+  --bad: #ff8a8a;
+  --on-bright: #1a1436;
+  --display: "Bricolage Grotesque", "Trebuchet MS", system-ui, sans-serif;
+  --body: "Instrument Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --mono: "DM Mono", ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+}
+*, *::before, *::after { box-sizing: border-box; }
+body {
+  background: var(--bg);
+  background-image: radial-gradient(90rem 40rem at 50% -10rem, var(--bg-glow), transparent 70%);
+  background-repeat: no-repeat;
+  color: var(--ink);
+  font-family: var(--body);
+  font-size: 15px;
+  line-height: 1.45;
+  min-height: 100%;
+}
+button, input { font: inherit; color: inherit; }
+button { cursor: pointer; }
+:focus-visible { outline: 2px solid var(--gold); outline-offset: 2px; }
+
+.app {
+  max-width: 1220px;
+  margin: 0 auto;
+  padding-block: 20px 36px;
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+  display: flex;
+  flex-direction: column;
+  gap: 22px;
+}
+
+/* ---------- top bar ---------- */
+.top { display: flex; flex-wrap: wrap; align-items: center; gap: 12px 20px; }
+.brand { margin: 0 auto 0 0; font-family: var(--display); font-weight: 800; font-size: 1.75rem; letter-spacing: -0.02em; line-height: 1; display: flex; align-items: center; gap: 10px; }
+.brand i { width: 0.62em; height: 0.62em; border-radius: 50%; background: radial-gradient(circle at 35% 30%, #fff3cf, var(--gold) 45%, var(--gold-deep)); box-shadow: 0 0 18px rgba(255, 200, 87, 0.55); }
+.wallet { display: flex; align-items: baseline; gap: 10px; padding: 8px 14px; border: 1px solid var(--line); border-radius: 999px; background: var(--panel); }
+.label { font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.09em; color: var(--muted); font-weight: 600; }
+#balance { font-family: var(--mono); font-weight: 500; font-size: 1.1rem; font-variant-numeric: tabular-nums; }
+#balance.up { animation: tint-up 0.6s; }
+@keyframes tint-up { 0% { color: var(--good); } 100% { color: var(--ink); } }
+.ghost-btn { background: none; border: 1px solid var(--line); border-radius: 999px; padding: 8px 14px; color: var(--muted); font-size: 0.85rem; font-weight: 500; transition: color 0.15s, border-color 0.15s; }
+.ghost-btn:hover { color: var(--ink); border-color: var(--muted); }
+
+/* ---------- layout ---------- */
+.layout { display: grid; grid-template-columns: 270px minmax(0, 1fr) 220px; grid-template-areas: "controls board side"; gap: 28px; align-items: start; }
+.controls { grid-area: controls; }
+.board { grid-area: board; min-width: 0; width: 100%; max-width: 660px; justify-self: center; }
+.side { grid-area: side; min-width: 0; }
+@media (max-width: 1040px) {
+  .layout { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); grid-template-areas: "board board" "controls side"; }
+}
+@media (max-width: 640px) {
+  .layout { grid-template-columns: minmax(0, 1fr); grid-template-areas: "board" "controls" "side"; gap: 22px; }
+  .brand { font-size: 1.45rem; }
+}
+
+/* ---------- controls ---------- */
+.controls { background: var(--panel); border: 1px solid var(--line); border-radius: 20px; padding: 18px; display: flex; flex-direction: column; gap: 18px; }
+.field { display: flex; flex-direction: column; gap: 8px; border: 0; padding: 0; margin: 0; min-width: 0; }
+.field legend, .field > label { padding: 0; }
+.row { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; }
+.bet-box { display: flex; align-items: center; gap: 6px; background: var(--bg); border: 1px solid var(--line); border-radius: 12px; padding: 4px 4px 4px 12px; }
+.bet-box:focus-within { border-color: var(--gold); }
+#bet { flex: 1; min-width: 0; width: 100%; background: none; border: 0; outline: 0; font-family: var(--mono); font-size: 1.05rem; padding: 8px 0; -moz-appearance: textfield; appearance: textfield; }
+#bet::-webkit-outer-spin-button, #bet::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
+.chip { background: var(--panel-2); border: 0; border-radius: 9px; padding: 8px 10px; font-family: var(--mono); font-size: 0.82rem; color: var(--ink); min-width: 38px; }
+.chip:hover { background: #322d70; }
+.seg { display: grid; grid-template-columns: repeat(3, 1fr); background: var(--bg); border: 1px solid var(--line); border-radius: 12px; padding: 4px; gap: 4px; }
+.seg input { position: absolute; opacity: 0; pointer-events: none; }
+.seg label { text-align: center; padding: 9px 4px; border-radius: 9px; font-weight: 500; font-size: 0.9rem; color: var(--muted); cursor: pointer; transition: background 0.15s, color 0.15s; }
+.seg label:hover { color: var(--ink); }
+.seg input:checked + label { background: var(--panel-2); color: var(--ink); box-shadow: inset 0 0 0 1px var(--line); }
+.seg input:focus-visible + label { outline: 2px solid var(--gold); outline-offset: 2px; }
+#rowsOut { font-family: var(--mono); font-size: 0.95rem; }
+input[type="range"] { width: 100%; accent-color: var(--gold); margin: 2px 0; }
+fieldset:disabled { opacity: 0.5; }
+fieldset:disabled label { cursor: not-allowed; }
+
+.drop { border: 0; border-radius: 14px; padding: 15px 16px; background: linear-gradient(180deg, #ffd980, var(--gold) 55%, var(--gold-deep)); color: var(--on-bright); font-family: var(--display); font-weight: 800; font-size: 1.2rem; letter-spacing: -0.01em; box-shadow: 0 4px 0 #9a6410, 0 14px 30px rgba(255, 200, 87, 0.18); transition: transform 0.06s, box-shadow 0.06s; display: flex; align-items: center; justify-content: center; gap: 10px; }
+.drop:active { transform: translateY(3px); box-shadow: 0 1px 0 #9a6410, 0 6px 16px rgba(255, 200, 87, 0.15); }
+.drop kbd { font-family: var(--mono); font-weight: 500; font-size: 0.68rem; letter-spacing: 0.04em; padding: 2px 6px; border-radius: 5px; background: rgba(26, 20, 54, 0.16); }
+@media (hover: none) { .drop kbd { display: none; } }
+.auto { background: var(--bg); border: 1px solid var(--line); border-radius: 12px; padding: 11px; font-weight: 500; color: var(--ink); }
+.auto[aria-pressed="true"] { border-color: var(--teal); color: var(--teal); }
+.actions { display: flex; flex-direction: column; gap: 10px; }
+.msg { margin: 0; min-height: 1.3em; font-size: 0.85rem; color: var(--bad); }
+.fine { margin: 0; font-size: 0.8rem; color: var(--muted); }
+.fine b { color: var(--ink); font-weight: 600; }
+
+/* ---------- board ---------- */
+.stage { position: relative; aspect-ratio: 1 / 0.82; max-width: 100%; }
+.stage canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
+.slots { container-type: inline-size; }
+.bins, .hist { --n: 12; display: grid; grid-template-columns: repeat(calc(var(--n) + 1), minmax(0, 1fr)); gap: 0.55cqw; padding-inline: calc(50cqw / (var(--n) + 2)); }
+.bin { border: 0; padding: 0; height: clamp(26px, 5.4cqw, 36px); border-radius: clamp(4px, 1cqw, 8px); background: var(--c); color: var(--on-bright); font-family: var(--mono); font-weight: 500; letter-spacing: -0.04em; font-size: clamp(8px, calc(36cqw / (var(--n) + 2)), 15px); box-shadow: 0 3px 0 color-mix(in srgb, var(--c) 55%, #000); display: grid; place-items: center; }
+.bin.hit { animation: press 0.32s ease-out; }
+@keyframes press { 0% { transform: translateY(0); filter: brightness(1.5); } 35% { transform: translateY(4px); box-shadow: 0 0 0 transparent; } 100% { transform: translateY(0); filter: none; } }
+.hist { height: 62px; margin-top: 12px; align-items: stretch; }
+.col { position: relative; }
+.col i, .col b { position: absolute; left: 0; right: 0; bottom: 0; border-radius: 3px 3px 0 0; }
+.col i { background: var(--line); }
+.col b { background: var(--c); transition: height 0.25s ease-out; }
+.caption { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 4px 16px; margin: 8px 0 0; padding-inline: 2px; font-size: 0.8rem; color: var(--muted); }
+.key { display: inline-flex; align-items: center; gap: 6px; }
+.key::before { content: ""; width: 10px; height: 10px; border-radius: 2px; background: var(--line); }
+.odds { margin: 14px 0 0; padding: 11px 14px; border-radius: 12px; background: var(--panel); border: 1px solid var(--line); font-size: 0.9rem; min-height: 2.9em; color: var(--muted); }
+.odds b { color: var(--ink); font-family: var(--mono); font-weight: 500; }
+
+/* ---------- side ledger ---------- */
+.side { display: flex; flex-direction: column; gap: 22px; }
+.side h2 { margin: 0 0 10px; font-family: var(--display); font-weight: 600; font-size: 1.05rem; letter-spacing: -0.01em; }
+.stats { margin: 0; display: grid; grid-template-columns: 1fr auto; gap: 8px 12px; }
+.stats dt { color: var(--muted); }
+.stats dd { margin: 0; text-align: right; font-family: var(--mono); font-variant-numeric: tabular-nums; }
+.pos { color: var(--good); }
+.neg { color: var(--bad); }
+.recent { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
+.recent li { display: grid; grid-template-columns: 54px 1fr; align-items: center; gap: 10px; font-family: var(--mono); font-size: 0.88rem; font-variant-numeric: tabular-nums; animation: slide 0.25s ease-out; }
+.recent li span:first-child { background: var(--c); color: var(--on-bright); border-radius: 7px; padding: 3px 0; text-align: center; font-weight: 500; }
+.recent li span:last-child { text-align: right; }
+.recent .empty { display: block; font-family: var(--body); color: var(--muted); animation: none; }
+@keyframes slide { from { opacity: 0; transform: translateY(-6px); } }
+@media (max-width: 1040px) and (min-width: 641px) { .recent li:nth-child(n + 9) { display: none; } }
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation: none !important; transition: none !important; }
+}
+</style>
+</head>
+<body>
+
+<div class="app">
+  <header class="top">
+    <h1 class="brand"><i aria-hidden="true"></i>Plinko Parlor</h1>
+    <div class="wallet"><span class="label">Credits</span><output id="balance">1,000.00</output></div>
+    <button class="ghost-btn" id="sound" type="button" aria-pressed="true">Sound on</button>
+    <button class="ghost-btn" id="reset" type="button">Start over</button>
+  </header>
+
+  <main class="layout">
+    <section class="controls" aria-label="Game controls">
+      <div class="field">
+        <label class="label" for="bet">Bet per ball</label>
+        <div class="bet-box">
+          <input id="bet" type="number" inputmode="decimal" min="1" step="1" value="10">
+          <button class="chip" id="half" type="button" aria-label="Halve the bet">1/2</button>
+          <button class="chip" id="double" type="button" aria-label="Double the bet">2×</button>
+          <button class="chip" id="max" type="button" aria-label="Bet all credits">Max</button>
+        </div>
+      </div>
+
+      <fieldset class="field" id="riskField">
+        <legend class="label">Risk</legend>
+        <div class="seg">
+          <input type="radio" name="risk" id="riskLow" value="low"><label for="riskLow">Low</label>
+          <input type="radio" name="risk" id="riskMed" value="medium" checked><label for="riskMed">Medium</label>
+          <input type="radio" name="risk" id="riskHigh" value="high"><label for="riskHigh">High</label>
+        </div>
+      </fieldset>
+
+      <fieldset class="field" id="rowsField">
+        <div class="row"><label class="label" for="rows">Rows of pegs</label><output id="rowsOut" for="rows">12</output></div>
+        <input id="rows" type="range" min="8" max="16" step="1" value="12">
+      </fieldset>
+
+      <div class="actions">
+        <button class="drop" id="drop" type="button">Drop ball <kbd>SPACE</kbd></button>
+        <button class="auto" id="auto" type="button" aria-pressed="false">Auto drop</button>
+        <p class="msg" id="msg" role="status"></p>
+      </div>
+
+      <p class="fine">Play credits only, no real money. This board pays back <b id="rtp">98.0%</b> of bets on average.</p>
+    </section>
+
+    <section class="board" aria-label="Peg board">
+      <div class="stage"><canvas id="canvas" aria-label="Balls falling through the pegs"></canvas></div>
+      <div class="slots">
+        <div class="bins" id="bins"></div>
+        <div class="hist" id="hist" aria-hidden="true"></div>
+      </div>
+      <p class="caption"><span>Where your balls have landed</span><span class="key">Expected share</span></p>
+      <p class="odds" id="odds" aria-live="polite"></p>
+    </section>
+
+    <aside class="side" aria-label="This session">
+      <div>
+        <h2>This session</h2>
+        <dl class="stats">
+          <dt>Balls dropped</dt><dd id="sDrops">0</dd>
+          <dt>Wagered</dt><dd id="sWagered">0.00</dd>
+          <dt>Net result</dt><dd id="sNet">0.00</dd>
+          <dt>Best hit</dt><dd id="sBest">none yet</dd>
+        </dl>
+      </div>
+      <div>
+        <h2>Last drops</h2>
+        <ol class="recent" id="recent"><li class="empty">Your results show up here.</li></ol>
+      </div>
+    </aside>
+  </main>
+</div>
+
+<script>
+(() => {
+  'use strict';
+  const $ = id => document.getElementById(id);
+  const START = 1000, STORE = 'plinko-parlor-v1', MAX_BALLS = 40;
+  const RISK = { low: { min: 0.5, e: 2 }, medium: { min: 0.3, e: 3.5 }, high: { min: 0.2, e: 5 } };
+
+  const state = { balance: START, bet: 10, rows: 12, risk: 'medium', sound: true };
+  const session = { drops: 0, wagered: 0, returned: 0, best: 0 };
+  try {
+    const saved = JSON.parse(localStorage.getItem(STORE) || 'null');
+    if (saved && typeof saved === 'object') {
+      if (Number.isFinite(saved.balance) && saved.balance >= 0) state.balance = saved.balance;
+      if (Number.isFinite(saved.bet) && saved.bet > 0) state.bet = saved.bet;
+      if (saved.rows >= 8 && saved.rows <= 16) state.rows = Math.round(saved.rows);
+      if (RISK[saved.risk]) state.risk = saved.risk;
+      state.sound = saved.sound !== false;
+    }
+  } catch (e) {}
+  const save = () => { try { localStorage.setItem(STORE, JSON.stringify(state)); } catch (e) {} };
+
+  const money = v => v.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  const round2 = v => Math.round(v * 100) / 100;
+  const multText = m => (m >= 10 ? String(m) : m.toFixed(1));
+
+  /* ---------- odds and payouts: exact binomial chances, payouts scaled to a 98% return ---------- */
+  function buildTable(n, risk) {
+    const p = [];
+    let c = 1;
+    for (let k = 0; k <= n; k++) { p.push(c / 2 ** n); c = c * (n - k) / (k + 1); }
+    const { min, e } = RISK[risk];
+    const dist = k => Math.abs(k - n / 2) / (n / 2);
+    const spread = p.reduce((s, pk, k) => s + pk * dist(k) ** e, 0);
+    const base = (0.98 - min) / spread;
+    const roundPay = v => (v >= 10 ? Math.round(v) : Math.round(v * 10) / 10);
+    // Payouts are rounded for display, so nudge the scale until the rounded table returns as close to 98% as it can.
+    let mult = null, rtp = 0;
+    for (let f = 0.9; f <= 1.6; f += 0.002) {
+      const m = p.map((_, k) => roundPay(min + base * f * dist(k) ** e));
+      const r = p.reduce((s, pk, k) => s + pk * m[k], 0);
+      if (!mult || Math.abs(r - 0.98) < Math.abs(rtp - 0.98)) { mult = m; rtp = r; }
+    }
+    return { p, mult, rtp, dist };
+  }
+
+  const css = getComputedStyle(document.documentElement);
+  const tok = name => css.getPropertyValue(name).trim();
+  const hexRgb = h => [1, 3, 5].map(i => parseInt(h.slice(i, i + 2), 16));
+  const RAMP = [hexRgb(tok('--teal')), hexRgb(tok('--gold')), hexRgb(tok('--rose'))];
+  function heat(d) {
+    const t = Math.min(1, Math.max(0, d)) * 2, i = t >= 1 ? 1 : 0, f = t - i;
+    const a = RAMP[i], b = RAMP[i + 1];
+    return `rgb(${a.map((v, j) => Math.round(v + (b[j] - v) * f)).join(',')})`;
+  }
+
+  let table = buildTable(state.rows, state.risk);
+  let counts = new Array(state.rows + 1).fill(0);
+  const binColor = k => heat(table.dist(k));
+
+  /* ---------- DOM ---------- */
+  const el = {
+    balance: $('balance'), bet: $('bet'), rows: $('rows'), rowsOut: $('rowsOut'), drop: $('drop'), auto: $('auto'),
+    msg: $('msg'), rtp: $('rtp'), bins: $('bins'), hist: $('hist'), odds: $('odds'), recent: $('recent'),
+    sound: $('sound'), canvas: $('canvas'), riskField: $('riskField'), rowsField: $('rowsField')
+  };
+  const ctx = el.canvas.getContext('2d');
+  const ODDS_HINT = 'Point at a slot to see what it pays and how often a ball lands there.';
+
+  function describe(k) {
+    const p = table.p[k], m = table.mult[k];
+    const pct = p * 100;
+    const pctText = pct >= 1 ? pct.toFixed(1) : pct >= 0.01 ? pct.toFixed(2) : pct.toFixed(4);
+    const bet = currentBet();
+    el.odds.innerHTML = `Pays <b>${multText(m)}×</b>. A ball lands here about <b>1 in ${Math.round(1 / p).toLocaleString('en-US')}</b> drops (${pctText}%). A ${money(bet)} bet returns <b>${money(round2(bet * m))}</b>.`;
+  }
+
+  function buildBoard() {
+    table = buildTable(state.rows, state.risk);
+    el.bins.style.setProperty('--n', state.rows);
+    el.hist.style.setProperty('--n', state.rows);
+    el.bins.textContent = '';
+    el.hist.textContent = '';
+    for (let k = 0; k <= state.rows; k++) {
+      const b = document.createElement('button');
+      b.type = 'button';
+      b.className = 'bin';
+      b.style.setProperty('--c', binColor(k));
+      b.textContent = multText(table.mult[k]);
+      b.setAttribute('aria-label', `Slot paying ${multText(table.mult[k])} times the bet`);
+      b.addEventListener('pointerenter', () => describe(k));
+      b.addEventListener('focus', () => describe(k));
+      b.addEventListener('click', () => describe(k));
+      el.bins.append(b);
+      const col = document.createElement('div');
+      col.className = 'col';
+      col.style.setProperty('--c', binColor(k));
+      col.append(document.createElement('i'), document.createElement('b'));
+      el.hist.append(col);
+    }
+    el.rtp.textContent = (table.rtp * 100).toFixed(1) + '%';
+    el.odds.textContent = ODDS_HINT;
+    renderHist();
+    draw();
+  }
+  el.bins.addEventListener('pointerleave', () => { el.odds.textContent = ODDS_HINT; });
+
+  function renderHist() {
+    const total = counts.reduce((a, b) => a + b, 0);
+    const pMax = Math.max(...table.p);
+    const top = Math.max(pMax, total ? Math.max(...counts) / total : 0);
+    [...el.hist.children].forEach((col, k) => {
+      col.firstChild.style.height = (table.p[k] / top * 100).toFixed(2) + '%';
+      col.lastChild.style.height = (total ? counts[k] / total / top * 100 : 0).toFixed(2) + '%';
+    });
+  }
+
+  function renderWallet(flash) {
+    el.balance.textContent = money(state.balance);
+    if (flash) { el.balance.classList.remove('up'); void el.balance.offsetWidth; el.balance.classList.add('up'); }
+  }
+  function renderStats() {
+    $('sDrops').textContent = session.drops.toLocaleString('en-US');
+    $('sWagered').textContent = money(session.wagered);
+    const net = round2(session.returned - session.wagered);
+    const netEl = $('sNet');
+    netEl.textContent = (net > 0 ? '+' : '') + money(net);
+    netEl.className = net > 0 ? 'pos' : net < 0 ? 'neg' : '';
+    $('sBest').textContent = session.best ? multText(session.best) + '×' : 'none yet';
+  }
+  function addRecent(mult, color, delta) {
+    const empty = el.recent.querySelector('.empty');
+    if (empty) empty.remove();
+    const li = document.createElement('li');
+    const a = document.createElement('span'), b = document.createElement('span');
+    a.style.setProperty('--c', color);
+    a.textContent = multText(mult) + '×';
+    b.textContent = (delta > 0 ? '+' : '') + money(delta);
+    b.className = delta > 0 ? 'pos' : delta < 0 ? 'neg' : '';
+    li.append(a, b);
+    el.recent.prepend(li);
+    while (el.recent.children.length > 12) el.recent.lastChild.remove();
+  }
+
+  /* ---------- sound ---------- */
+  let ac = null;
+  function tone(freq, dur, vol, type, delay) {
+    if (!state.sound) return;
+    try {
+      ac = ac || new (window.AudioContext || window.webkitAudioContext)();
+      if (ac.state === 'suspended') ac.resume();
+      const t = ac.currentTime + (delay || 0), o = ac.createOscillator(), g = ac.createGain();
+      o.type = type || 'sine';
+      o.frequency.value = freq;
+      g.gain.setValueAtTime(vol, t);
+      g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+      o.connect(g).connect(ac.destination);
+      o.start(t);
+      o.stop(t + dur + 0.02);
+    } catch (e) {}
+  }
+  function landSound(mult) {
+    if (mult < 1) return tone(170, 0.12, 0.05, 'sine');
+    const base = 520 * Math.min(2.2, 1 + Math.log2(mult) / 5);
+    tone(base, 0.16, 0.06, 'triangle');
+    tone(base * 1.5, 0.22, 0.05, 'triangle', 0.07);
+    if (mult >= 5) tone(base * 2, 0.35, 0.05, 'triangle', 0.15);
+  }
+
+  /* ---------- board geometry and drawing ---------- */
+  let W = 0, H = 0, geo = null;
+  function measure() {
+    const r = el.canvas.getBoundingClientRect();
+    const dpr = Math.min(window.devicePixelRatio || 1, 2.5);
+    W = r.width; H = r.height;
+    el.canvas.width = Math.max(1, Math.round(W * dpr));
+    el.canvas.height = Math.max(1, Math.round(H * dpr));
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    draw();
+  }
+  function geometry(n) {
+    const s = W / (n + 2);
+    const yTop = Math.max(s * 0.9, 26), yBot = H - s * 0.55;
+    const rowH = (yBot - yTop) / (n - 1);
+    return { n, s, yTop, rowH, cx: W / 2, pr: Math.min(5.5, Math.max(2.2, s * 0.09)), br: Math.min(s * 0.2, rowH * 0.22) };
+  }
+  const pegX = (g, i, j) => g.cx + (j - (i + 2) / 2) * g.s;
+  const pegY = (g, i) => g.yTop + i * g.rowH;
+
+  const balls = [];
+  const hits = new Map();
+  let running = false;
+  const COL = { peg: tok('--peg'), gold: tok('--gold'), goldDeep: tok('--gold-deep') };
+
+  function ballPos(ball, g, t) {
+    let seg = 0;
+    while (seg < ball.ends.length - 1 && t >= ball.ends[seg]) seg++;
+    const t0 = seg ? ball.ends[seg - 1] : 0;
+    const u = Math.min(1, Math.max(0, (t - t0) / (ball.ends[seg] - t0)));
+    const rest = i => ({ x: pegX(g, i, ball.rights[i] + 1) + ball.jit[i] * g.s, y: pegY(g, i) - (g.pr + g.br) });
+    if (seg === 0) {
+      const to = rest(0);
+      return { x: to.x, y: -g.br + (to.y + g.br) * u * u, seg };
+    }
+    const from = rest(seg - 1);
+    const to = seg < g.n ? rest(seg) : { x: g.cx + (ball.bin - g.n / 2) * g.s, y: H + g.br * 2 };
+    const bounce = g.rowH * 0.42, dy = to.y - from.y;
+    return { x: from.x + (to.x - from.x) * u, y: from.y - bounce * u + (dy + bounce) * u * u, seg };
+  }
+
+  function draw(now) {
+    if (!W) return;
+    now = now || performance.now();
+    const g = geo = geometry(state.rows);
+    ctx.clearRect(0, 0, W, H);
+    for (let i = 0; i < g.n; i++) {
+      const y = pegY(g, i);
+      for (let j = 0; j < i + 3; j++) {
+        const x = pegX(g, i, j);
+        const hitAt = hits.get(i * 100 + j);
+        const glow = hitAt ? Math.max(0, 1 - (now - hitAt) / 380) : 0;
+        if (hitAt && !glow) hits.delete(i * 100 + j);
+        if (glow) {
+          ctx.beginPath();
+          ctx.arc(x, y, g.pr + 2 + (1 - glow) * g.pr * 2.4, 0, 6.2832);
+          ctx.fillStyle = `rgba(255, 200, 87, ${0.35 * glow})`;
+          ctx.fill();
+        }
+        ctx.beginPath();
+        ctx.arc(x, y, g.pr, 0, 6.2832);
+        ctx.fillStyle = glow > 0.3 ? COL.gold : COL.peg;
+        ctx.fill();
+        ctx.beginPath();
+        ctx.arc(x - g.pr * 0.3, y - g.pr * 0.35, g.pr * 0.35, 0, 6.2832);
+        ctx.fillStyle = 'rgba(255, 255, 255, 0.75)';
+        ctx.fill();
+      }
+    }
+    for (const ball of balls) {
+      const t = now - ball.t0;
+      for (let k = 5; k >= 1; k--) {
+        if (t - k * 13 < 0) continue;
+        const q = ballPos(ball, g, t - k * 13);
+        ctx.beginPath();
+        ctx.arc(q.x, q.y, g.br * (1 - k * 0.09), 0, 6.2832);
+        ctx.fillStyle = `rgba(255, 200, 87, ${0.11 * (1 - k / 6)})`;
+        ctx.fill();
+      }
+      const p = ballPos(ball, g, t);
+      const grad = ctx.createRadialGradient(p.x - g.br * 0.35, p.y - g.br * 0.4, g.br * 0.1, p.x, p.y, g.br);
+      grad.addColorStop(0, '#fff6d8');
+      grad.addColorStop(0.5, COL.gold);
+      grad.addColorStop(1, COL.goldDeep);
+      ctx.shadowColor = 'rgba(255, 200, 87, 0.6)';
+      ctx.shadowBlur = g.br * 1.4;
+      ctx.beginPath();
+      ctx.arc(p.x, p.y, g.br, 0, 6.2832);
+      ctx.fillStyle = grad;
+      ctx.fill();
+      ctx.shadowBlur = 0;
+    }
+  }
+
+  function frame(now) {
+    for (let b = balls.length - 1; b >= 0; b--) {
+      const ball = balls[b], t = now - ball.t0;
+      let seg = 0;
+      while (seg < ball.ends.length && t >= ball.ends[seg]) seg++;
+      while (ball.seg < Math.min(seg, ball.n)) {
+        const i = ball.seg++;
+        hits.set(i * 100 + ball.rights[i] + 1, now);
+        tone(880 + i * 38 + Math.random() * 60, 0.05, 0.022, 'triangle');
+      }
+      if (seg >= ball.ends.length) { balls.splice(b, 1); land(ball); }
+    }
+    draw(now);
+    if (balls.length || hits.size) requestAnimationFrame(frame);
+    else running = false;
+  }
+  function kick() { if (!running) { running = true; requestAnimationFrame(frame); } }
+
+  /* ---------- play ---------- */
+  function currentBet() {
+    const v = parseFloat(el.bet.value);
+    return Number.isFinite(v) && v > 0 ? round2(v) : 0;
+  }
+  function setBet(v) {
+    v = Math.max(1, round2(v));
+    state.bet = v;
+    el.bet.value = Number.isInteger(v) ? v : v.toFixed(2);
+    save();
+  }
+  function say(text) { el.msg.textContent = text || ''; }
+  function lock() {
+    const busy = balls.length > 0;
+    el.riskField.disabled = busy;
+    el.rowsField.disabled = busy;
+  }
+
+  function drop() {
+    const bet = currentBet();
+    if (bet < 1) { say('Enter a bet of at least 1 credit.'); return false; }
+    if (bet > state.balance) {
+      say(state.balance < 1 ? 'You are out of credits. Press Start over for a fresh 1,000.' : 'That bet is more than your credits. Lower it and drop again.');
+      return false;
+    }
+    if (balls.length >= MAX_BALLS) return true;
+    say('');
+    state.bet = bet;
+    state.balance = round2(state.balance - bet);
+    const n = state.rows, rights = [], jit = [], ends = [];
+    let r = 0, t = 400;
+    const hop = 330 - n * 8;
+    for (let i = 0; i < n; i++) {
+      rights.push(r);
+      jit.push((Math.random() - 0.5) * 0.1);
+      ends.push(t);
+      t += hop * (0.93 + Math.random() * 0.14);
+      if (Math.random() < 0.5) r++;
+    }
+    ends.push(t + hop * 0.15);
+    balls.push({ n, rights, jit, ends, bin: r, bet, mult: table.mult[r], color: binColor(r), t0: performance.now(), seg: 0 });
+    session.drops++;
+    session.wagered = round2(session.wagered + bet);
+    renderWallet();
+    renderStats();
+    lock();
+    save();
+    kick();
+    return true;
+  }
+
+  function land(ball) {
+    const win = round2(ball.bet * ball.mult);
+    state.balance = round2(state.balance + win);
+    session.returned = round2(session.returned + win);
+    session.best = Math.max(session.best, ball.mult);
+    if (ball.n === state.rows) {
+      counts[ball.bin]++;
+      const bin = el.bins.children[ball.bin];
+      if (bin) { bin.classList.remove('hit'); void bin.offsetWidth; bin.classList.add('hit'); }
+      renderHist();
+    }
+    landSound(ball.mult);
+    addRecent(ball.mult, ball.color, round2(win - ball.bet));
+    renderWallet(win > ball.bet);
+    renderStats();
+    lock();
+    save();
+  }
+
+  let autoTimer = null;
+  function setAuto(on) {
+    clearInterval(autoTimer);
+    autoTimer = null;
+    if (on) {
+      if (!drop()) on = false;
+      else autoTimer = setInterval(() => { if (!drop()) setAuto(false); }, 320);
+    }
+    el.auto.setAttribute('aria-pressed', String(on));
+    el.auto.textContent = on ? 'Stop auto drop' : 'Auto drop';
+  }
+
+  /* ---------- wiring ---------- */
+  el.drop.addEventListener('click', drop);
+  el.auto.addEventListener('click', () => setAuto(!autoTimer));
+  document.addEventListener('keydown', e => {
+    if (e.code !== 'Space' || e.repeat) return;
+    const tag = e.target.tagName;
+    if (tag === 'BUTTON' || tag === 'INPUT' || tag === 'A') return;
+    e.preventDefault();
+    drop();
+  });
+  el.bet.addEventListener('change', () => setBet(currentBet() || 1));
+  $('half').addEventListener('click', () => setBet(currentBet() / 2));
+  $('double').addEventListener('click', () => setBet(Math.min(currentBet() * 2, Math.max(1, state.balance))));
+  $('max').addEventListener('click', () => setBet(Math.floor(state.balance)));
+  document.querySelectorAll('input[name="risk"]').forEach(r => r.addEventListener('change', () => {
+    state.risk = r.value;
+    save();
+    buildBoard();
+  }));
+  el.rows.addEventListener('input', () => {
+    state.rows = +el.rows.value;
+    el.rowsOut.textContent = state.rows;
+    counts = new Array(state.rows + 1).fill(0);
+    save();
+    buildBoard();
+  });
+  el.sound.addEventListener('click', () => {
+    state.sound = !state.sound;
+    el.sound.setAttribute('aria-pressed', String(state.sound));
+    el.sound.textContent = state.sound ? 'Sound on' : 'Sound off';
+    save();
+  });
+  $('reset').addEventListener('click', () => {
+    setAuto(false);
+    balls.length = 0;
+    state.balance = START;
+    Object.assign(session, { drops: 0, wagered: 0, returned: 0, best: 0 });
+    counts.fill(0);
+    el.recent.innerHTML = '<li class="empty">Your results show up here.</li>';
+    say('');
+    renderWallet();
+    renderStats();
+    renderHist();
+    lock();
+    save();
+    draw();
+  });
+
+  el.bet.value = Number.isInteger(state.bet) ? state.bet : state.bet.toFixed(2);
+  el.rows.value = state.rows;
+  el.rowsOut.textContent = state.rows;
+  document.querySelector(`input[name="risk"][value="${state.risk}"]`).checked = true;
+  el.sound.setAttribute('aria-pressed', String(state.sound));
+  el.sound.textContent = state.sound ? 'Sound on' : 'Sound off';
+  renderWallet();
+  renderStats();
+  buildBoard();
+  new ResizeObserver(measure).observe(el.canvas);
+  measure();
+})();
+</script>
+</body>
+</html>
